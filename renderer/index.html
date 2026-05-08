@@ -34,8 +34,8 @@
       <div class="panel panel-compact">
         <div class="connect-row">
           <input id="embedBigoId" placeholder="BIGO ID (vd: 1066691535)" class="connect-input" />
-          <button id="btnConnect" class="primary">🔌 Kết nối</button>
-          <button id="btnEmbedShow" disabled>👁 Cửa sổ Bigo</button>
+          <button id="btnConnect" class="primary">KẾT NỐI</button>
+          <button id="btnEmbedShow" disabled>VIEW</button>
           <span id="liveInfo" class="live-info-inline">Nhập ID rồi bấm Kết nối</span>
           <div class="connect-stats">
             <span title="Số lần đã phát hiệu ứng (kể cả phát thử)">🎵 <b id="csEffects">0</b></span>
@@ -362,8 +362,8 @@
         <label class="checkbox-row" title="Khi BẬT: nhạc nền tự dừng trong lúc phát hiệu ứng. Khi TẮT: nhạc nền chạy chung với hiệu ứng.">
           <input type="checkbox" id="dlgPauseBgm" /> 🔇 Tạm dừng nhạc nền khi phát
         </label>
-        <label class="checkbox-row" title="Khi BẬT: app phát file âm thanh đã chọn ở Cài đặt chung TRƯỚC khi phát hiệu ứng quà này.">
-          <input type="checkbox" id="dlgPreFx" /> 🔔 Phát âm thanh trước hiệu ứng (theo Cài đặt chung)
+        <label class="checkbox-row" title="Mặc định BẬT cho mọi quà khi Cài đặt chung bật pre-effect. UNCHECK nếu muốn TẮT riêng quà này.">
+          <input type="checkbox" id="dlgPreFx" checked /> 🔔 Phát âm thanh trước (mặc định bật — uncheck để tắt riêng quà này)
         </label>
       </div>
       <div class="modal-actions">

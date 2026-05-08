@@ -17,6 +17,10 @@ const seenGifts = new Map();
 const CHAT_PATTERNS = [
   /^\s*Lv\.?\s*(\d+)\s+([^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
   /^\s*\[Lv\.?(\d+)\]\s*([^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
+  // Bigo.tv UI mới: level hiện dạng badge tròn "36", text content khong co "Lv." prefix.
+  // Format: "<level> <username>: content" — username co the la "ID:394471037" voi colon.
+  // Alternation (?:ID:\d+|[^:：\n]{1,80}?) cho phep username chua "ID:xxx".
+  /^\s*(\d{1,3})\s+(ID:\d+|[^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
 ];
 
 function tryMatchChat(text) {
@@ -134,9 +138,10 @@ function scanChatsAndGifts() {
         gift_icon_url: giftIconUrl, user_avatar_url: avatarUrl, raw: text,
       });
     } else if (/^sent\s+/i.test(m.content)) {
+      // Strip "sent " AND optional "a "/"an " article (e.g. "sent a Enigma Crate" → "Enigma Crate")
       gifts.push({
         type: 'gift', level: m.level, user: m.user,
-        gift_name: m.content.replace(/^sent\s+/i, '').trim(), gift_count: 1,
+        gift_name: m.content.replace(/^sent\s+(?:an?\s+)?/i, '').trim(), gift_count: 1,
         gift_icon_url: giftIconUrl, user_avatar_url: avatarUrl, raw: text,
       });
     } else {

@@ -158,8 +158,12 @@ function pushPlayBatch(item, ev, playTimes) {
   if (priority > 0 && queueItems.length > 0) {
     const insertIdx = Math.min(priority, queueItems.length);
     queueItems.splice(insertIdx, 0, ...batch);
+    appendLog(`[queue] ${baseName}: priority=${priority} → chèn tại index ${insertIdx}/${queueItems.length} (${batch.length} hàng)`);
   } else {
     queueItems.push(...batch); // FIFO append cuối
+    if (priority > 0) {
+      appendLog(`[queue] ${baseName}: priority=${priority} nhưng queue rỗng → append cuối`);
+    }
   }
   while (queueItems.length > QUEUE_MAX) queueItems.shift();
 
@@ -765,14 +769,20 @@ function renderGroupCard(grp, overlayMap) {
       ? `<img src="${escapeHtml(iconUrl)}" class="grow-icon" loading="lazy" />`
       : '<div class="grow-icon-empty"></div>';
     const displayName = item.alias || (item.matchKeys || [])[0] || '?';
-    const priorityBadge = item.priority > 0 ? `<span class="prio-badge" title="Ưu tiên hàng ${item.priority}">⚡${item.priority}</span>` : '';
+    const priorityBadge = item.priority > 0 ? `<span class="prio-badge" title="Ưu tiên: chèn vào hàng ${item.priority} trong queue">⚡ Ưu tiên #${item.priority}</span>` : '';
+    // Hiển thị tên file rút gọn (basename) nếu là full path/URL
+    const fileDisplay = item.mediaFile
+      ? (item.mediaFile.includes('/') || item.mediaFile.includes('\\')
+        ? (() => { try { return decodeURIComponent(item.mediaFile.split(/[\\\/]/).pop() || item.mediaFile); } catch { return item.mediaFile.split(/[\\\/]/).pop() || item.mediaFile; } })()
+        : item.mediaFile)
+      : '';
     const fileLine = item.mediaFile
-      ? `<div class="grow-sub"><code>${escapeHtml(item.mediaFile)}</code></div>`
+      ? `<div class="grow-sub"><code>${escapeHtml(fileDisplay)}</code>${priorityBadge}</div>`
       : '<div class="grow-sub" style="color:#ff6b6b">— chưa có file hiệu ứng —</div>';
     return `<div class="group-item" data-iid="${item.id}" data-gid="${grp.id}">
       ${iconCell}
       <div class="grow-meta">
-        <div class="grow-name"><b>${escapeHtml(displayName)}</b>${priorityBadge}</div>
+        <div class="grow-name"><b>${escapeHtml(displayName)}</b></div>
         ${fileLine}
       </div>
       <div class="grow-actions">
@@ -1061,7 +1071,8 @@ async function openGiftDialog(gift = null, groupId = null) {
   }
   els.dlgFile.value = mf;
   if (els.dlgPauseBgm) els.dlgPauseBgm.checked = !!gift?.pauseBgm;
-  if (els.dlgPreFx) els.dlgPreFx.checked = !!gift?.preEffect;
+  // preEffect opt-out: undefined / true → checked (default ON), chỉ false → unchecked.
+  if (els.dlgPreFx) els.dlgPreFx.checked = gift ? gift.preEffect !== false : true;
   els.giftDialog.dataset.editingId = gift?.id || '';
   els.giftDialog.showModal();
   await ensureMasterLoaded();
@@ -1287,12 +1298,12 @@ let isConnected = false;
 function setConnectedUi(yes) {
   isConnected = yes;
   if (yes) {
-    els.btnConnect.textContent = '⏹ Hủy kết nối';
+    els.btnConnect.textContent = 'HỦY KẾT NỐI';
     els.btnConnect.classList.remove('primary');
     els.btnConnect.classList.add('danger');
     els.btnEmbedShow.disabled = false;
   } else {
-    els.btnConnect.textContent = '🔌 Kết nối phòng';
+    els.btnConnect.textContent = 'KẾT NỐI';
     els.btnConnect.classList.add('primary');
     els.btnConnect.classList.remove('danger');
     els.btnEmbedShow.disabled = true;
@@ -1304,7 +1315,7 @@ async function disconnect() {
   els.status.textContent = 'disconnected';
   els.status.classList.remove('on');
   setConnectedUi(false);
-  setLiveInfo('Đã hủy kết nối. Nhập BIGO ID khác và bấm Kết nối phòng.', '');
+  setLiveInfo('Đã hủy kết nối. Nhập BIGO ID khác và bấm KẾT NỐI.', '');
   resetEmbedUi();
 }
 
@@ -1684,8 +1695,13 @@ function resolveMediaPayload(mediaFile) {
 // Phát file pre-effect (mp3/mp4/wav/webm) qua overlay.
 // Gọi 1 LẦN trước khi dispatch effect chính (không lặp theo combo).
 // Pre-effect file được user pick từ ổ đĩa → dùng raw fileUrl IPC variant.
+//
+// MODEL OPT-OUT: khi setting bật + có file → MẶC ĐỊNH mọi quà đều phát pre-effect.
+// User chỉ uncheck riêng quà nào không muốn → giftItem.preEffect === false → SKIP.
+// undefined / true → vẫn phát.
 function maybeDispatchPreEffect(giftItem) {
-  if (!giftItem || !giftItem.preEffect) return;  // gift không bật
+  if (!giftItem) return;
+  if (giftItem.preEffect === false) return;  // explicit opt-out trên quà này
   const cfg = appSettings.preFx;
   if (!cfg || !cfg.enabled || !cfg.file) return;  // settings chưa bật hoặc chưa có file
   if (!giftItem.overlayId) return;

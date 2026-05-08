@@ -380,7 +380,18 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .group-item .grow-sub { color: #8a8f9a; font-size: 11px; margin-top: 2px; word-break: break-all; }
 .group-item .grow-sub code { background: #0f1117; padding: 1px 6px; border-radius: 4px; color: #ffd166; }
 .group-item .grow-actions { display: flex; gap: 4px; align-items: center; }
-.prio-badge { background: linear-gradient(135deg, #fe2c55, #ff8a3d); color: #fff; padding: 1px 7px; border-radius: 8px; font-size: 10px; font-weight: 700; }
+.prio-badge {
+  background: linear-gradient(135deg, #fe2c55, #ff8a3d);
+  color: #fff;
+  padding: 2px 9px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 8px;
+  display: inline-block;
+  box-shadow: 0 2px 6px rgba(254, 44, 85, 0.4);
+  letter-spacing: 0.3px;
+}
 
 /* Switch toggle */
 .switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
