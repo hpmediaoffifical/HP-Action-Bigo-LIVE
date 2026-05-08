@@ -220,9 +220,14 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   animation-play-state: paused;
 }
 
-.connect-stats { display: flex; gap: 14px; padding: 4px 12px; background: #0f1117; border-radius: 6px; font-size: 13px; color: #8a8f9a; }
-.connect-stats span { white-space: nowrap; }
-.connect-stats b { color: #ffd166; font-weight: 700; }
+.connect-stats { display: flex; gap: 18px; padding: 6px 14px; background: #0f1117; border-radius: 6px; font-size: 13px; color: #8a8f9a; align-items: center; flex-wrap: wrap; }
+.connect-stats span { white-space: nowrap; min-width: 56px; display: inline-flex; align-items: center; gap: 4px; }
+.connect-stats b { color: #ffd166; font-weight: 700; min-width: 18px; text-align: right; display: inline-block; }
+.connect-stats button.tiny.cs-reset {
+  margin-left: 4px; padding: 2px 8px; font-size: 11px;
+  background: transparent; border: 1px solid #3a3f4b; color: #8a8f9a; border-radius: 4px; cursor: pointer;
+}
+.connect-stats button.tiny.cs-reset:hover { background: #1c1f28; color: #ffd166; border-color: #ffd166; }
 
 .events { max-height: 280px; overflow-y: auto; background: #0f1117; border-radius: 6px; padding: 8px; font-family: 'Consolas', monospace; font-size: 11px; }
 .event { padding: 4px 6px; border-bottom: 1px solid #1c1f28; word-break: break-all; }

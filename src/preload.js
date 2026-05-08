@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('bigo', {
   effectsPickFiles: () => ipcRenderer.invoke('effects:pick-files'),
   effectsOpenFolder: () => ipcRenderer.invoke('effects:open-folder'),
   pickBgmFile: () => ipcRenderer.invoke('bgm:pick-file'),
+  pickPreFxFile: () => ipcRenderer.invoke('preFx:pick-file'),
 
   // Gift master catalog
   giftsMasterList: () => ipcRenderer.invoke('gifts:master-list'),

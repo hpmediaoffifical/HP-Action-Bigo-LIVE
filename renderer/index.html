@@ -38,10 +38,11 @@
           <button id="btnEmbedShow" disabled>👁 Cửa sổ Bigo</button>
           <span id="liveInfo" class="live-info-inline">Nhập ID rồi bấm Kết nối</span>
           <div class="connect-stats">
-            <span title="Số hiệu ứng đã phát">🎵 <b id="csEffects">0</b></span>
-            <span title="Tổng đậu (KC) đã nhận">💎 <b id="csDiamond">0</b></span>
-            <span title="Số user tặng quà">👤 <b id="csUsers">0</b></span>
-            <span title="Tổng quà đã nhận">🎁 <b id="csGifts">0</b></span>
+            <span title="Số lần đã phát hiệu ứng (kể cả phát thử)">🎵 <b id="csEffects">0</b></span>
+            <span title="Tổng đậu (KC) đã nhận từ live">💎 <b id="csDiamond">0</b></span>
+            <span title="Số user khác nhau đã tặng quà">👤 <b id="csUsers">0</b></span>
+            <span title="Tổng số quà đã nhận từ live">🎁 <b id="csGifts">0</b></span>
+            <button id="btnResetStats" class="tiny cs-reset" title="Reset bộ đếm về 0">↺ Reset</button>
           </div>
         </div>
       </div>
@@ -212,6 +213,22 @@
           </label>
         </div>
         <div class="row">
+          <label style="flex:2">🔔 Âm thanh trước hiệu ứng (mp3/mp4/wav/webm)
+            <div style="display:flex; gap:6px">
+              <input id="preFxFileLabel" placeholder="Chưa chọn — chọn file phát trước mỗi hiệu ứng" readonly style="flex:1" />
+              <button type="button" id="btnPickPreFx" class="tiny" title="Chọn file phát trước hiệu ứng">📁 Chọn</button>
+              <button type="button" id="btnTestPreFx" class="tiny" title="Phát thử">▶</button>
+              <button type="button" id="btnClearPreFx" class="tiny danger" title="Xoá">🗑</button>
+            </div>
+          </label>
+          <label class="checkbox-row" style="flex:0 0 auto; align-self:flex-end; padding-bottom:8px">
+            <input type="checkbox" id="preFxEnabled" /> Bật
+          </label>
+        </div>
+        <div class="hint small" style="margin-top:-6px; margin-bottom:6px">
+          Khi bật + quà có "Phát âm thanh trước" được tick → app sẽ phát file này TRƯỚC hiệu ứng quà rồi mới phát hiệu ứng.
+        </div>
+        <div class="row">
           <label style="flex:2">🔊 Thiết bị phát (output)
             <select id="audioDevice"></select>
           </label>
@@ -332,6 +349,9 @@
       <div class="form-row">
         <label class="checkbox-row" title="Khi BẬT: nhạc nền tự dừng trong lúc phát hiệu ứng. Khi TẮT: nhạc nền chạy chung với hiệu ứng.">
           <input type="checkbox" id="dlgPauseBgm" /> 🔇 Tạm dừng nhạc nền khi phát
+        </label>
+        <label class="checkbox-row" title="Khi BẬT: app phát file âm thanh đã chọn ở Cài đặt chung TRƯỚC khi phát hiệu ứng quà này.">
+          <input type="checkbox" id="dlgPreFx" /> 🔔 Phát âm thanh trước hiệu ứng (theo Cài đặt chung)
         </label>
       </div>
       <div class="modal-actions">

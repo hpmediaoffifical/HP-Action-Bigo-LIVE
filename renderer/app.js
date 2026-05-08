@@ -78,12 +78,19 @@ function resetSessionStats() {
   sessionStats.users.clear();
   updateConnectStats();
 }
+function fmtStat(n) {
+  // Format số lớn cho gọn: 1234 → 1,234; 12345 → 12.3K; 1234567 → 1.23M
+  if (n == null) return '0';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2).replace(/\.?0+$/, '') + 'M';
+  if (n >= 10_000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return n.toLocaleString('en-US');
+}
 function updateConnectStats() {
   if (!els.csEffects) return;
-  els.csEffects.textContent = sessionStats.effects;
-  els.csDiamond.textContent = sessionStats.diamond;
-  els.csUsers.textContent = sessionStats.users.size;
-  els.csGifts.textContent = sessionStats.giftCount;
+  els.csEffects.textContent = fmtStat(sessionStats.effects);
+  els.csDiamond.textContent = fmtStat(sessionStats.diamond);
+  els.csUsers.textContent = fmtStat(sessionStats.users.size);
+  els.csGifts.textContent = fmtStat(sessionStats.giftCount);
 }
 
 // =================== Effect Queue State ===================
@@ -278,16 +285,20 @@ const els = {
   metaPanel: $('metaPanel'), metaInfo: $('metaInfo'),
   liveChats: $('liveChats'), liveGifts: $('liveGifts'),
   csEffects: $('csEffects'), csDiamond: $('csDiamond'), csUsers: $('csUsers'), csGifts: $('csGifts'),
+  btnResetStats: $('btnResetStats'),
   btnPopupGifts: $('btnPopupGifts'),
   // Settings tab
   bgmAudio: $('bgmAudio'), bgmFileLabel: $('bgmFileLabel'),
   btnPickBgm: $('btnPickBgm'), btnPlayBgm: $('btnPlayBgm'), btnStopBgm: $('btnStopBgm'), btnClearBgm: $('btnClearBgm'),
+  // Pre-effect sound (Cài đặt chung)
+  preFxFileLabel: $('preFxFileLabel'), preFxEnabled: $('preFxEnabled'),
+  btnPickPreFx: $('btnPickPreFx'), btnTestPreFx: $('btnTestPreFx'), btnClearPreFx: $('btnClearPreFx'),
   audioDevice: $('audioDevice'), btnRefreshDevices: $('btnRefreshDevices'),
   bgmVol: $('bgmVol'), bgmVolVal: $('bgmVolVal'),
   fxVol: $('fxVol'), fxVolVal: $('fxVolVal'),
   maxListItems: $('maxListItems'),
   // Gift dialog extras
-  dlgPauseBgm: $('dlgPauseBgm'),
+  dlgPauseBgm: $('dlgPauseBgm'), dlgPreFx: $('dlgPreFx'),
   effectQueue: $('effectQueue'), btnClearQueue: $('btnClearQueue'),
   btnPopupQueue: $('btnPopupQueue'),
   qStatGifts: $('qStatGifts'), qStatDiamond: $('qStatDiamond'), qStatUsers: $('qStatUsers'),
@@ -360,6 +371,14 @@ document.querySelectorAll('.tab').forEach(t => {
     }
   };
 });
+
+// Reset stats button → bộ đếm về 0 (giữ session vẫn chạy)
+if (els.btnResetStats) {
+  els.btnResetStats.addEventListener('click', () => {
+    if (!confirm('Reset bộ đếm 🎵 💎 👤 🎁 về 0?')) return;
+    resetSessionStats();
+  });
+}
 
 // Sidebar lock settings button — toggle chế độ Khoá cài đặt (chống chỉnh nhầm khi stream)
 (function wireLockSettings() {
@@ -789,9 +808,14 @@ async function groupAction(act, gid, value, itemId) {
       const countInput = document.querySelector(`.play-count[data-iid="${itemId}"]`);
       const playTimes = Math.max(1, Math.min(50, parseInt(countInput?.value || '1', 10) || 1));
       if (found.item.pauseBgm) pauseBgmForEffect();
+      // Pre-effect: phát ÂM THANH/VIDEO trước (1 lần) nếu cả gift + setting cùng bật
+      maybeDispatchPreEffect(found.item);
       for (let i = 0; i < playTimes; i++) {
         await window.bigo.overlayPlay({ overlayId: found.item.overlayId, file: found.item.mediaFile });
       }
+      // Manual play cũng counter 🎵 effects để user thấy stats hoạt động khi test
+      sessionStats.effects += playTimes;
+      updateConnectStats();
       // Chia tách thành playTimes entries (đếm lùi giảm dần)
       pushPlayBatch(found.item, null, playTimes);
     } else if (act === 'edit-item') {
@@ -965,6 +989,7 @@ async function openGiftDialog(gift = null, groupId = null) {
   els.dlgOverlay.value = gift?.overlayId || mapping.overlays[0]?.id || '';
   els.dlgFile.value = gift?.mediaFile || '';
   if (els.dlgPauseBgm) els.dlgPauseBgm.checked = !!gift?.pauseBgm;
+  if (els.dlgPreFx) els.dlgPreFx.checked = !!gift?.preEffect;
   els.giftDialog.dataset.editingId = gift?.id || '';
   els.giftDialog.showModal();
   await ensureMasterLoaded();
@@ -983,6 +1008,7 @@ els.dlgGiftSave.onclick = async (e) => {
     mediaFile: els.dlgFile.value,
     overlayId: els.dlgOverlay.value,
     pauseBgm: els.dlgPauseBgm ? els.dlgPauseBgm.checked : false,
+    preEffect: els.dlgPreFx ? els.dlgPreFx.checked : false,
     priority: els.dlgPriority ? Math.max(0, Math.min(100, parseInt(els.dlgPriority.value, 10) || 0)) : 0,
   };
   // Tìm/tạo group case-insensitive (NPC = npc = Npc)
@@ -1498,11 +1524,13 @@ function renderParsed(ev) {
     if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
       // Combo: tặng N lần thì phát N lần. total_count = gift_count × combo.
       const playTimes = Math.max(1, Math.min(50, ev.total_count || ev.gift_count || 1));
+      // Tạm dừng nhạc nền nếu gift cấu hình "không chạy chung"
+      if (matched.pauseBgm) pauseBgmForEffect();
+      // Pre-effect: phát ÂM THANH/VIDEO trước MỘT LẦN (không lặp theo combo)
+      maybeDispatchPreEffect(matched);
       for (let i = 0; i < playTimes; i++) {
         window.bigo.overlayPlay({ overlayId: matched.overlayId, file: matched.mediaFile });
       }
-      // Tạm dừng nhạc nền nếu gift cấu hình "không chạy chung"
-      if (matched.pauseBgm) pauseBgmForEffect();
       pushQueue(ev, matched, playTimes);
     }
   }
@@ -1550,6 +1578,7 @@ function renderEmbedEvent(ev) {
 // =================== Cài đặt chung (BGM, audio device, volume) ===================
 let appSettings = {
   bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
+  preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
   fxVolume: 100,
   maxListItems: 200,
 };
@@ -1558,10 +1587,24 @@ async function saveAppSettings(patch) {
   const s = await window.bigo.settingsLoad();
   if (patch) {
     if (patch.bgm) s.bgm = { ...(s.bgm || {}), ...patch.bgm };
+    if (patch.preFx) s.preFx = { ...(s.preFx || {}), ...patch.preFx };
     if ('fxVolume' in patch) s.fxVolume = patch.fxVolume;
     if ('maxListItems' in patch) s.maxListItems = patch.maxListItems;
   }
   await window.bigo.settingsSave(s);
+}
+
+// Phát file pre-effect (mp3/mp4/wav/webm) qua overlay.
+// Gọi 1 LẦN trước khi dispatch effect chính (không lặp theo combo).
+// Pre-effect file được user pick từ ổ đĩa → dùng raw fileUrl IPC variant.
+function maybeDispatchPreEffect(giftItem) {
+  if (!giftItem || !giftItem.preEffect) return;  // gift không bật
+  const cfg = appSettings.preFx;
+  if (!cfg || !cfg.enabled || !cfg.file) return;  // settings chưa bật hoặc chưa có file
+  if (!giftItem.overlayId) return;
+  try {
+    window.bigo.overlayPlay({ overlayId: giftItem.overlayId, fileUrl: cfg.file });
+  } catch (e) { console.warn('preFx dispatch failed:', e); }
 }
 
 async function refreshAudioDevices() {
@@ -1591,6 +1634,7 @@ async function applyBgmSinkId() {
 
 async function initAppSettings(s) {
   appSettings.bgm = { ...appSettings.bgm, ...(s.bgm || {}) };
+  appSettings.preFx = { ...appSettings.preFx, ...(s.preFx || {}) };
   appSettings.fxVolume = s.fxVolume != null ? s.fxVolume : 100;
   appSettings.maxListItems = s.maxListItems || 200;
   // Apply BGM
@@ -1599,6 +1643,9 @@ async function initAppSettings(s) {
     if (appSettings.bgm.file) els.bgmAudio.src = appSettings.bgm.file;
     if (appSettings.bgm.fileName) els.bgmFileLabel.value = appSettings.bgm.fileName;
   }
+  // Apply pre-effect UI
+  if (els.preFxFileLabel) els.preFxFileLabel.value = appSettings.preFx.fileName || '';
+  if (els.preFxEnabled) els.preFxEnabled.checked = !!appSettings.preFx.enabled;
   // Apply UI controls
   if (els.bgmVol) { els.bgmVol.value = appSettings.bgm.volume || 80; els.bgmVolVal.textContent = els.bgmVol.value; }
   if (els.fxVol) { els.fxVol.value = appSettings.fxVolume; els.fxVolVal.textContent = appSettings.fxVolume; }
@@ -1606,6 +1653,47 @@ async function initAppSettings(s) {
   // Devices
   await refreshAudioDevices();
   await applyBgmSinkId();
+}
+
+// =================== Pre-effect sound controls ===================
+if (els.btnPickPreFx) {
+  els.btnPickPreFx.onclick = async () => {
+    const r = await window.bigo.pickPreFxFile();
+    if (!r.ok) return;
+    appSettings.preFx.file = r.fileUrl;
+    appSettings.preFx.fileName = r.fileName;
+    if (els.preFxFileLabel) els.preFxFileLabel.value = r.fileName;
+    await saveAppSettings({ preFx: { file: r.fileUrl, fileName: r.fileName } });
+  };
+}
+if (els.btnTestPreFx) {
+  els.btnTestPreFx.onclick = () => {
+    if (!appSettings.preFx.file) { alert('Chưa chọn file'); return; }
+    // Phát test qua overlay đầu tiên (hoặc renderer audio nếu không có overlay)
+    const ov = (mapping?.overlays || [])[0];
+    if (ov) {
+      window.bigo.overlayPlay({ overlayId: ov.id, fileUrl: appSettings.preFx.file });
+    } else {
+      // fallback: phát bằng audio element tạm
+      const a = new Audio(appSettings.preFx.file);
+      a.volume = (appSettings.fxVolume || 100) / 100;
+      a.play().catch(e => alert('Không phát được: ' + e.message));
+    }
+  };
+}
+if (els.btnClearPreFx) {
+  els.btnClearPreFx.onclick = async () => {
+    appSettings.preFx.file = null;
+    appSettings.preFx.fileName = '';
+    if (els.preFxFileLabel) els.preFxFileLabel.value = '';
+    await saveAppSettings({ preFx: { file: null, fileName: '' } });
+  };
+}
+if (els.preFxEnabled) {
+  els.preFxEnabled.addEventListener('change', async () => {
+    appSettings.preFx.enabled = !!els.preFxEnabled.checked;
+    await saveAppSettings({ preFx: { enabled: appSettings.preFx.enabled } });
+  });
 }
 
 if (els.btnPickBgm) {

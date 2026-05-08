@@ -418,6 +418,23 @@ ipcMain.handle('bgm:pick-file', async () => {
   return { ok: true, filePath, fileUrl, fileName: path.basename(filePath) };
 });
 
+// Pick pre-effect media file (mp3/mp4/wav/webm) — phát trước hiệu ứng quà.
+ipcMain.handle('preFx:pick-file', async () => {
+  if (!win) return { ok: false };
+  const res = await dialog.showOpenDialog(win, {
+    title: 'Chọn âm thanh/video phát trước hiệu ứng',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Media', extensions: ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'mp4', 'webm'] },
+      { name: 'All', extensions: ['*'] },
+    ],
+  });
+  if (res.canceled || !res.filePaths.length) return { ok: false, canceled: true };
+  const filePath = res.filePaths[0];
+  const fileUrl = 'file:///' + filePath.replace(/\\/g, '/').replace(/^\/+/, '');
+  return { ok: true, filePath, fileUrl, fileName: path.basename(filePath) };
+});
+
 // Mở dialog chọn 1 hoặc nhiều file mp3/mp4/webm/wav rồi copy vào assets/effects.
 // Trả về tên file mới (hoặc null nếu user huỷ).
 ipcMain.handle('effects:pick-files', async () => {
@@ -802,11 +819,22 @@ ipcMain.on('overlay:queue-empty', (e) => {
   }
 });
 
-ipcMain.handle('overlay:play', (_e, { overlayId, file }) => {
+ipcMain.handle('overlay:play', (_e, { overlayId, file, fileUrl: rawUrl }) => {
   const cfg = mapping.overlays.find(o => o.id === overlayId);
-  if (!cfg || !file) return { ok: false };
-  const full = path.join(EFFECTS_DIR, file);
-  if (!fs.existsSync(full)) return { ok: false, error: 'file không tồn tại' };
-  overlayManager.play(cfg, fileUrl(full));
+  if (!cfg) return { ok: false };
+  // 2 modes:
+  // - file (basename trong assets/effects) → resolve qua EFFECTS_DIR
+  // - fileUrl (raw file:// URL) → dùng thẳng (cho pre-effect sound user pick từ ổ đĩa)
+  let url = null;
+  if (rawUrl) {
+    url = rawUrl;
+  } else if (file) {
+    const full = path.join(EFFECTS_DIR, file);
+    if (!fs.existsSync(full)) return { ok: false, error: 'file không tồn tại' };
+    url = fileUrl(full);
+  } else {
+    return { ok: false, error: 'thiếu file' };
+  }
+  overlayManager.play(cfg, url);
   return { ok: true };
 });

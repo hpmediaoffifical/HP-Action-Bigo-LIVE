@@ -20,6 +20,20 @@
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": false,
           "priority": 0
+        },
+        {
+          "id": "i_moxc5oh9rk0x",
+          "matchKeys": [
+            "2463",
+            "Bell",
+            "7750",
+            "Bell-测试68372/60190"
+          ],
+          "alias": "Bell",
+          "mediaFile": "Tơ nhện.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "priority": 0
         }
       ],
       "isCommon": true
@@ -132,14 +146,17 @@
       "bgColor": "#b1f1b1",
       "opacity": 0.25,
       "bounds": {
-        "x": 1834,
-        "y": 1191,
+        "x": 1928,
+        "y": 1150,
         "width": 460,
         "height": 828
       },
       "alwaysOnTop": true,
       "clickThrough": false,
-      "autoHide": false
+      "autoHide": true,
+      "lockRatio": true,
+      "autoOpen": true,
+      "autoFocus": true
     }
   ]
 }
