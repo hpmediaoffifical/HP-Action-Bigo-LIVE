@@ -158,6 +158,22 @@ function scanChatsAndGifts() {
         });
       }
     } else {
+      // CHECK HEART: trước khi xử lý như chat thường, detect message "gửi N lượt thích".
+      const heartN = detectHeartFromChat(m.content);
+      if (heartN > 0) {
+        const heartHash = `h|${normalize(m.user)}|${heartN}`;
+        const last = seenGifts.get(heartHash);
+        if (last && Date.now() - last < 500) continue;
+        seenGifts.set(heartHash, Date.now());
+        // Emit như gift event với type='heart' → app's renderEmbedEvent xử lý
+        // bumpHeartCount(count). KHÔNG add vào chats[] để tránh hiển thị trong
+        // panel TƯƠNG TÁC như chat thường.
+        gifts.push({
+          type: 'heart', level: m.level, user: m.user, count: heartN,
+          user_avatar_url: avatarUrl, raw: text,
+        });
+        continue;
+      }
       // CHAT DEDUP DÀI — chats lặp lại trong 60s thường là DOM re-scan, không
       // phải user spam thật (Bigo cap ~3s/msg). Hash dài để giảm noise.
       const chatHash = `c|${m.level}|${normalize(m.user)}|${normalize(m.content)}`;
@@ -200,30 +216,30 @@ function scanGiftOverlay() {
   return out;
 }
 
-// Detect số tym (heart count) hiển thị trên bigo.tv.
-// Bigo show heart count gần nick name dạng: "❤ 1.2K", "10K likes", "♥ 500".
-// Track diff từ tick trước → emit 'heart' event với count tăng thêm.
-let _lastHeartCount = -1;
-function scanHeartCount() {
-  if (!document.body) return null;
-  // Heuristic: tìm element có pattern heart icon + number (K/M shorthand)
-  const text = document.body.innerText || '';
-  // Match patterns: "❤️ 1.2K", "1234 likes", "🤍 500"
-  const patterns = [
-    /[♥♡❤🤍🧡💛💚💙💜🖤🤎♥️❤️]\s*(\d+(?:[.,]\d+)?)\s*([KMkm])?/u,
-    /(\d+(?:[.,]\d+)?)\s*([KMkm])?\s*(?:lượt\s+)?(?:tym|likes?|hearts?)/iu,
-  ];
-  for (const re of patterns) {
-    const m = text.match(re);
+// CHAT-BASED heart detection (cách BIGO LIVE thật sự dùng).
+// Khi viewer tap màn hình gửi like cho idol, BIGO emit chat message dạng:
+//   "<USER> gửi <N> lượt thích cho Idol ❤"  (Vietnamese)
+//   "<USER> sent <N> likes to Idol"           (English)
+//   "<USER> 给 Idol 发送 <N> 个赞"             (Chinese)
+//
+// Match patterns trong content của chat row (sau khi tryMatchChat đã extract user/content).
+const HEART_CHAT_PATTERNS = [
+  /g[uưử]+i\s+(\d+)\s+l[uượ]+t?\s+th[ií]ch/iu,           // VN: "gửi N lượt thích"
+  /sent\s+(\d+)\s+(?:hearts?|likes?|loves?)/i,             // EN: "sent N hearts/likes"
+  /发送\s*(\d+)\s*个?\s*[赞喜]/u,                          // CN: "发送N赞"
+  /(\d+)\s+(?:hearts?|likes?)\s+(?:to|cho)/i,              // EN/VN mix: "100 likes to"
+];
+
+function detectHeartFromChat(content) {
+  if (!content) return 0;
+  for (const re of HEART_CHAT_PATTERNS) {
+    const m = String(content).match(re);
     if (m) {
-      let n = parseFloat(m[1].replace(',', '.')) || 0;
-      const unit = (m[2] || '').toUpperCase();
-      if (unit === 'K') n *= 1000;
-      else if (unit === 'M') n *= 1_000_000;
-      return Math.floor(n);
+      const n = parseInt(m[1], 10);
+      if (n > 0 && n < 100000) return n; // sanity bound
     }
   }
-  return null;
+  return 0;
 }
 
 function scanRoomMeta() {
@@ -273,15 +289,9 @@ function attach() {
       for (const ev of chats) send('embed:parsed', { ...ev, ts: Date.now() });
       for (const ev of gifts) send('embed:parsed', { ...ev, ts: Date.now() });
       for (const ev of scanGiftOverlay()) send('embed:parsed', { ...ev, ts: Date.now() });
-      // Heart count: emit diff khi tăng lên (tym mới)
-      const heartNow = scanHeartCount();
-      if (heartNow != null) {
-        if (_lastHeartCount >= 0 && heartNow > _lastHeartCount) {
-          const delta = heartNow - _lastHeartCount;
-          send('embed:parsed', { type: 'heart', count: delta, total: heartNow, ts: Date.now() });
-        }
-        _lastHeartCount = heartNow;
-      }
+      // Heart events giờ đến qua chat scan (BIGO emit message "gửi N lượt thích")
+      // → đã được handle trong scanChatsAndGifts → push vào gifts[] với type='heart'.
+      // Không cần global counter scan nữa.
       const meta = scanRoomMeta();
       const j = JSON.stringify(meta);
       if (j !== lastMeta) { lastMeta = j; send('embed:meta', { ...meta, ts: Date.now() }); }
