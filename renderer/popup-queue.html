@@ -84,12 +84,9 @@
 
     function renderAll() {
       const q = document.getElementById('popQueue');
-      // Sort: playing trước (chỉ có 1), rồi theo thứ tự trong snapshot (đã sort ở app).
-      // STT: playing không tính, hàng đầu sau playing là STT 1.
       let playingCount = 0;
       const html = snapshot.map((it, i) => {
         if (it.status === 'playing') { playingCount++; return renderRow(it, 0); }
-        // STT cho non-playing = i - playingCount + 1 (offset cho playing items đứng trước)
         return renderRow(it, i - playingCount + 1);
       }).join('');
       q.innerHTML = html || '<div style="color:#555;text-align:center;padding:20px">Chưa có hiệu ứng nào</div>';
@@ -101,6 +98,55 @@
           ipcRenderer.send('popup-queue:remove', id);
         };
       });
+      // Right-click context menu cho mỗi row
+      q.querySelectorAll('.queue-row').forEach(row => {
+        row.oncontextmenu = (e) => {
+          e.preventDefault();
+          const id = row.dataset.id;
+          if (!id) return;
+          showCtxMenu(e.clientX, e.clientY, [
+            { icon: '🔝', label: 'Ưu tiên lên đầu', action: () => ipcRenderer.send('popup-queue:action', { type: 'top', id }) },
+            { icon: '⬆️', label: 'Di chuyển lên 1 hàng', action: () => ipcRenderer.send('popup-queue:action', { type: 'up', id }) },
+            { icon: '⬇️', label: 'Di chuyển xuống 1 hàng', action: () => ipcRenderer.send('popup-queue:action', { type: 'down', id }) },
+            { divider: true },
+            { icon: '🗑', label: 'Xoá', danger: true, action: () => ipcRenderer.send('popup-queue:remove', id) },
+          ]);
+        };
+      });
+    }
+
+    // Mini context menu — copy logic từ main app cho popup window.
+    function removeCtxMenu() {
+      document.querySelectorAll('.ctx-menu').forEach(m => m.remove());
+    }
+    function showCtxMenu(x, y, items) {
+      removeCtxMenu();
+      const menu = document.createElement('div');
+      menu.className = 'ctx-menu';
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const w = 220, h = items.length * 36 + 8;
+      if (x + w > vw) x = vw - w - 8;
+      if (y + h > vh) y = vh - h - 8;
+      menu.style.left = x + 'px';
+      menu.style.top = y + 'px';
+      menu.innerHTML = items.map((it, i) => {
+        if (it.divider) return '<div class="ctx-divider"></div>';
+        return `<div class="ctx-item ${it.danger ? 'danger' : ''}" data-i="${i}">
+          <span style="width:18px">${it.icon || ''}</span><span>${escapeHtml(it.label)}</span>
+        </div>`;
+      }).join('');
+      document.body.appendChild(menu);
+      menu.querySelectorAll('.ctx-item').forEach(el => {
+        el.onclick = () => {
+          const i = +el.dataset.i;
+          removeCtxMenu();
+          try { items[i].action(); } catch (e) { console.error(e); }
+        };
+      });
+      setTimeout(() => {
+        document.addEventListener('click', removeCtxMenu, { once: true });
+        document.addEventListener('contextmenu', removeCtxMenu, { once: true });
+      }, 0);
     }
 
     function updateStats() {

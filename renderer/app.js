@@ -95,7 +95,7 @@ function updateConnectStats() {
 
 // =================== Effect Queue State ===================
 const queueItems = []; // { id, ts, user, avatar, gift_id, gift_name, gift_icon, count, diamond, status }
-const QUEUE_MAX = 100;
+const QUEUE_MAX = 5000; // Cho phép hold 5000 items in-memory; render UI giới hạn theo maxListItems.
 const PLAY_DURATION_MS = 5000; // assume effect ~5s — TODO sync với 'ended' từ overlay sau
 
 function loadQueueSettings() {
@@ -253,11 +253,19 @@ function renderMiniQueue() {
     el.innerHTML = '<div style="color:#555;text-align:center;padding:14px;font-size:11px">Chưa có hiệu ứng</div>';
     return;
   }
-  el.innerHTML = list.slice(0, 10).map(q => renderQueueRowHtml(q, { rowClass: 'mini-queue-row' })).join('');
+  // Render top N theo settings (default 20). Còn lại trong queue chạy hết, chỉ
+  // không hiển thị UI (tránh lag). Khi item đầu hết → item dưới được "đẩy lên".
+  const maxRows = Math.max(5, Math.min(200, parseInt(appSettings?.maxListItems, 10) || 20));
+  const visible = list.slice(0, maxRows);
+  const hidden = list.length - visible.length;
+  let html = visible.map(q => renderQueueRowHtml(q, { rowClass: 'mini-queue-row' })).join('');
+  if (hidden > 0) {
+    html += `<div class="mini-queue-more" title="${hidden} hiệu ứng nữa đang chờ phát">+ ${hidden} đang chờ phát…</div>`;
+  }
+  el.innerHTML = html;
   el.querySelectorAll('[data-qid]').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); removeQueueItemById(btn.dataset.qid); };
   });
-  // Right-click context menu cho mỗi row
   el.querySelectorAll('.mini-queue-row').forEach(row => wireQueueContextMenu(row));
 }
 
@@ -387,7 +395,14 @@ function renderQueue() {
     els.effectQueue.innerHTML = '<div style="color:#555;text-align:center;padding:16px">Chưa có hiệu ứng nào trong danh sách</div>';
     return;
   }
-  els.effectQueue.innerHTML = list.map(q => renderQueueRowHtml(q, { rowClass: 'queue-row' })).join('');
+  const maxRows = Math.max(5, Math.min(500, parseInt(appSettings?.maxListItems, 10) || 20));
+  const visible = list.slice(0, maxRows);
+  const hidden = list.length - visible.length;
+  let html = visible.map(q => renderQueueRowHtml(q, { rowClass: 'queue-row' })).join('');
+  if (hidden > 0) {
+    html += `<div class="mini-queue-more">+ ${hidden} hiệu ứng nữa đang chờ phát…</div>`;
+  }
+  els.effectQueue.innerHTML = html;
   els.effectQueue.querySelectorAll('[data-qid]').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); removeQueueItemById(btn.dataset.qid); };
   });
@@ -532,9 +547,17 @@ els.btnClearQueue.onclick = () => {
   clearAllQueue();
 };
 
-// IPC listeners từ popup window (popup user bấm X / Xoá tất cả)
+// IPC listeners từ popup window (popup user bấm X / Xoá tất cả / right-click)
 if (window.bigo.onQueueRemove) window.bigo.onQueueRemove(id => removeQueueItemById(id));
 if (window.bigo.onQueueClearAll) window.bigo.onQueueClearAll(() => clearAllQueue());
+if (window.bigo.onQueueAction) {
+  window.bigo.onQueueAction(({ type, id }) => {
+    if (!id) return;
+    if (type === 'top') queueMoveTop(id);
+    else if (type === 'up') queueMoveUp(id);
+    else if (type === 'down') queueMoveDown(id);
+  });
+}
 
 // (legacy, bỏ qua dòng dưới — giữ để giảm rủi ro break code khác)
 if (false) {
@@ -638,6 +661,35 @@ if (els.btnResetStats) {
     e.preventDefault();
     try { window.bigo.openExternal('https://hpvn.media'); } catch {}
   });
+})();
+
+// Phiên bản hiện tại + license key (tab ℹ️)
+(async function wireInfoTab() {
+  const verEl = document.getElementById('appVersion');
+  if (verEl && window.bigo.appGetVersion) {
+    try { verEl.textContent = await window.bigo.appGetVersion(); } catch { verEl.textContent = '?'; }
+  }
+  const keyInput = document.getElementById('licenseKey');
+  const verifyBtn = document.getElementById('btnVerifyLicense');
+  const statusEl = document.getElementById('licenseStatus');
+  if (keyInput) {
+    // Restore từ localStorage
+    try { keyInput.value = localStorage.getItem('hp_license_key') || ''; } catch {}
+    keyInput.addEventListener('change', () => {
+      try { localStorage.setItem('hp_license_key', keyInput.value.trim()); } catch {}
+    });
+  }
+  if (verifyBtn) {
+    verifyBtn.onclick = () => {
+      const k = keyInput?.value.trim() || '';
+      if (!k) { statusEl.textContent = '⚠️ Chưa nhập key'; statusEl.style.color = '#ff6b6b'; return; }
+      // Placeholder: chưa fetch Google Sheet — chỉ lưu local + show "đã lưu".
+      // Khi triển khai: fetch GSheet API → check key tồn tại + thời hạn.
+      statusEl.textContent = '✓ Đã lưu (chưa kết nối Google Sheet)';
+      statusEl.style.color = '#4ad07a';
+      try { localStorage.setItem('hp_license_key', k); } catch {}
+    };
+  }
 })();
 
 // Mọi link có data-ext → mở trong trình duyệt mặc định (panel Thông tin NPT)
@@ -1077,7 +1129,7 @@ async function groupAction(act, gid, value, itemId) {
       if (!found.item.mediaFile || !found.item.overlayId) { alert('Quà chưa có file hoặc overlay'); return; }
       // Lấy số lượng từ input cùng row
       const countInput = document.querySelector(`.play-count[data-iid="${itemId}"]`);
-      const playTimes = Math.max(1, Math.min(50, parseInt(countInput?.value || '1', 10) || 1));
+      const playTimes = Math.max(1, Math.min(1000, parseInt(countInput?.value || '1', 10) || 1));
       if (found.item.pauseBgm) pauseBgmForEffect();
       // Pre-effect: phát ÂM THANH/VIDEO trước (1 lần) nếu cả gift + setting cùng bật
       maybeDispatchPreEffect(found.item);
@@ -1873,7 +1925,7 @@ function renderParsed(ev) {
       sessionStats.diamond += ev.total_diamond || 0;
       if (ev.user) sessionStats.users.add(ev.user);
       if (matched && matched.mediaFile) {
-        sessionStats.effects += Math.max(1, Math.min(50, ev.total_count || ev.gift_count || 1));
+        sessionStats.effects += Math.max(1, Math.min(1000, ev.total_count || ev.gift_count || 1));
       }
       updateConnectStats();
       // Push vào received gifts list (right panel) — layout mới gọn
@@ -1881,7 +1933,7 @@ function renderParsed(ev) {
     }
     if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
       // Combo: tặng N lần thì phát N lần. total_count = gift_count × combo.
-      const playTimes = Math.max(1, Math.min(50, ev.total_count || ev.gift_count || 1));
+      const playTimes = Math.max(1, Math.min(1000, ev.total_count || ev.gift_count || 1));
       // Tạm dừng nhạc nền nếu gift cấu hình "không chạy chung"
       if (matched.pauseBgm) pauseBgmForEffect();
       // Pre-effect: phát ÂM THANH/VIDEO trước MỘT LẦN (không lặp theo combo)

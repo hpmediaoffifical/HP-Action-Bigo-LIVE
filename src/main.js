@@ -358,6 +358,11 @@ ipcMain.handle('settings:save', (_e, data) => { saveJson(CONFIG_PATH, data); ret
 
 ipcMain.handle('shell:open-external', (_e, url) => shell.openExternal(url));
 
+// App info — version từ package.json
+ipcMain.handle('app:get-version', () => {
+  try { return require(path.join(ROOT, 'package.json')).version || '0.0.0'; } catch { return '0.0.0'; }
+});
+
 ipcMain.handle('mapping:load', () => mapping);
 ipcMain.handle('mapping:save', (_e, data) => {
   // Preserve overlay bounds từ mapping hiện tại (đã được track qua move/resize events).
@@ -751,6 +756,12 @@ ipcMain.on('popup-queue:remove', (_e, id) => {
 ipcMain.on('popup-queue:clear-all', () => {
   if (win && !win.isDestroyed()) {
     try { win.webContents.send('queue:clear-all'); } catch {}
+  }
+});
+// Popup right-click action (top / up / down) → forward về app.
+ipcMain.on('popup-queue:action', (_e, payload) => {
+  if (win && !win.isDestroyed()) {
+    try { win.webContents.send('queue:action', payload); } catch {}
   }
 });
 

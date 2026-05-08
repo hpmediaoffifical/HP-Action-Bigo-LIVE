@@ -21,6 +21,7 @@
       <button class="sidebar-tab" id="sidebarBgmToggle" title="Phát / Dừng nhạc nền">🎵</button>
       <button class="sidebar-tab" id="sidebarLockSettings" title="Khoá cài đặt — chống chỉnh nhầm trong khi stream">🔐</button>
       <button class="tab sidebar-tab" data-tab="settings" title="Cài đặt chung">⚙️</button>
+      <button class="tab sidebar-tab" data-tab="info" title="Thông tin Nhà Phát Triển">ℹ️</button>
     </aside>
 
     <div class="main-content">
@@ -344,6 +345,28 @@
         <div class="hint small">
           Tên nhóm <b>không phân biệt hoa thường</b> — gõ "npc" sẽ merge vào "NPC" nếu đã có.
           Khi tạo quà mới với tên nhóm chưa tồn tại, app tự thêm vào danh sách này.
+        </div>
+      </div>
+
+    </section>
+
+    <!-- =================== TAB: THÔNG TIN NHÀ PHÁT TRIỂN =================== -->
+    <section class="tab-panel" data-tab="info">
+      <div class="panel">
+        <h2>ℹ️ Phiên bản &amp; Bản quyền</h2>
+        <div class="dev-info">
+          <div class="dev-row"><span class="dev-key">Phiên bản hiện tại:</span><span class="dev-val"><b id="appVersion">—</b></span></div>
+          <div class="dev-row">
+            <span class="dev-key">Key bản quyền:</span>
+            <span class="dev-val">
+              <input id="licenseKey" placeholder="Nhập key (sẽ verify với Google Sheet)" style="flex:1; min-width:200px" />
+              <button type="button" id="btnVerifyLicense" class="tiny primary" style="margin-left:6px">Xác minh</button>
+              <span id="licenseStatus" style="margin-left:8px; font-size:11px"></span>
+            </span>
+          </div>
+          <div class="hint small" style="margin-top:6px">
+            📌 Tính năng key bản quyền sẽ fetch từ Google Sheet (sắp ra mắt). Hiện tại nhập để lưu local.
+          </div>
         </div>
       </div>
 
