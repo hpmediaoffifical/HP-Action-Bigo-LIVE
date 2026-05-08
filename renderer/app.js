@@ -1071,8 +1071,8 @@ async function openGiftDialog(gift = null, groupId = null) {
   }
   els.dlgFile.value = mf;
   if (els.dlgPauseBgm) els.dlgPauseBgm.checked = !!gift?.pauseBgm;
-  // preEffect opt-out: undefined / true → checked (default ON), chỉ false → unchecked.
-  if (els.dlgPreFx) els.dlgPreFx.checked = gift ? gift.preEffect !== false : true;
+  // preEffect opt-in: chỉ tick khi user đã explicit set true. undefined/false → unchecked.
+  if (els.dlgPreFx) els.dlgPreFx.checked = gift?.preEffect === true;
   els.giftDialog.dataset.editingId = gift?.id || '';
   els.giftDialog.showModal();
   await ensureMasterLoaded();
@@ -1696,12 +1696,12 @@ function resolveMediaPayload(mediaFile) {
 // Gọi 1 LẦN trước khi dispatch effect chính (không lặp theo combo).
 // Pre-effect file được user pick từ ổ đĩa → dùng raw fileUrl IPC variant.
 //
-// MODEL OPT-OUT: khi setting bật + có file → MẶC ĐỊNH mọi quà đều phát pre-effect.
-// User chỉ uncheck riêng quà nào không muốn → giftItem.preEffect === false → SKIP.
-// undefined / true → vẫn phát.
+// MODEL OPT-IN: mặc định OFF cho mọi quà. User phải EXPLICIT tick checkbox trên dialog
+// từng quà → giftItem.preEffect === true → mới phát. Toggle global setting off/on
+// nhiều lần KHÔNG tự bật lại quà nào — mỗi quà giữ nguyên trạng thái user đã set.
 function maybeDispatchPreEffect(giftItem) {
   if (!giftItem) return;
-  if (giftItem.preEffect === false) return;  // explicit opt-out trên quà này
+  if (giftItem.preEffect !== true) return;  // chỉ phát khi user explicit opt-in (true)
   const cfg = appSettings.preFx;
   if (!cfg || !cfg.enabled || !cfg.file) return;  // settings chưa bật hoặc chưa có file
   if (!giftItem.overlayId) return;

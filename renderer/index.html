@@ -226,7 +226,7 @@
           </label>
         </div>
         <div class="hint small" style="margin-top:-6px; margin-bottom:6px">
-          Khi bật + quà có "Phát âm thanh trước" được tick → app sẽ phát file này TRƯỚC hiệu ứng quà rồi mới phát hiệu ứng.
+          Mặc định <b>TẮT</b> cho tất cả quà. Vào dialog "Sửa quà" tick riêng từng quà cần phát pre-effect. Toggle Bật/Tắt ô này nhiều lần <b>KHÔNG tự bật lại</b> quà nào — mỗi quà giữ trạng thái user đã set.
         </div>
         <div class="row">
           <label style="flex:2">🔊 Thiết bị phát (output)
@@ -362,8 +362,8 @@
         <label class="checkbox-row" title="Khi BẬT: nhạc nền tự dừng trong lúc phát hiệu ứng. Khi TẮT: nhạc nền chạy chung với hiệu ứng.">
           <input type="checkbox" id="dlgPauseBgm" /> 🔇 Tạm dừng nhạc nền khi phát
         </label>
-        <label class="checkbox-row" title="Mặc định BẬT cho mọi quà khi Cài đặt chung bật pre-effect. UNCHECK nếu muốn TẮT riêng quà này.">
-          <input type="checkbox" id="dlgPreFx" checked /> 🔔 Phát âm thanh trước (mặc định bật — uncheck để tắt riêng quà này)
+        <label class="checkbox-row" title="Mặc định TẮT. Chỉ tick khi muốn phát pre-effect cho quà này. Toggle global off/on KHÔNG tự bật lại.">
+          <input type="checkbox" id="dlgPreFx" /> 🔔 Phát âm thanh trước (chỉ tick riêng quà nào cần)
         </label>
       </div>
       <div class="modal-actions">
