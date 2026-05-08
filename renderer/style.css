@@ -82,15 +82,20 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .icon-cache-bar #iconCacheStatus { flex: 1; }
 .icon-cache-bar progress { flex: 1; height: 12px; }
 
-/* Master gift search */
-.master-search { background: #0f1117; border-radius: 6px; padding: 8px; max-height: 240px; overflow-y: auto; margin-top: 6px; }
-.master-search-row { display: grid; grid-template-columns: 28px 1fr auto auto; gap: 8px; padding: 4px 6px; align-items: center; cursor: pointer; border-radius: 4px; }
-.master-search-row:hover { background: #20242f; }
-.master-search-row img { width: 28px; height: 28px; border-radius: 4px; cursor: grab; }
-.master-search-row img:active { cursor: grabbing; }
-.master-search-row img[draggable] { -webkit-user-drag: element; }
-.master-search-row .id { color: #8a8f9a; font-family: 'Consolas', monospace; font-size: 11px; }
-.master-search-row .price { color: #ffd166; font-size: 11px; }
+/* Master gift browser table */
+.master-table-wrap { background: #0f1117; border-radius: 6px; max-height: 320px; overflow-y: auto; margin-top: 6px; border: 1px solid #262a35; }
+.master-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.master-table thead { position: sticky; top: 0; background: #0f1117; z-index: 1; }
+.master-table thead th { padding: 6px 8px; text-align: left; color: #8a8f9a; font-size: 11px; text-transform: uppercase; font-weight: 600; border-bottom: 1px solid #262a35; }
+.master-table tbody tr { cursor: pointer; }
+.master-table tbody tr:hover { background: #20242f; }
+.master-table tbody td { padding: 4px 8px; border-bottom: 1px solid #1c1f28; }
+.master-table img { width: 28px; height: 28px; border-radius: 4px; cursor: grab; vertical-align: middle; }
+.master-table img:active { cursor: grabbing; }
+.master-table img[draggable] { -webkit-user-drag: element; }
+.master-table .id { color: #8a8f9a; font-family: 'Consolas', monospace; font-size: 11px; }
+.master-table .price { color: #ffd166; font-size: 11px; }
+.master-table .name { color: #c9d6ff; }
 
 /* ============ Tables ============ */
 .table-wrap { overflow-x: auto; }

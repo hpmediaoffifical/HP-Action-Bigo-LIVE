@@ -9,7 +9,7 @@ const els = {
   status: $('status'), log: $('log'),
   // Embed tab
   embedBigoId: $('embedBigoId'),
-  btnConnect: $('btnConnect'), btnEmbedStop: $('btnEmbedStop'), btnEmbedShow: $('btnEmbedShow'),
+  btnConnect: $('btnConnect'), btnEmbedShow: $('btnEmbedShow'),
   liveInfo: $('liveInfo'),
   metaPanel: $('metaPanel'), metaInfo: $('metaInfo'),
   liveChats: $('liveChats'), liveGifts: $('liveGifts'),
@@ -28,7 +28,8 @@ const els = {
   dlgMatchKeys: $('dlgMatchKeys'), dlgAlias: $('dlgAlias'),
   dlgGroup: $('dlgGroup'), dlgFile: $('dlgFile'), dlgOverlay: $('dlgOverlay'),
   dlgGiftSave: $('dlgGiftSave'), groupList: $('groupList'),
-  dlgMasterQuery: $('dlgMasterQuery'), dlgMasterResults: $('dlgMasterResults'),
+  dlgMasterFilter: $('dlgMasterFilter'), dlgMasterSort: $('dlgMasterSort'),
+  dlgMasterTableBody: $('dlgMasterTableBody'), dlgMasterCount: $('dlgMasterCount'),
   // Overlay modal
   overlayDialog: $('overlayDialog'), overlayDialogTitle: $('overlayDialogTitle'),
   ovName: $('ovName'), ovBgColor: $('ovBgColor'), ovOpacity: $('ovOpacity'), ovOpacityVal: $('ovOpacityVal'),
@@ -160,14 +161,96 @@ async function giftAction(act, id) {
   }
 }
 
-function openGiftDialog(gift = null) {
+// Cache master list 1 lần khi mở modal đầu tiên
+let masterFullList = null;
+
+async function ensureMasterLoaded() {
+  if (masterFullList) return;
+  masterFullList = await window.bigo.giftsMasterList();
+}
+
+function sortMasterArr(arr, key) {
+  const nameCmp = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi', { sensitivity: 'base' });
+  switch (key) {
+    case 'id-desc': return arr.sort((a, b) => b.typeid - a.typeid);
+    case 'kc-asc': return arr.sort((a, b) => (a.diamonds || 0) - (b.diamonds || 0));
+    case 'kc-desc': return arr.sort((a, b) => (b.diamonds || 0) - (a.diamonds || 0));
+    case 'name-asc': return arr.sort(nameCmp);
+    case 'name-desc': return arr.sort((a, b) => nameCmp(b, a));
+    case 'id-asc':
+    default: return arr.sort((a, b) => a.typeid - b.typeid);
+  }
+}
+
+function renderMasterTable() {
+  if (!masterFullList) {
+    els.dlgMasterCount.textContent = 'đang tải...';
+    return;
+  }
+  const filter = els.dlgMasterFilter.value.toLowerCase().trim();
+  const sortKey = els.dlgMasterSort.value;
+  let arr = masterFullList.slice();
+  if (filter) {
+    arr = arr.filter(g => {
+      const n = String(g.name || '').toLowerCase();
+      const id = String(g.typeid || '');
+      return n.includes(filter) || id.includes(filter);
+    });
+  }
+  sortMasterArr(arr, sortKey);
+  els.dlgMasterCount.textContent = `${arr.length}/${masterFullList.length} quà`;
+  // Limit render to 500 first to avoid lag, but show count
+  const renderLimit = 500;
+  const display = arr.slice(0, renderLimit);
+  els.dlgMasterTableBody.innerHTML = display.map(g => {
+    const src = g.localIcon || g.img_url || '';
+    return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
+      <td><img src="${escapeHtml(src)}" loading="lazy" draggable="true" data-typeid="${g.typeid}" title="Kéo ra desktop = ${g.typeid}.png" /></td>
+      <td><span class="id">${g.typeid}</span></td>
+      <td><span class="price">💎 ${g.diamonds ?? '?'}</span></td>
+      <td><span class="name">${escapeHtml(g.name)}</span></td>
+    </tr>`;
+  }).join('');
+  if (arr.length > renderLimit) {
+    els.dlgMasterCount.textContent += ` · hiển thị ${renderLimit} đầu — gõ filter để thu hẹp`;
+  }
+  // Click row -> add to matchKeys
+  els.dlgMasterTableBody.querySelectorAll('tr').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.tagName === 'IMG') return;
+      const name = row.dataset.name;
+      const typeid = row.dataset.typeid;
+      const cur = els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean);
+      if (!cur.includes(typeid)) cur.push(typeid);
+      if (!cur.includes(name)) cur.push(name);
+      els.dlgMatchKeys.value = cur.join(', ');
+      if (!els.dlgAlias.value) els.dlgAlias.value = name;
+    };
+  });
+  // Drag icon ra desktop
+  els.dlgMasterTableBody.querySelectorAll('img[draggable]').forEach(img => {
+    img.ondragstart = (e) => {
+      e.preventDefault();
+      window.bigo.giftsStartDrag(parseInt(img.dataset.typeid, 10));
+    };
+  });
+}
+
+let masterRenderTimer = null;
+function scheduleRenderMaster() {
+  clearTimeout(masterRenderTimer);
+  masterRenderTimer = setTimeout(renderMasterTable, 80);
+}
+els.dlgMasterFilter.addEventListener('input', scheduleRenderMaster);
+els.dlgMasterSort.addEventListener('change', renderMasterTable);
+
+async function openGiftDialog(gift = null) {
   els.giftDialogTitle.textContent = gift ? 'Sửa quà' : 'Thêm quà';
   els.dlgMatchKeys.value = gift ? gift.matchKeys.join(', ') : '';
   els.dlgAlias.value = gift?.alias || '';
   els.dlgGroup.value = gift?.group || '';
-  els.dlgMasterQuery.value = '';
-  els.dlgMasterResults.style.display = 'none';
-  els.dlgMasterResults.innerHTML = '';
+  els.dlgMasterFilter.value = '';
+  els.dlgMasterSort.value = 'id-asc';
   // refresh overlay options
   els.dlgOverlay.innerHTML = mapping.overlays.length
     ? mapping.overlays.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('')
@@ -176,59 +259,9 @@ function openGiftDialog(gift = null) {
   els.dlgFile.value = gift?.mediaFile || '';
   els.giftDialog.dataset.editingId = gift?.id || '';
   els.giftDialog.showModal();
+  await ensureMasterLoaded();
+  renderMasterTable();
 }
-
-// Master search inside gift dialog
-let masterSearchTimer = null;
-els.dlgMasterQuery.addEventListener('input', () => {
-  clearTimeout(masterSearchTimer);
-  const q = els.dlgMasterQuery.value.trim();
-  if (!q) {
-    els.dlgMasterResults.style.display = 'none';
-    els.dlgMasterResults.innerHTML = '';
-    return;
-  }
-  masterSearchTimer = setTimeout(async () => {
-    const results = await window.bigo.giftsLookup(q);
-    if (!results.length) {
-      els.dlgMasterResults.innerHTML = '<div style="padding:8px;color:#666">không tìm thấy</div>';
-    } else {
-      els.dlgMasterResults.innerHTML = results.map(g => {
-        const src = g.localIcon || g.img_url || '';
-        return `<div class="master-search-row" data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
-          <img src="${escapeHtml(src)}" loading="lazy" draggable="true" data-typeid="${g.typeid}" title="Kéo ra desktop để lưu ${g.typeid}.png" />
-          <div><b>${escapeHtml(g.name)}</b></div>
-          <div class="id">id ${g.typeid}</div>
-          <div class="price">💎 ${g.diamonds ?? '?'}</div>
-        </div>`;
-      }).join('');
-      els.dlgMasterResults.querySelectorAll('.master-search-row').forEach(row => {
-        row.onclick = (e) => {
-          if (e.target.tagName === 'IMG') return; // image drag, không trigger click
-          const name = row.dataset.name;
-          const typeid = row.dataset.typeid;
-          // Match key có thể là gift_id (số) hoặc name. Dùng cả 2 cho linh hoạt.
-          const cur = els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean);
-          if (!cur.includes(typeid)) cur.push(typeid);
-          if (!cur.includes(name)) cur.push(name);
-          els.dlgMatchKeys.value = cur.join(', ');
-          if (!els.dlgAlias.value) els.dlgAlias.value = name;
-          els.dlgMasterResults.style.display = 'none';
-          els.dlgMasterResults.innerHTML = '';
-          els.dlgMasterQuery.value = '';
-        };
-      });
-      // Native drag — kéo icon ra desktop, file lưu thành <typeid>.png
-      els.dlgMasterResults.querySelectorAll('img[draggable]').forEach(img => {
-        img.ondragstart = (e) => {
-          e.preventDefault();
-          window.bigo.giftsStartDrag(parseInt(img.dataset.typeid, 10));
-        };
-      });
-    }
-    els.dlgMasterResults.style.display = 'block';
-  }, 200);
-});
 
 els.dlgGiftSave.onclick = async (e) => {
   // dialog default behavior closes form; we hijack save
@@ -369,7 +402,40 @@ function resetEmbedUi() {
   els.liveGifts.innerHTML = '';
 }
 
+// Toggle state: false=disconnected, true=connected
+let isConnected = false;
+
+function setConnectedUi(yes) {
+  isConnected = yes;
+  if (yes) {
+    els.btnConnect.textContent = '⏹ Hủy kết nối';
+    els.btnConnect.classList.remove('primary');
+    els.btnConnect.classList.add('danger');
+    els.btnEmbedShow.disabled = false;
+  } else {
+    els.btnConnect.textContent = '🔌 Kết nối phòng';
+    els.btnConnect.classList.add('primary');
+    els.btnConnect.classList.remove('danger');
+    els.btnEmbedShow.disabled = true;
+  }
+}
+
+async function disconnect() {
+  await window.bigo.embedStop();
+  els.status.textContent = 'disconnected';
+  els.status.classList.remove('on');
+  setConnectedUi(false);
+  els.liveInfo.textContent = 'Đã hủy kết nối. Nhập BIGO ID khác và bấm Kết nối phòng.';
+  els.liveInfo.className = 'live-info';
+  resetEmbedUi();
+}
+
 els.btnConnect.onclick = async () => {
+  // Toggle: nếu đang connect → disconnect
+  if (isConnected) {
+    await disconnect();
+    return;
+  }
   const id = els.embedBigoId.value.trim();
   if (!id) { alert('Nhập BIGO ID'); return; }
 
@@ -377,7 +443,7 @@ els.btnConnect.onclick = async () => {
   els.status.textContent = 'checking...';
   els.status.classList.remove('on');
 
-  // 1. Stop session cũ + clear UI
+  // 1. Stop session cũ + clear UI (đề phòng)
   await window.bigo.embedStop();
   resetEmbedUi();
 
@@ -409,27 +475,16 @@ els.btnConnect.onclick = async () => {
   // 4. Start embed listener
   els.status.textContent = 'connecting...';
   const res = await window.bigo.embedStart({ bigoId: id, visible: false });
+  els.btnConnect.disabled = false;
   if (!res.ok) {
-    els.btnConnect.disabled = false;
     appendLog(`embed failed: ${res.error}`);
     alert(`Lỗi: ${res.error}`);
     return;
   }
   els.status.textContent = `listening · ${id}`;
   els.status.classList.add('on');
-  els.btnConnect.disabled = false;
-  els.btnEmbedStop.disabled = false;
-  els.btnEmbedShow.disabled = false;
+  setConnectedUi(true);
   appendLog(`connected to ${id}`);
-};
-
-els.btnEmbedStop.onclick = async () => {
-  await window.bigo.embedStop();
-  els.status.textContent = 'disconnected';
-  els.status.classList.remove('on');
-  els.btnEmbedStop.disabled = true;
-  els.btnEmbedShow.disabled = true;
-  resetEmbedUi();
 };
 
 els.btnEmbedShow.onclick = async () => {

@@ -31,9 +31,6 @@
             <button id="btnConnect" class="primary">🔌 Kết nối phòng</button>
           </label>
           <label>&nbsp;
-            <button id="btnEmbedStop" disabled>⏹ Dừng</button>
-          </label>
-          <label>&nbsp;
             <button id="btnEmbedShow" disabled>👁 Hiện cửa sổ Bigo</button>
           </label>
         </div>
@@ -168,16 +165,34 @@
     <form method="dialog">
       <h3 id="giftDialogTitle">Quà</h3>
       <div class="form-row">
-        <label>Match keys (tên Bigo render — cách nhau bằng dấu phẩy)
-          <input id="dlgMatchKeys" required placeholder="Roses, Love" />
+        <label>Match keys (tên Bigo render hoặc mã ID — cách nhau bằng dấu phẩy)
+          <input id="dlgMatchKeys" required placeholder="Roses, 502695, Love" />
         </label>
       </div>
-      <div class="form-row">
-        <label>🔍 Tìm trong master (2410 quà Bigo)
-          <input id="dlgMasterQuery" placeholder="gõ tên hoặc gift_id..." />
+      <div class="form-row" style="margin-bottom:6px">
+        <label style="flex:2">🔍 Lọc trong master (2410 quà)
+          <input id="dlgMasterFilter" placeholder="gõ tên hoặc mã quà..." />
+        </label>
+        <label>Sắp xếp
+          <select id="dlgMasterSort">
+            <option value="id-asc">Mã ↑</option>
+            <option value="id-desc">Mã ↓</option>
+            <option value="kc-asc">KC thấp → cao</option>
+            <option value="kc-desc">KC cao → thấp</option>
+            <option value="name-asc">Tên A → Z</option>
+            <option value="name-desc">Tên Z → A</option>
+          </select>
         </label>
       </div>
-      <div id="dlgMasterResults" class="master-search" style="display:none"></div>
+      <div class="master-table-wrap">
+        <table class="master-table">
+          <thead>
+            <tr><th style="width:40px">Icon</th><th style="width:80px">Mã</th><th style="width:80px">KC</th><th>Tên quà</th></tr>
+          </thead>
+          <tbody id="dlgMasterTableBody"></tbody>
+        </table>
+        <div id="dlgMasterCount" class="hint small" style="text-align:center; padding:6px">đang tải...</div>
+      </div>
       <div class="form-row">
         <label>Alias hiển thị
           <input id="dlgAlias" placeholder="Mặt nạ" />
