@@ -28,6 +28,7 @@ const els = {
   dlgMatchKeys: $('dlgMatchKeys'), dlgAlias: $('dlgAlias'),
   dlgGroup: $('dlgGroup'), dlgFile: $('dlgFile'), dlgOverlay: $('dlgOverlay'),
   dlgGiftSave: $('dlgGiftSave'), groupList: $('groupList'),
+  dlgPickFile: $('dlgPickFile'), dlgOpenFolder: $('dlgOpenFolder'),
   dlgMasterFilter: $('dlgMasterFilter'), dlgMasterSort: $('dlgMasterSort'),
   dlgMasterTableBody: $('dlgMasterTableBody'), dlgMasterCount: $('dlgMasterCount'),
   // Overlay modal
@@ -110,6 +111,18 @@ async function reloadEffects() {
     ...effects.map(e => `<option value="${escapeHtml(e.file)}">${escapeHtml(e.file)}</option>`)];
   els.dlgFile.innerHTML = opts.join('');
 }
+
+els.dlgPickFile.onclick = async () => {
+  const r = await window.bigo.effectsPickFiles();
+  if (!r.ok) return;
+  await reloadEffects();
+  if (r.copied && r.copied.length) {
+    // Auto-select file vừa thêm (đầu tiên)
+    els.dlgFile.value = r.copied[0];
+    appendLog(`đã copy ${r.copied.length} file vào assets/effects`);
+  }
+};
+els.dlgOpenFolder.onclick = () => window.bigo.effectsOpenFolder();
 
 async function persistMapping() {
   await window.bigo.mappingSave(mapping);

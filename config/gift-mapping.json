@@ -1,17 +1,29 @@
 {
   "version": 2,
-  "gifts": [],
+  "gifts": [
+    {
+      "id": "g_mox220symqfo",
+      "matchKeys": [
+        "1",
+        "Flower"
+      ],
+      "alias": "Flower",
+      "group": "TUNG HOA",
+      "mediaFile": "",
+      "overlayId": "ov_mowzeyw8m6as"
+    }
+  ],
   "overlays": [
     {
       "id": "ov_mowzeyw8m6as",
       "name": "Overlay 1",
-      "bgColor": "#00FF00",
-      "opacity": 1,
+      "bgColor": "#00ff00",
+      "opacity": 0,
       "bounds": {
-        "x": null,
-        "y": null,
-        "width": 540,
-        "height": 960
+        "x": 1612,
+        "y": 546,
+        "width": 434,
+        "height": 736
       },
       "alwaysOnTop": true
     }

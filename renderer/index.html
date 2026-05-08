@@ -205,8 +205,12 @@
         </label>
       </div>
       <div class="form-row">
-        <label>File hiệu ứng
-          <select id="dlgFile"></select>
+        <label style="flex:2">File hiệu ứng (mp4/webm/mp3/wav)
+          <div style="display:flex; gap:6px">
+            <select id="dlgFile" style="flex:1"></select>
+            <button type="button" id="dlgPickFile" class="tiny" title="Chọn file từ ổ đĩa, copy vào assets/effects">📁</button>
+            <button type="button" id="dlgOpenFolder" class="tiny" title="Mở folder assets/effects">📂</button>
+          </div>
         </label>
         <label>Overlay
           <select id="dlgOverlay"></select>

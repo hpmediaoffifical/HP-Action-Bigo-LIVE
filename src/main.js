@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeImage, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { BigoClient } = require('./bigo-client');
@@ -267,10 +267,52 @@ ipcMain.handle('mapping:save', (_e, data) => {
 
 ipcMain.handle('effects:list', () => {
   try {
+    fs.mkdirSync(EFFECTS_DIR, { recursive: true });
     return fs.readdirSync(EFFECTS_DIR)
       .filter(f => /\.(mp4|webm|mp3|wav|ogg|gif)$/i.test(f))
       .map(f => ({ file: f, path: path.join(EFFECTS_DIR, f) }));
   } catch { return []; }
+});
+
+// Mở dialog chọn 1 hoặc nhiều file mp3/mp4/webm/wav rồi copy vào assets/effects.
+// Trả về tên file mới (hoặc null nếu user huỷ).
+ipcMain.handle('effects:pick-files', async () => {
+  if (!win) return { ok: false };
+  const res = await dialog.showOpenDialog(win, {
+    title: 'Chọn file hiệu ứng (mp3/mp4/webm/wav/ogg)',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: 'Media', extensions: ['mp4', 'webm', 'mp3', 'wav', 'ogg', 'gif'] },
+      { name: 'All', extensions: ['*'] },
+    ],
+  });
+  if (res.canceled || !res.filePaths.length) return { ok: false, canceled: true };
+  fs.mkdirSync(EFFECTS_DIR, { recursive: true });
+  const copied = [];
+  const skipped = [];
+  for (const src of res.filePaths) {
+    const base = path.basename(src);
+    const dst = path.join(EFFECTS_DIR, base);
+    try {
+      if (path.resolve(src) === path.resolve(dst)) {
+        skipped.push(base);
+        continue;
+      }
+      fs.copyFileSync(src, dst);
+      copied.push(base);
+    } catch (e) {
+      // ignore individual errors but continue
+    }
+  }
+  return { ok: true, copied, skipped };
+});
+
+// Mở folder assets/effects bằng file explorer
+ipcMain.handle('effects:open-folder', async () => {
+  fs.mkdirSync(EFFECTS_DIR, { recursive: true });
+  const { shell } = require('electron');
+  await shell.openPath(EFFECTS_DIR);
+  return { ok: true };
 });
 
 // =================== Open API (OAuth) ===================

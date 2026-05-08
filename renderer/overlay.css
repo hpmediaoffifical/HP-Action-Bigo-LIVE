@@ -11,17 +11,29 @@ html, body {
 #dragHandle {
   position: fixed;
   top: 0; left: 0; right: 0;
-  height: 24px;
+  height: 28px;
   -webkit-app-region: drag;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.55);
   color: rgba(255, 255, 255, 0.9);
   font-size: 11px;
   text-align: center;
-  line-height: 24px;
+  line-height: 28px;
   z-index: 10;
   cursor: move;
   user-select: none;
   letter-spacing: 0.05em;
+  /* Luôn nhìn thấy được — không auto-hide để user dễ kéo */
+  opacity: 0.65;
+  transition: opacity 0.15s ease;
+}
+#dragHandle:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.75);
+}
+
+/* Video không nhận event để không che drag handle */
+#player {
+  pointer-events: none;
 }
 
 #stage {

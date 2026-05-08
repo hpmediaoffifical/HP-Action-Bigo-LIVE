@@ -63,10 +63,13 @@ class OverlayWindow {
   applyConfig() {
     if (!this.win || this.win.isDestroyed()) return;
     try { this.win.setBackgroundColor(this.cfg.bgColor || '#00FF00'); } catch {}
+    // Window-level opacity: thật sự trong suốt cả frame, không chỉ body
+    const op = this.cfg.opacity != null ? Math.max(0.05, Math.min(1, this.cfg.opacity)) : 1.0;
+    try { this.win.setOpacity(op); } catch {}
     this.win.setAlwaysOnTop(!!this.cfg.alwaysOnTop, this.cfg.alwaysOnTop ? 'screen-saver' : 'normal');
+    // Body chỉ nhận bgColor — không set body opacity vì đã handle ở window level
     this.win.webContents.send('overlay:config', {
       bgColor: this.cfg.bgColor || '#00FF00',
-      opacity: this.cfg.opacity != null ? this.cfg.opacity : 1.0,
     });
   }
 
