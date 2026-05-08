@@ -441,8 +441,8 @@ function renderOverlayTable() {
     els.overlayTableBody.innerHTML = mapping.overlays.map(o => {
       const b = o.bounds || {};
       const lockBtn = o.clickThrough
-        ? `<button class="tiny" data-act="unlock" data-id="${o.id}" title="Đang khoá - bấm để mở khoá">🔓 Mở khoá</button>`
-        : `<button class="tiny" data-act="lock" data-id="${o.id}" title="Bật click-through OBS mode">🔒 Khoá</button>`;
+        ? `<button class="tiny" data-act="unlock" data-id="${o.id}" title="Đang khoá - bấm để mở khoá">🔓</button>`
+        : `<button class="tiny" data-act="lock" data-id="${o.id}" title="Bật click-through OBS mode">🔒</button>`;
       return `<tr data-id="${o.id}">
         <td>${escapeHtml(o.name)}</td>
         <td><span class="color-swatch" style="background:${o.bgColor}"></span><code>${escapeHtml(o.bgColor)}</code></td>
@@ -452,7 +452,8 @@ function renderOverlayTable() {
         <td>${o.alwaysOnTop ? '✓' : '—'}</td>
         <td>${o.clickThrough ? '🔒 Có' : '—'}</td>
         <td class="actions-col">
-          <button class="tiny" data-act="show" data-id="${o.id}">👁 Mở</button>
+          <button class="tiny" data-act="show" data-id="${o.id}" title="Mở/hiện overlay">👁</button>
+          <button class="tiny" data-act="hide" data-id="${o.id}" title="Ẩn overlay (gift về vẫn auto-show + play)">🙈</button>
           ${lockBtn}
           <button class="tiny" data-act="edit" data-id="${o.id}">✏️</button>
           <button class="tiny danger" data-act="del" data-id="${o.id}">🗑</button>
@@ -471,6 +472,8 @@ async function overlayAction(act, id) {
   if (act === 'show') {
     const r = await window.bigo.overlayShow(id);
     if (!r.ok) alert('Lỗi: ' + (r.error || 'unknown'));
+  } else if (act === 'hide') {
+    await window.bigo.overlayHide(id);
   } else if (act === 'lock' || act === 'unlock') {
     o.clickThrough = (act === 'lock');
     await window.bigo.overlayApplyConfig({ ...o });

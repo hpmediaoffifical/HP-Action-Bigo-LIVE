@@ -88,7 +88,11 @@ class OverlayWindow {
     } else {
       send();
     }
-    this.win.show();
+    // Auto-show NHƯNG không steal focus — quan trọng cho user đang stream:
+    // app/OBS đang focus, khi gift về overlay show ngầm để OBS capture nhưng không nhảy lên trước.
+    try {
+      if (!this.win.isVisible()) this.win.showInactive();
+    } catch { try { this.win.show(); } catch {} }
   }
 
   showAndFocus() {
