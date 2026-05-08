@@ -252,6 +252,11 @@ document.querySelectorAll('.tab').forEach(t => {
     document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
     t.classList.add('active');
     document.querySelector(`.tab-panel[data-tab="${t.dataset.tab}"]`).classList.add('active');
+    // Re-render groups khi switch sang Tương tác hoặc Bảng quà
+    // để đảm bảo embedGroupsContainer được populate (lỡ render lần init bị skip)
+    if (t.dataset.tab === 'embed' || t.dataset.tab === 'gifts') {
+      try { renderGiftTable(); } catch (e) { console.warn(e); }
+    }
   };
 });
 
@@ -348,24 +353,28 @@ function getGiftIcon(g) {
 const subtypeByContainer = new WeakMap();
 
 function renderGiftTable() {
-  // v3: render groups list trong container của tab Bảng quà
-  let groupsContainer = $('groupsContainer');
-  if (!groupsContainer && els.giftTableBody) {
-    const tableWrap = els.giftTableBody.closest('.table-wrap');
-    if (tableWrap) {
-      groupsContainer = document.createElement('div');
-      groupsContainer.id = 'groupsContainer';
-      groupsContainer.className = 'groups-container';
-      tableWrap.replaceWith(groupsContainer);
-      els.groupsContainer = groupsContainer;
+  // Tab Bảng quà (sidebar 🎁) — replace table 1 lần đầu nếu chưa có groupsContainer
+  let groupsContainer = document.getElementById('groupsContainer');
+  if (!groupsContainer) {
+    const tableBody = document.getElementById('giftTableBody');
+    if (tableBody) {
+      const tableWrap = tableBody.closest('.table-wrap');
+      if (tableWrap) {
+        const div = document.createElement('div');
+        div.id = 'groupsContainer';
+        div.className = 'groups-container';
+        tableWrap.replaceWith(div);
+        groupsContainer = div;
+      }
     }
   }
-  els.groupsContainer = groupsContainer || $('groupsContainer');
-  if (els.groupsContainer) renderGroupsInto(els.groupsContainer, {});
-  // Render cả container trong tab Tương tác
-  if (els.embedGroupsContainer) {
-    const search = els.embedGroupSearch?.value.toLowerCase().trim() || '';
-    renderGroupsInto(els.embedGroupsContainer, { search });
+  if (groupsContainer) renderGroupsInto(groupsContainer, {});
+
+  // Tab Tương tác (sidebar 💬, trang chính)
+  const embedContainer = document.getElementById('embedGroupsContainer');
+  if (embedContainer) {
+    const search = (document.getElementById('embedGroupSearch')?.value || '').toLowerCase().trim();
+    renderGroupsInto(embedContainer, { search });
   }
 }
 
@@ -399,11 +408,67 @@ function renderGroupsInto(container, opts) {
       el.onclick = () => groupAction(act, el.dataset.gid, undefined, el.dataset.iid);
     }
   });
+  // Drag-drop reorder items trong group
+  wireDragDrop(container);
   // Update group datalist
   if (els.groupList) {
     const groupNames = (mapping.groups || []).map(g => g.name).filter(Boolean);
     els.groupList.innerHTML = groupNames.map(g => `<option value="${escapeHtml(g)}"></option>`).join('');
   }
+}
+
+// Drag-drop reorder cho items trong cùng group + giữa groups
+function wireDragDrop(container) {
+  let dragIid = null;
+  let dragGid = null;
+  container.querySelectorAll('.group-item').forEach(row => {
+    row.draggable = true;
+    row.ondragstart = (e) => {
+      dragIid = row.dataset.iid;
+      dragGid = row.dataset.gid;
+      e.dataTransfer.effectAllowed = 'move';
+      row.classList.add('dragging');
+    };
+    row.ondragend = () => {
+      row.classList.remove('dragging');
+      container.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+    };
+    row.ondragover = (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      // Highlight target
+      container.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+      row.classList.add('drop-target');
+    };
+    row.ondragleave = () => {
+      row.classList.remove('drop-target');
+    };
+    row.ondrop = async (e) => {
+      e.preventDefault();
+      row.classList.remove('drop-target');
+      const targetIid = row.dataset.iid;
+      const targetGid = row.dataset.gid;
+      if (!dragIid || dragIid === targetIid) return;
+      await moveItem(dragIid, dragGid, targetIid, targetGid);
+    };
+  });
+}
+
+async function moveItem(srcIid, srcGid, dstIid, dstGid) {
+  const srcGroup = findGroupById(srcGid);
+  const dstGroup = findGroupById(dstGid);
+  if (!srcGroup || !dstGroup) return;
+  const srcIdx = srcGroup.items.findIndex(i => i.id === srcIid);
+  if (srcIdx === -1) return;
+  const [moved] = srcGroup.items.splice(srcIdx, 1);
+  const dstIdx = dstGroup.items.findIndex(i => i.id === dstIid);
+  if (dstIdx === -1) {
+    dstGroup.items.push(moved);
+  } else {
+    dstGroup.items.splice(dstIdx, 0, moved);
+  }
+  await persistMapping();
+  renderGiftTable();
 }
 
 function renderGroupCard(grp, overlayMap) {

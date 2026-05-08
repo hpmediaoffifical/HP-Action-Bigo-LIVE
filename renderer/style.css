@@ -196,7 +196,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .group-status { color: #4ad07a; font-size: 11px; flex: 1; }
 .group-card.off .group-status { color: #ff6b6b; }
 .group-items { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
-.group-item { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; background: #14161c; border: 1px solid #262a35; border-radius: 6px; }
+.group-item { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; background: #14161c; border: 1px solid #262a35; border-radius: 6px; cursor: grab; transition: all 0.12s; }
+.group-item:active { cursor: grabbing; }
+.group-item.dragging { opacity: 0.4; transform: scale(0.98); }
+.group-item.drop-target { border-color: #ff8a3d; box-shadow: 0 0 0 2px rgba(255, 138, 61, 0.25); }
 .group-item .grow-icon { width: 40px; height: 40px; border-radius: 6px; object-fit: contain; background: #0f1117; }
 .group-item .grow-icon-empty { width: 40px; height: 40px; border-radius: 6px; background: #1c1f28; }
 .group-item .grow-meta { min-width: 0; }
