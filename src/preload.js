@@ -33,6 +33,9 @@ contextBridge.exposeInMainWorld('bigo', {
   popupSendQueue: (item) => ipcRenderer.invoke('popup:queue-item', item),
   popupResetQueue: () => ipcRenderer.invoke('popup:reset-queue'),
 
+  // Open external URL in default browser
+  openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
+
   // Open API mode
   start: (opts) => ipcRenderer.invoke('bigo:start', opts),
   stop: () => ipcRenderer.invoke('bigo:stop'),

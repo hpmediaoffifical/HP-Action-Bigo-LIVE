@@ -16,10 +16,21 @@ function getAllItems() {
 function getEnabledGiftItems() {
   if (Array.isArray(mapping.groups)) {
     return mapping.groups
-      .filter(g => g.enabled !== false && g.type !== 'comment')
+      // NHÓM CHUNG luôn bật. Các nhóm khác tuỳ enabled.
+      .filter(g => (g.isCommon || g.enabled !== false) && g.type !== 'comment')
       .flatMap(g => (g.items || []).map(item => ({ ...item, _group: g })));
   }
   return (mapping.gifts || []).map(item => ({ ...item, _group: null }));
+}
+// Tìm/tạo NHÓM CHUNG ở renderer
+function getCommonGroup() {
+  if (!Array.isArray(mapping.groups)) mapping.groups = [];
+  let common = mapping.groups.find(g => g.isCommon || g.id === 'g_common');
+  if (!common) {
+    common = { id: 'g_common', name: 'NHÓM CHUNG', type: 'gift', enabled: true, collapsed: false, bigoId: '', items: [], isCommon: true };
+    mapping.groups.unshift(common);
+  }
+  return common;
 }
 function getEnabledCommentItems() {
   if (Array.isArray(mapping.groups)) {
@@ -106,7 +117,7 @@ function applyQueueSize() {
 // Dùng chung cho cả manual play và live gift event.
 function pushPlayBatch(item, ev, playTimes) {
   const batchId = 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 4);
-  const baseUser = ev?.user || 'You (test)';
+  const baseUser = ev?.user || 'NHPHUNG';
   const baseAvatar = ev?.user_avatar_url || '';
   const baseName = ev?.gift_name || item?.alias || (item?.matchKeys || [])[0] || '?';
   const baseId = ev?.gift_id ?? null;
@@ -627,7 +638,8 @@ async function moveItem(srcIid, srcGid, dstIid, dstGid) {
 }
 
 function renderGroupCard(grp, overlayMap) {
-  const enabled = grp.enabled !== false;
+  const isCommon = !!grp.isCommon;
+  const enabled = isCommon ? true : grp.enabled !== false;
   const collapsed = !!grp.collapsed;
   const itemsHtml = (grp.items || []).map(item => {
     const iconUrl = getGiftIcon(item);
@@ -650,18 +662,27 @@ function renderGroupCard(grp, overlayMap) {
     </div>`;
   }).join('') || '<div style="color:#555;padding:8px;font-size:11px">Nhóm trống</div>';
 
-  return `<div class="group-card ${enabled ? 'on' : 'off'} ${collapsed ? 'collapsed' : ''}" data-gid="${grp.id}">
+  // NHÓM CHUNG: không có toggle bật/tắt + không xoá được + tên cố định
+  const toggleHtml = isCommon
+    ? '<span class="group-status common">⭐ Luôn bật</span>'
+    : `<span class="group-status">${enabled ? 'Đang bật' : 'Đang tắt'}</span>
+       <label class="switch" title="Bật/tắt nhóm">
+         <input type="checkbox" data-act="toggle-group" data-gid="${grp.id}" ${enabled ? 'checked' : ''} />
+         <span class="slider"></span>
+       </label>`;
+  const editBtn = isCommon ? '' :
+    `<button class="tiny" data-act="edit-group" data-gid="${grp.id}" title="Sửa nhóm">✏️</button>`;
+  const delBtn = isCommon ? '' :
+    `<button class="tiny danger" data-act="del-group" data-gid="${grp.id}" title="Xoá nhóm (items chuyển về NHÓM CHUNG)">🗑</button>`;
+
+  return `<div class="group-card ${enabled ? 'on' : 'off'} ${collapsed ? 'collapsed' : ''} ${isCommon ? 'common' : ''}" data-gid="${grp.id}">
     <div class="group-head">
       <span class="group-name">${escapeHtml(grp.name)}</span>
       <span class="group-badge">${(grp.items || []).length} mục</span>
-      <span class="group-status">${enabled ? 'Đang bật' : 'Đang tắt'}</span>
-      <label class="switch" title="Bật/tắt nhóm">
-        <input type="checkbox" data-act="toggle-group" data-gid="${grp.id}" ${enabled ? 'checked' : ''} />
-        <span class="slider"></span>
-      </label>
+      ${toggleHtml}
       <button class="tiny" data-act="add-item" data-gid="${grp.id}" title="Thêm vào nhóm">+ mục</button>
-      <button class="tiny" data-act="edit-group" data-gid="${grp.id}" title="Sửa tên nhóm">✏️</button>
-      <button class="tiny danger" data-act="del-group" data-gid="${grp.id}" title="Xoá nhóm">🗑</button>
+      ${editBtn}
+      ${delBtn}
       <button class="tiny" data-act="collapse" data-gid="${grp.id}" title="Thu gọn/Mở">${collapsed ? '▶' : '▼'}</button>
     </div>
     ${collapsed ? '' : `<div class="group-items">${itemsHtml}</div>`}
@@ -698,12 +719,18 @@ async function groupAction(act, gid, value, itemId) {
   }
   if (act === 'del-group') {
     if (!grp) return;
-    if (!confirm(`Xoá nhóm "${grp.name}" và ${(grp.items || []).length} quà bên trong?`)) return;
+    if (grp.isCommon) { alert('Không thể xoá NHÓM CHUNG'); return; }
+    const itemCount = (grp.items || []).length;
+    const msg = itemCount > 0
+      ? `Xoá nhóm "${grp.name}"?\n${itemCount} quà bên trong sẽ tự động chuyển về NHÓM CHUNG (KHÔNG mất).`
+      : `Xoá nhóm "${grp.name}"?`;
+    if (!confirm(msg)) return;
+    // Auto-move items về NHÓM CHUNG để KHÔNG mất data
+    if (itemCount > 0) {
+      const common = getCommonGroup();
+      common.items.push(...(grp.items || []));
+    }
     mapping.groups = mapping.groups.filter(g => g.id !== gid);
-    if (mapping.groups.length === 0) mapping.groups.push({
-      id: 'g_default_' + Date.now().toString(36),
-      name: 'Mặc định', type: 'gift', enabled: true, collapsed: false, bigoId: '', items: [],
-    });
     await persistMapping();
     renderGiftTable();
     return;
@@ -1646,8 +1673,10 @@ if (grpDlgSave) {
 
 // =================== Quản lý nhóm trong tab Cài đặt ===================
 async function settingsGroupRename(gid) {
+  console.log('[settingsGroupRename]', gid);
   const g = findGroupById(gid);
-  if (!g) { alert('Nhóm không tồn tại'); return; }
+  if (!g) { alert('Nhóm không tồn tại (gid=' + gid + ')'); return; }
+  if (g.isCommon) { alert('Không thể đổi tên NHÓM CHUNG'); return; }
   const newName = prompt('Đổi tên nhóm:', g.name);
   if (!newName || !newName.trim()) return;
   const lower = newName.trim().toLowerCase();
@@ -1662,7 +1691,16 @@ async function settingsGroupRename(gid) {
 async function settingsGroupDelete(gid) {
   const g = findGroupById(gid);
   if (!g) return;
-  if (!confirm(`Xoá nhóm "${g.name}" và ${(g.items || []).length} quà bên trong?`)) return;
+  if (g.isCommon) { alert('Không thể xoá NHÓM CHUNG'); return; }
+  const itemCount = (g.items || []).length;
+  const msg = itemCount > 0
+    ? `Xoá nhóm "${g.name}"?\n${itemCount} quà bên trong sẽ tự động chuyển về NHÓM CHUNG (KHÔNG mất).`
+    : `Xoá nhóm "${g.name}"?`;
+  if (!confirm(msg)) return;
+  if (itemCount > 0) {
+    const common = getCommonGroup();
+    common.items.push(...(g.items || []));
+  }
   mapping.groups = (mapping.groups || []).filter(x => x.id !== gid);
   await persistMapping();
   renderSettingsGroupsList();

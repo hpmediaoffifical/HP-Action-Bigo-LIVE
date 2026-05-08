@@ -2,98 +2,6 @@
   "version": 3,
   "groups": [
     {
-      "id": "g_mox7zmlqy3ay",
-      "name": "Mặc định",
-      "type": "gift",
-      "enabled": true,
-      "collapsed": false,
-      "bigoId": "",
-      "items": [
-        {
-          "id": "g_mox220symqfo",
-          "matchKeys": [
-            "2463",
-            "Bell",
-            "7750",
-            "Bell-测试68372/60190"
-          ],
-          "alias": "Tung hoa",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": true
-        },
-        {
-          "id": "g_mox7uyyhhk53",
-          "matchKeys": [
-            "5355",
-            "Duck Box"
-          ],
-          "alias": "Duck Box",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false
-        },
-        {
-          "id": "g_mox7vd5166qb",
-          "matchKeys": [
-            "4214",
-            "Gala's Flower",
-            "7455"
-          ],
-          "alias": "Gala's Flower",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false
-        },
-        {
-          "id": "g_mox7vndakh4v",
-          "matchKeys": [
-            "502136",
-            "SummerChill Box"
-          ],
-          "alias": "SummerChill Box",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false
-        },
-        {
-          "id": "g_mox7w37oq18f",
-          "matchKeys": [
-            "Gold",
-            "500858"
-          ],
-          "alias": "Gold",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false
-        },
-        {
-          "id": "i_mox8dkm1u58u",
-          "matchKeys": [
-            "504754",
-            "Galaxy Ring"
-          ],
-          "alias": "Galaxy Ring",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false
-        },
-        {
-          "id": "i_mox8emi1zvkl",
-          "matchKeys": [
-            "5317",
-            "💓Gem ring",
-            "501027",
-            "Gem Ring"
-          ],
-          "alias": "💓Gem ring",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": true
-        }
-      ]
-    },
-    {
       "id": "g_mox8ulzfk04f",
       "name": "NPC",
       "type": "gift",
@@ -141,7 +49,7 @@
       "id": "g_mox9je2347fw",
       "name": "Peo",
       "type": "gift",
-      "enabled": true,
+      "enabled": false,
       "collapsed": true,
       "bigoId": "",
       "items": [
@@ -172,7 +80,7 @@
       "id": "g_mox9jh2358um",
       "name": "Ada",
       "type": "gift",
-      "enabled": true,
+      "enabled": false,
       "collapsed": true,
       "bigoId": "",
       "items": [
@@ -203,7 +111,7 @@
         "height": 814
       },
       "alwaysOnTop": true,
-      "clickThrough": true,
+      "clickThrough": false,
       "autoHide": false
     }
   ]

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeImage, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { BigoClient } = require('./bigo-client');
@@ -60,10 +60,32 @@ function defaultGroup(name = 'Mặc định', type = 'gift') {
   };
 }
 
+// NHÓM CHUNG luôn tồn tại trên cùng. ID cố định 'g_common' để dễ track.
+function defaultCommonGroup() {
+  return {
+    id: 'g_common', name: 'NHÓM CHUNG', type: 'gift',
+    enabled: true, collapsed: false, bigoId: '', items: [], isCommon: true,
+  };
+}
+function ensureCommonGroup(m) {
+  if (!m || !Array.isArray(m.groups)) return;
+  let common = m.groups.find(g => g.isCommon || g.id === 'g_common');
+  if (!common) {
+    common = defaultCommonGroup();
+    m.groups.unshift(common);
+  } else {
+    common.isCommon = true;
+    common.enabled = true; // luôn bật
+    // Move common to top
+    m.groups = m.groups.filter(g => g.id !== common.id);
+    m.groups.unshift(common);
+  }
+}
+
 function defaultMapping() {
   return {
     version: 3,
-    groups: [defaultGroup('Mặc định', 'gift')],
+    groups: [defaultCommonGroup(), defaultGroup('Mặc định', 'gift')],
     overlays: [defaultOverlay()],
   };
 }
@@ -115,7 +137,10 @@ function migrateMapping(raw) {
 function loadMapping() {
   const raw = loadJson(MAPPING_PATH, null);
   const m = migrateMapping(raw);
-  if (!raw || raw.version !== 3) saveJson(MAPPING_PATH, m); // upgrade on disk
+  ensureCommonGroup(m);  // Đảm bảo NHÓM CHUNG luôn ở đầu
+  if (!raw || raw.version !== 3 || !raw.groups?.some?.(g => g.isCommon)) {
+    saveJson(MAPPING_PATH, m);
+  }
   return m;
 }
 
@@ -318,8 +343,29 @@ ipcMain.handle('settings:load', () => loadJson(CONFIG_PATH, {
 }));
 ipcMain.handle('settings:save', (_e, data) => { saveJson(CONFIG_PATH, data); return true; });
 
+ipcMain.handle('shell:open-external', (_e, url) => shell.openExternal(url));
+
 ipcMain.handle('mapping:load', () => mapping);
 ipcMain.handle('mapping:save', (_e, data) => {
+  // Preserve overlay bounds từ mapping hiện tại (đã được track qua move/resize events).
+  // Renderer's mapping có thể stale - không nên cho phép overwrite bounds latest.
+  if (data && Array.isArray(data.overlays) && mapping && Array.isArray(mapping.overlays)) {
+    for (const newOv of data.overlays) {
+      const existing = mapping.overlays.find(o => o.id === newOv.id);
+      if (existing && existing.bounds) {
+        // Giữ bounds.x, y (vị trí). Width/height có thể đến từ user nhập trong dialog.
+        const newB = newOv.bounds || {};
+        newOv.bounds = {
+          x: existing.bounds.x != null ? existing.bounds.x : newB.x,
+          y: existing.bounds.y != null ? existing.bounds.y : newB.y,
+          width: newB.width != null ? newB.width : existing.bounds.width,
+          height: newB.height != null ? newB.height : existing.bounds.height,
+        };
+      }
+    }
+  }
+  // Đảm bảo NHÓM CHUNG luôn tồn tại
+  ensureCommonGroup(data);
   mapping = data;
   saveJson(MAPPING_PATH, mapping);
   return true;
