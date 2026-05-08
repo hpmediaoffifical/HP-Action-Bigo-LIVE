@@ -24,21 +24,35 @@ function applyConfig(cfg) {
 const queue = [];
 let playing = false;
 
+// Stop session — mỗi lần receive 'overlay:stop', tăng nonce. Plays với nonce
+// CŨ (in-flight trước stop) sẽ bị reject. Giải quyết triệt để race condition
+// khi app gửi N overlay:play sync, user delete giữa chừng → một số IPC vẫn
+// đang trên đường tới overlay → chúng arrive sau stop → start play lại.
+let stopNonce = 0;
+let blockPlaysUntil = 0;
+
 function isVideo(url) { return /\.(mp4|webm)(\?|$)/i.test(url); }
 function isAudio(url) { return /\.(mp3|wav|ogg)(\?|$)/i.test(url); }
 
-// Clear video element triệt để - tránh vệt mờ frame cuối
+// Clear video element triệt để - tránh vệt mờ frame cuối + đảm bảo OBS
+// không bắt được frame cũ.
 function clearPlayer() {
   try {
     player.pause();
+    player.currentTime = 0;
     player.removeAttribute('src');
     player.load(); // flush frame buffer
   } catch {}
   player.style.display = 'none';
+  // Defensive: hide via opacity + visibility (OBS Window Capture sometimes
+  // captures hidden display:none if rendering thread chưa flush)
+  player.style.opacity = '0';
+  player.style.visibility = 'hidden';
 }
 function clearAudio() {
   try {
     audio.pause();
+    audio.currentTime = 0;
     audio.removeAttribute('src');
     audio.load();
   } catch {}
@@ -48,7 +62,6 @@ function playNext() {
   if (queue.length === 0) {
     playing = false;
     clearPlayer();
-    // Báo main biết queue rỗng → main có thể auto-hide window nếu config bật
     try { ipcRenderer.send('overlay:queue-empty'); } catch {}
     return;
   }
@@ -58,11 +71,11 @@ function playNext() {
     clearAudio();
     player.src = url;
     player.muted = false;
+    // Reset visibility/opacity vì clearPlayer đã set 0/hidden
     player.style.display = 'block';
-    player.play().catch(() => {
-      // Nếu play fail (vd file lỗi) thì tiếp tới quà sau
-      setTimeout(playNext, 100);
-    });
+    player.style.opacity = '1';
+    player.style.visibility = 'visible';
+    player.play().catch(() => setTimeout(playNext, 100));
   } else if (isAudio(url)) {
     clearPlayer();
     audio.src = url;
@@ -70,13 +83,15 @@ function playNext() {
   } else {
     // Unknown - thử video trước
     player.src = url;
+    player.style.display = 'block';
+    player.style.opacity = '1';
+    player.style.visibility = 'visible';
     player.play().catch(() => setTimeout(playNext, 100));
   }
 }
 
 player.addEventListener('ended', () => {
   clearPlayer();
-  // Báo main để renderer chính advance UI queue
   try { ipcRenderer.send('overlay:effect-ended'); } catch {}
   playNext();
 });
@@ -85,28 +100,40 @@ audio.addEventListener('ended', () => {
   try { ipcRenderer.send('overlay:effect-ended'); } catch {}
   playNext();
 });
-// Defensive: nếu lỗi cũng tiếp tục queue
 player.addEventListener('error', () => {
   clearPlayer();
-  playNext();
+  // Sau error, vẫn tiếp tục queue (defensive) — nhưng nếu queue trống thì noop.
+  if (queue.length > 0) playNext();
+  else { playing = false; try { ipcRenderer.send('overlay:queue-empty'); } catch {} }
 });
 audio.addEventListener('error', () => {
   clearAudio();
-  playNext();
+  if (queue.length > 0) playNext();
+  else playing = false;
 });
 
 ipcRenderer.on('overlay:config', (_e, cfg) => applyConfig(cfg));
+
+// QUAN TRỌNG: ignore plays during block window (sau stop) hoặc stale nonce.
 ipcRenderer.on('overlay:play', (_e, url) => {
   if (!url) return;
+  if (Date.now() < blockPlaysUntil) {
+    // Trong block window — ignore play này (in-flight từ trước stop).
+    return;
+  }
   queue.push(url);
   if (!playing) playNext();
 });
-// User xoá item playing trong DSHT → main app gửi stop → overlay tắt ngay video/audio + clear queue.
+
+// User xoá item playing → stop NGAY + block plays trong 500ms để drain in-flight.
 ipcRenderer.on('overlay:stop', () => {
+  stopNonce++;
   queue.length = 0;
   playing = false;
   clearPlayer();
   clearAudio();
-  // Báo main → renderer chính advance UI (giống 'ended') để tránh state mắc kẹt.
+  // Block window 500ms — đủ thời gian cho mọi IPC in-flight (gốc từ event handler
+  // for-loop) đi qua và bị ignore. Sau 500ms, plays mới được accept.
+  blockPlaysUntil = Date.now() + 500;
   try { ipcRenderer.send('overlay:queue-empty'); } catch {}
 });

@@ -395,6 +395,15 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .group-item .grow-sub { color: #8a8f9a; font-size: 11px; margin-top: 2px; word-break: break-all; }
 .group-item .grow-sub code { background: #0f1117; padding: 1px 6px; border-radius: 4px; color: #ffd166; }
 .group-item .grow-actions { display: flex; gap: 4px; align-items: center; }
+/* Thông tin nhà phát triển */
+.dev-info { display: flex; flex-direction: column; gap: 8px; padding: 8px 4px; }
+.dev-row { display: flex; gap: 14px; align-items: baseline; padding: 6px 10px; background: #0f1117; border-radius: 6px; }
+.dev-row .dev-key { color: #8a8f9a; min-width: 130px; font-size: 12px; }
+.dev-row .dev-val { color: #c9d6ff; flex: 1; font-size: 13px; word-break: break-all; }
+.dev-row .dev-val b { color: #ffd166; }
+.dev-link { color: #8ad6ff; text-decoration: none; }
+.dev-link:hover { color: #fe2c55; text-decoration: underline; }
+
 /* Hiệu Ứng Đặc Biệt rows */
 .se-row {
   background: #0f1117;

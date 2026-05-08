@@ -283,13 +283,14 @@ function removeQueueItemById(id) {
 }
 
 function clearAllQueue() {
-  // Stop tất cả overlay đang playing TRƯỚC khi clear (tránh chạy ẩn)
-  const playingOverlays = new Set();
-  for (const q of queueItems) {
-    if (q.status === 'playing' && q.overlayId) playingOverlays.add(q.overlayId);
-  }
-  for (const ovId of playingOverlays) {
-    if (window.bigo.overlayStopEffect) window.bigo.overlayStopEffect(ovId).catch(() => {});
+  // DEFENSIVE: Stop TẤT CẢ overlays trong mapping (không chỉ playing items).
+  // Lý do: race condition — IPC overlay:play có thể IN-FLIGHT từ event handler
+  // for-loop (combo gift fires N plays sync). Stop hết để overlay's block window
+  // (500ms) drain mọi play in-flight.
+  if (window.bigo.overlayStopEffect && mapping?.overlays) {
+    for (const ov of mapping.overlays) {
+      window.bigo.overlayStopEffect(ov.id).catch(() => {});
+    }
   }
   // Decrement counter
   sessionStats.effects = Math.max(0, sessionStats.effects - queueItems.length);
@@ -582,6 +583,15 @@ if (els.btnResetStats) {
     try { window.bigo.openExternal('https://hpvn.media'); } catch {}
   });
 })();
+
+// Mọi link có data-ext → mở trong trình duyệt mặc định (panel Thông tin NPT)
+document.body.addEventListener('click', (e) => {
+  const link = e.target.closest('[data-ext]');
+  if (!link) return;
+  e.preventDefault();
+  const url = link.dataset.ext;
+  if (url) { try { window.bigo.openExternal(url); } catch {} }
+});
 
 // =================== Init ===================
 // Marquee suffix branding (chữ chạy)
