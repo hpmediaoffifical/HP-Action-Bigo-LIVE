@@ -12,7 +12,12 @@
       overflow: hidden;
       color: #fff;
     }
-    body { display: flex; align-items: center; justify-content: center; padding: 20px; }
+    /* Toàn body draggable (frameless window cần drag region rõ ràng) */
+    body {
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+      -webkit-app-region: drag;
+      cursor: move;
+    }
 
     .heart-stage {
       position: relative;
@@ -52,6 +57,11 @@
     .heart-icon {
       font-size: 42px;
       line-height: 1;
+      /* Force màu ĐỎ — Unicode ❤ có thể render text-style (đen) ở vài font.
+         color đỏ + WebKit text fill (Chrome) đảm bảo emoji hiển thị màu đỏ. */
+      color: #ff3b6f;
+      -webkit-text-fill-color: #ff3b6f;
+      text-shadow: 0 0 8px rgba(255, 59, 111, 0.7), 0 0 16px rgba(255, 59, 111, 0.4);
       filter: drop-shadow(0 0 6px rgba(255, 80, 120, 0.6));
       animation: heart-beat 1.2s ease-in-out infinite;
     }
@@ -104,7 +114,7 @@
               stroke-dasharray="552.92" stroke-dashoffset="552.92"></circle>
     </svg>
     <div class="center">
-      <div class="heart-icon">❤</div>
+      <div class="heart-icon">❤️</div>
       <div class="count" id="count">0</div>
       <div class="target-line">Mục tiêu: <b id="target">100</b></div>
     </div>
