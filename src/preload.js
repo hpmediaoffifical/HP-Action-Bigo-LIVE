@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld('bigo', {
 
   // Overlays
   overlayShow: (overlayId) => ipcRenderer.invoke('overlay:show', overlayId),
+  overlayNudge: (overlayId) => ipcRenderer.invoke('overlay:nudge', overlayId),
   overlayHide: (overlayId) => ipcRenderer.invoke('overlay:hide', overlayId),
   overlayApplyConfig: (cfg) => ipcRenderer.invoke('overlay:apply-config', cfg),
   overlayDelete: (overlayId) => ipcRenderer.invoke('overlay:delete', overlayId),

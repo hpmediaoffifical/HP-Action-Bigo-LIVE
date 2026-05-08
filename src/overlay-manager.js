@@ -66,11 +66,24 @@ class OverlayWindow {
     if (!this.win || this.win.isDestroyed()) return;
     // Always-on-top
     this.win.setAlwaysOnTop(!!this.cfg.alwaysOnTop, this.cfg.alwaysOnTop ? 'screen-saver' : 'normal');
-    // Click-through (OBS mode): window vẫn render nhưng không nhận click + ẩn taskbar
+    // Click-through (OBS mode): không nhận click + ẩn taskbar + KHOÁ resize/move
     const ct = !!this.cfg.clickThrough;
     try {
       this.win.setIgnoreMouseEvents(ct, ct ? { forward: true } : undefined);
       this.win.setSkipTaskbar(ct);
+      // Khi khoá (click-through ON): không cho phép resize hoặc move
+      this.win.setResizable(!ct);
+      this.win.setMovable(!ct);
+    } catch {}
+    // Khoá tỉ lệ khi resize: giữ aspect ratio hiện tại
+    try {
+      const lockRatio = this.cfg.lockRatio !== false; // default true
+      const b = this.cfg.bounds || {};
+      if (lockRatio && b.width && b.height) {
+        this.win.setAspectRatio(b.width / b.height);
+      } else {
+        this.win.setAspectRatio(0); // disable
+      }
     } catch {}
     // Send config xuống renderer cho CSS RGBA
     this.win.webContents.send('overlay:config', {

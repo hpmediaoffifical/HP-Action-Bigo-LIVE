@@ -313,7 +313,8 @@ const els = {
   overlayDialog: $('overlayDialog'), overlayDialogTitle: $('overlayDialogTitle'),
   ovName: $('ovName'), ovBgColor: $('ovBgColor'), ovOpacity: $('ovOpacity'), ovOpacityVal: $('ovOpacityVal'),
   ovW: $('ovW'), ovH: $('ovH'), ovTop: $('ovTop'), ovClickThrough: $('ovClickThrough'),
-  ovAutoHide: $('ovAutoHide'),
+  ovAutoHide: $('ovAutoHide'), ovLockRatio: $('ovLockRatio'),
+  ovAutoOpen: $('ovAutoOpen'), ovAutoFocus: $('ovAutoFocus'),
   dlgOverlaySave: $('dlgOverlaySave'),
 };
 
@@ -1092,6 +1093,9 @@ function openOverlayDialog(ov = null) {
   els.ovTop.checked = ov?.alwaysOnTop !== false;
   els.ovClickThrough.checked = !!ov?.clickThrough;
   els.ovAutoHide.checked = !!ov?.autoHide;
+  if (els.ovLockRatio) els.ovLockRatio.checked = ov?.lockRatio !== false;
+  if (els.ovAutoOpen) els.ovAutoOpen.checked = !!ov?.autoOpen;
+  if (els.ovAutoFocus) els.ovAutoFocus.checked = !!ov?.autoFocus;
   els.overlayDialog.dataset.editingId = ov?.id || '';
   els.overlayDialog.showModal();
 }
@@ -1114,6 +1118,9 @@ els.dlgOverlaySave.onclick = async (e) => {
     alwaysOnTop: els.ovTop.checked,
     clickThrough: els.ovClickThrough.checked,
     autoHide: els.ovAutoHide.checked,
+    lockRatio: els.ovLockRatio ? els.ovLockRatio.checked : true,
+    autoOpen: els.ovAutoOpen ? els.ovAutoOpen.checked : false,
+    autoFocus: els.ovAutoFocus ? els.ovAutoFocus.checked : false,
   };
   if (existing) {
     Object.assign(existing, data);
@@ -1476,8 +1483,21 @@ function forwardToQueuePopup(item) {
   }
 }
 
+function nudgeAutoFocusOverlays() {
+  // Auto-focus: overlay nào có cfg.autoFocus → showInactive (không steal focus)
+  for (const ov of (mapping.overlays || [])) {
+    if (ov.autoFocus) {
+      try { window.bigo.overlayNudge(ov.id); } catch {}
+    }
+  }
+}
+
 function renderEmbedEvent(ev) {
-  if (ev.kind === 'parsed') return renderParsed(ev);
+  if (ev.kind === 'parsed') {
+    // Auto-focus on gift or chat event
+    if (ev.type === 'gift' || ev.type === 'chat') nudgeAutoFocusOverlays();
+    return renderParsed(ev);
+  }
   if (ev.kind === 'meta') {
     // Panel "Room hiện tại" đã bỏ - silently ignore meta event
     if (els.metaPanel && els.metaInfo) {

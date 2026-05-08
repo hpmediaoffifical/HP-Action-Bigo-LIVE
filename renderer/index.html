@@ -19,6 +19,7 @@
       <button class="tab sidebar-tab" data-tab="settings" title="Cài đặt chung">⚙️</button>
       <div class="sidebar-spacer"></div>
       <button class="sidebar-tab" id="sidebarBgmToggle" title="Phát / Dừng nhạc nền">🎵</button>
+      <button class="sidebar-tab" id="sidebarLockSettings" title="Khoá cài đặt — chống chỉnh nhầm trong khi stream">🔐</button>
     </aside>
 
     <div class="main-content">
@@ -412,6 +413,17 @@
       <div class="form-row">
         <label class="checkbox-row" title="Khi đã ẩn overlay, gift về vẫn auto-show + play. Sau khi play xong toàn bộ queue, tự ẩn lại.">
           <input type="checkbox" id="ovAutoHide" /> 🌙 Tự ẩn sau khi phát xong
+        </label>
+        <label class="checkbox-row" title="Khi resize, giữ tỉ lệ chiều dài/rộng (kéo 1 cạnh các cạnh khác tự co theo).">
+          <input type="checkbox" id="ovLockRatio" checked /> 🔗 Khoá tỉ lệ khi resize
+        </label>
+      </div>
+      <div class="form-row">
+        <label class="checkbox-row" title="Khi bật app, overlay này tự động mở.">
+          <input type="checkbox" id="ovAutoOpen" /> 🚀 Mở overlay khi bật app
+        </label>
+        <label class="checkbox-row" title="Khi có quà/bình luận, overlay tự show ngầm (showInactive) để OBS bắt được.">
+          <input type="checkbox" id="ovAutoFocus" /> 👁 Auto-focus khi có sự kiện
         </label>
       </div>
       <div class="modal-actions">

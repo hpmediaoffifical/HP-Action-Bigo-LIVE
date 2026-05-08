@@ -66,6 +66,33 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #1
   color: #fff;
   box-shadow: 0 2px 10px rgba(74, 208, 122, 0.5);
 }
+#sidebarLockSettings.locked {
+  background: linear-gradient(135deg, #fe2c55, #ff3b6f);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(254, 44, 85, 0.5);
+}
+/* App locked mode: disable inputs/selects/buttons in setting/overlay/gift areas */
+body.app-locked .panel input:not([readonly]),
+body.app-locked .panel select,
+body.app-locked .panel-compact input,
+body.app-locked .data-table button,
+body.app-locked .group-card button[data-act],
+body.app-locked .group-card .switch input,
+body.app-locked .group-item button,
+body.app-locked .group-item input,
+body.app-locked .gls-row button,
+body.app-locked #btnAddGiftEmbed,
+body.app-locked #btnCreateGroup,
+body.app-locked #btnAddOverlay {
+  pointer-events: none;
+  opacity: 0.55;
+  filter: grayscale(0.4);
+}
+body.app-locked .embed-right .rcv-row,
+body.app-locked .mini-queue-row {
+  pointer-events: auto;
+  opacity: 1; filter: none;
+}
 .main-content {
   overflow-y: auto;
   min-width: 0;

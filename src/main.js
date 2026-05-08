@@ -313,6 +313,14 @@ app.whenReady().then(async () => {
     },
   });
   createWindow();
+  // Auto-open overlays với cfg.autoOpen = true sau khi app sẵn sàng
+  setTimeout(() => {
+    for (const ov of (mapping.overlays || [])) {
+      if (ov.autoOpen) {
+        try { overlayManager.show(ov); } catch (e) { console.warn('autoOpen overlay failed:', e); }
+      }
+    }
+  }, 1200);
   // Background: load master → auto-download icons nếu thiếu
   (async () => {
     const r = await ensureGiftMaster().catch(e => ({ ok: false, error: e.message }));
@@ -699,6 +707,19 @@ ipcMain.handle('overlay:show', (_e, overlayId) => {
   const cfg = mapping.overlays.find(o => o.id === overlayId);
   if (!cfg) return { ok: false, error: 'overlay không tồn tại' };
   overlayManager.show(cfg);
+  return { ok: true };
+});
+
+// Auto-focus (showInactive) cho overlay autoFocus khi có gift/chat event
+ipcMain.handle('overlay:nudge', (_e, overlayId) => {
+  const cfg = mapping.overlays.find(o => o.id === overlayId);
+  if (!cfg || !cfg.autoFocus) return { ok: false };
+  const ov = overlayManager.overlays.get(overlayId);
+  if (!ov || !ov.win || ov.win.isDestroyed()) {
+    overlayManager.show(cfg);
+  } else if (!ov.win.isVisible()) {
+    try { ov.win.showInactive(); } catch {}
+  }
   return { ok: true };
 });
 ipcMain.handle('overlay:hide', (_e, overlayId) => {
