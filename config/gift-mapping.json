@@ -141,7 +141,7 @@
       "id": "g_mox9je2347fw",
       "name": "Peo",
       "type": "gift",
-      "enabled": false,
+      "enabled": true,
       "collapsed": false,
       "bigoId": "",
       "items": [
@@ -172,10 +172,22 @@
       "id": "g_mox9jh2358um",
       "name": "Ada",
       "type": "gift",
-      "enabled": false,
+      "enabled": true,
       "collapsed": false,
       "bigoId": "",
-      "items": []
+      "items": [
+        {
+          "id": "i_mox9vw2zsv1c",
+          "matchKeys": [
+            "500348",
+            "Bluelover"
+          ],
+          "alias": "Bluelover",
+          "mediaFile": "09. Phóng Dây Leo.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false
+        }
+      ]
     }
   ],
   "overlays": [

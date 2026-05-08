@@ -660,10 +660,23 @@ ipcMain.handle('overlay:hide', (_e, overlayId) => {
   return { ok: true };
 });
 ipcMain.handle('overlay:apply-config', (_e, cfg) => {
-  // cfg đến từ renderer khi user edit overlay → cập nhật mapping & live update window
+  // cfg từ renderer khi user edit overlay. Chú ý: nếu cfg.bounds không có,
+  // GIỮ NGUYÊN bounds hiện tại (được track qua onBoundsChanged khi user move).
+  // Nếu cfg.bounds có (user nhập W/H trong dialog), update theo cfg.
   const idx = mapping.overlays.findIndex(o => o.id === cfg.id);
   if (idx === -1) return { ok: false };
-  mapping.overlays[idx] = { ...mapping.overlays[idx], ...cfg };
+  const existing = mapping.overlays[idx];
+  const merged = { ...existing, ...cfg };
+  // Nếu cfg.bounds chỉ có w/h (không có x/y), giữ x/y hiện tại
+  if (cfg.bounds) {
+    merged.bounds = {
+      x: cfg.bounds.x != null ? cfg.bounds.x : existing.bounds?.x,
+      y: cfg.bounds.y != null ? cfg.bounds.y : existing.bounds?.y,
+      width: cfg.bounds.width != null ? cfg.bounds.width : existing.bounds?.width,
+      height: cfg.bounds.height != null ? cfg.bounds.height : existing.bounds?.height,
+    };
+  }
+  mapping.overlays[idx] = merged;
   saveJson(MAPPING_PATH, mapping);
   overlayManager.applyConfig(mapping.overlays[idx]);
   return { ok: true };

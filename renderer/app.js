@@ -1012,8 +1012,10 @@ async function overlayAction(act, id) {
   } else if (act === 'hide') {
     await window.bigo.overlayHide(id);
   } else if (act === 'lock' || act === 'unlock') {
+    // Chỉ gửi id + clickThrough — KHÔNG gửi bounds (renderer's bounds có thể stale,
+    // bounds thực tế đã được track trong main qua onBoundsChanged khi user move/resize).
     o.clickThrough = (act === 'lock');
-    await window.bigo.overlayApplyConfig({ ...o });
+    await window.bigo.overlayApplyConfig({ id: o.id, clickThrough: o.clickThrough });
     renderOverlayTable();
   } else if (act === 'edit') {
     openOverlayDialog(o);
@@ -1631,6 +1633,34 @@ if (grpDlgSave) {
 }
 
 // =================== Quản lý nhóm trong tab Cài đặt ===================
+async function settingsGroupRename(gid) {
+  const g = findGroupById(gid);
+  if (!g) { alert('Nhóm không tồn tại'); return; }
+  const newName = prompt('Đổi tên nhóm:', g.name);
+  if (!newName || !newName.trim()) return;
+  const lower = newName.trim().toLowerCase();
+  const dup = (mapping.groups || []).find(x => x.id !== gid && x.name.toLowerCase() === lower);
+  if (dup) { alert(`Đã có nhóm "${dup.name}" - tên trùng (không phân biệt hoa/thường)`); return; }
+  g.name = newName.trim();
+  await persistMapping();
+  renderSettingsGroupsList();
+  renderGiftTable();
+}
+
+async function settingsGroupDelete(gid) {
+  const g = findGroupById(gid);
+  if (!g) return;
+  if (!confirm(`Xoá nhóm "${g.name}" và ${(g.items || []).length} quà bên trong?`)) return;
+  mapping.groups = (mapping.groups || []).filter(x => x.id !== gid);
+  await persistMapping();
+  renderSettingsGroupsList();
+  renderGiftTable();
+}
+
+// Expose ra window để onclick attribute có thể gọi
+window.settingsGroupRename = settingsGroupRename;
+window.settingsGroupDelete = settingsGroupDelete;
+
 function renderSettingsGroupsList() {
   const container = document.getElementById('groupsListSettings');
   if (!container) return;
@@ -1643,40 +1673,10 @@ function renderSettingsGroupsList() {
     <div class="gls-row" data-gid="${g.id}">
       <span class="name">${escapeHtml(g.name)}</span>
       <span class="count">${(g.items || []).length} mục</span>
-      <button class="tiny" data-act="settings-rename" data-gid="${g.id}" title="Đổi tên">✏️</button>
-      <button class="tiny danger" data-act="settings-del" data-gid="${g.id}" title="Xoá nhóm">🗑</button>
+      <button class="tiny" onclick="window.settingsGroupRename('${g.id}')" title="Đổi tên">✏️</button>
+      <button class="tiny danger" onclick="window.settingsGroupDelete('${g.id}')" title="Xoá nhóm">🗑</button>
     </div>
   `).join('');
-}
-
-// Event delegation cho settings groups list — gắn 1 lần (không bị mất khi re-render innerHTML)
-const settingsGroupsContainer = document.getElementById('groupsListSettings');
-if (settingsGroupsContainer && !settingsGroupsContainer._wired) {
-  settingsGroupsContainer._wired = true;
-  settingsGroupsContainer.addEventListener('click', async (e) => {
-    const btn = e.target.closest('button[data-act]');
-    if (!btn) return;
-    const gid = btn.dataset.gid;
-    const g = findGroupById(gid);
-    if (!g) return;
-    if (btn.dataset.act === 'settings-rename') {
-      const newName = prompt('Đổi tên nhóm:', g.name);
-      if (!newName || !newName.trim()) return;
-      const lower = newName.trim().toLowerCase();
-      const dup = mapping.groups.find(x => x.id !== gid && x.name.toLowerCase() === lower);
-      if (dup) { alert(`Đã có nhóm "${dup.name}" - tên trùng (không phân biệt hoa/thường)`); return; }
-      g.name = newName.trim();
-      await persistMapping();
-      renderSettingsGroupsList();
-      renderGiftTable();
-    } else if (btn.dataset.act === 'settings-del') {
-      if (!confirm(`Xoá nhóm "${g.name}" và ${(g.items || []).length} quà bên trong?`)) return;
-      mapping.groups = mapping.groups.filter(x => x.id !== gid);
-      await persistMapping();
-      renderSettingsGroupsList();
-      renderGiftTable();
-    }
-  });
 }
 
 const btnCreateGroup = document.getElementById('btnCreateGroup');
