@@ -60,6 +60,12 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #1
   color: #fff;
   box-shadow: 0 2px 10px rgba(255, 59, 111, 0.4);
 }
+.sidebar-spacer { flex: 1; }
+#sidebarBgmToggle.playing {
+  background: linear-gradient(135deg, #1e8a4f, #4ad07a);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(74, 208, 122, 0.5);
+}
 .main-content {
   overflow-y: auto;
   min-width: 0;

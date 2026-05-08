@@ -354,6 +354,7 @@ async function init() {
   renderSettingsGroupsList();
   // Pre-load master để gift table có icon ngay (background)
   ensureMasterLoaded().catch(() => {});
+  updateBgmSidebarIcon();
 }
 
 async function refreshIconCacheStatus() {
@@ -596,7 +597,16 @@ function renderGroupCard(grp, overlayMap) {
 async function groupAction(act, gid, value, itemId) {
   const grp = findGroupById(gid);
   if (act === 'toggle-group') {
-    if (grp) { grp.enabled = !!value; await persistMapping(); renderGiftTable(); }
+    if (grp) {
+      grp.enabled = !!value;
+      await persistMapping();
+      // Khi BẬT nhóm: tự đưa tên nhóm vào search để focus duy nhất nhóm đó + tự phát BGM
+      if (value && grp.name) {
+        if (els.embedGroupSearch) els.embedGroupSearch.value = grp.name;
+        playBgmIfHas();
+      }
+      renderGiftTable();
+    }
     return;
   }
   if (act === 'collapse') {
@@ -1096,6 +1106,8 @@ els.btnConnect.onclick = async () => {
   els.status.classList.add('on');
   setConnectedUi(true);
   appendLog(`connected to ${id}`);
+  // Auto-play BGM khi kết nối thành công
+  playBgmIfHas();
 };
 
 els.btnPopupGifts.onclick = () => window.bigo.popupOpenGifts();
@@ -1588,6 +1600,48 @@ if (window.bigo.onOverlayQueueEmpty) {
   window.bigo.onOverlayQueueEmpty(() => {
     resumeBgmAfterEffect();
   });
+}
+
+// Helper: play BGM nếu có file và đang paused (dùng cho auto-trigger)
+function playBgmIfHas() {
+  if (!els.bgmAudio || !els.bgmAudio.src) return;
+  if (els.bgmAudio.paused) {
+    els.bgmAudio.play().catch(() => {});
+  }
+}
+
+// Update icon BGM trên sidebar theo trạng thái play/pause
+function updateBgmSidebarIcon() {
+  const btn = document.getElementById('sidebarBgmToggle');
+  if (!btn || !els.bgmAudio) return;
+  if (!els.bgmAudio.paused && els.bgmAudio.src) {
+    btn.textContent = '⏸';
+    btn.classList.add('playing');
+    btn.title = 'Đang phát nhạc nền — bấm để dừng';
+  } else {
+    btn.textContent = '🎵';
+    btn.classList.remove('playing');
+    btn.title = els.bgmAudio.src ? 'Bấm để phát nhạc nền' : 'Chưa chọn nhạc nền (vào tab Cài đặt)';
+  }
+}
+
+if (els.bgmAudio) {
+  els.bgmAudio.addEventListener('play', updateBgmSidebarIcon);
+  els.bgmAudio.addEventListener('pause', updateBgmSidebarIcon);
+  els.bgmAudio.addEventListener('loadedmetadata', updateBgmSidebarIcon);
+}
+
+// Sidebar BGM toggle button
+const sidebarBgmBtn = document.getElementById('sidebarBgmToggle');
+if (sidebarBgmBtn) {
+  sidebarBgmBtn.onclick = () => {
+    if (!els.bgmAudio.src) {
+      alert('Chưa chọn nhạc nền — vào tab ⚙️ Cài đặt chung để chọn file');
+      return;
+    }
+    if (els.bgmAudio.paused) els.bgmAudio.play().catch(e => alert('Không phát được: ' + e.message));
+    else els.bgmAudio.pause();
+  };
 }
 
 // =================== Wire up ===================
