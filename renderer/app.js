@@ -188,6 +188,14 @@ function pushPlayBatch(item, ev, playTimes) {
 // User wants: quà hết hiệu ứng → XOÁ LUÔN khỏi danh sách (không giữ 'done' state).
 if (window.bigo.onOverlayEffectEnded) {
   window.bigo.onOverlayEffectEnded(() => {
+    // Pre-effect ended → decrement ghost counter, không advance app queue.
+    // Tránh off-by-one khi gift có pre-effect: overlay chạy N+1 plays nhưng
+    // app queueItems chỉ có N entries (cho main effect). Nếu không skip 1 ended
+    // event thì queue empty trước khi main effect cuối kết thúc.
+    if (_preEffectPending > 0) {
+      _preEffectPending--;
+      return;
+    }
     if (queueItems.length === 0) return;
     const playingIdx = queueItems.findIndex(q => q.status === 'playing');
     if (playingIdx !== -1) {
@@ -1702,8 +1710,9 @@ async function disconnect() {
 }
 
 els.btnConnect.onclick = async () => {
-  // Toggle: nếu đang connect → disconnect
+  // Toggle: nếu đang connect → disconnect (confirm tránh bấm nhầm)
   if (isConnected) {
+    if (!confirm('⚠️ HỦY KẾT NỐI khỏi room hiện tại?\n\nLịch sử quà + chat trong session này sẽ bị xoá. Tiếp tục?')) return;
     await disconnect();
     return;
   }
@@ -1762,6 +1771,17 @@ els.btnConnect.onclick = async () => {
 
 els.btnPopupGifts.onclick = () => window.bigo.popupOpenGifts();
 if (els.btnPopupQueue) els.btnPopupQueue.onclick = () => window.bigo.popupOpenQueue();
+// Nút "🗑 Xoá tất cả" trên panel DSHT mini (trang chính) — confirm trước
+const btnClearMiniQueue = document.getElementById('btnClearMiniQueue');
+if (btnClearMiniQueue) btnClearMiniQueue.onclick = () => {
+  if (queueItems.length === 0) {
+    appendLog('[queue] DSHT đã trống');
+    return;
+  }
+  if (confirm(`⚠️ Xoá TOÀN BỘ ${queueItems.length} hiệu ứng đang chờ?\n\nThao tác này không thể hoàn tác. Hiệu ứng đang phát cũng sẽ dừng ngay.`)) {
+    clearAllQueue();
+  }
+};
 // Chat popup button
 const btnPopupChats = document.getElementById('btnPopupChats');
 if (btnPopupChats) btnPopupChats.onclick = () => window.bigo.popupOpenChats();
@@ -2179,13 +2199,20 @@ function resolveMediaPayload(mediaFile) {
 // MODEL OPT-IN: mặc định OFF cho mọi quà. User phải EXPLICIT tick checkbox trên dialog
 // từng quà → giftItem.preEffect === true → mới phát. Toggle global setting off/on
 // nhiều lần KHÔNG tự bật lại quà nào — mỗi quà giữ nguyên trạng thái user đã set.
+// Pre-effect "ghost" count: số ended events đến từ pre-effect plays (KHÔNG phải
+// main effect). Khi onOverlayEffectEnded fire, nếu _preEffectPending > 0 thì
+// decrement counter — KHÔNG advance app queueItems (vì app queue chỉ track
+// main effects, pre-effect là phụ).
+let _preEffectPending = 0;
+
 function maybeDispatchPreEffect(giftItem) {
   if (!giftItem) return;
-  if (giftItem.preEffect !== true) return;  // chỉ phát khi user explicit opt-in (true)
+  if (giftItem.preEffect !== true) return;
   const cfg = appSettings.preFx;
-  if (!cfg || !cfg.enabled || !cfg.file) return;  // settings chưa bật hoặc chưa có file
+  if (!cfg || !cfg.enabled || !cfg.file) return;
   if (!giftItem.overlayId) return;
   try {
+    _preEffectPending++;
     window.bigo.overlayPlay({ overlayId: giftItem.overlayId, fileUrl: cfg.file });
   } catch (e) { console.warn('preFx dispatch failed:', e); }
 }

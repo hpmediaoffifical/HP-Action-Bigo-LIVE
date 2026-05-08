@@ -35,7 +35,8 @@
     <section class="tab-panel active" data-tab="embed">
       <div class="panel panel-compact">
         <div class="connect-row">
-          <input id="embedBigoId" placeholder="BIGO ID (vd: 1066691535)" class="connect-input" />
+          <label class="bigo-id-label" for="embedBigoId">BIGO ID:</label>
+          <input id="embedBigoId" placeholder="vd: 1066691535" class="connect-input" />
           <button id="btnConnect" class="primary">KẾT NỐI</button>
           <button id="btnEmbedShow" disabled>VIEW</button>
           <span id="liveInfo" class="live-info-inline">Nhập ID rồi bấm Kết nối</span>
@@ -66,6 +67,7 @@
             <div class="panel-head">
               <h2>📋 DANH SÁCH HIỆU ỨNG</h2>
               <div style="display:flex; gap:4px">
+                <button id="btnClearMiniQueue" class="tiny danger" title="Xoá toàn bộ DSHT (sẽ hỏi xác nhận)">🗑 Xoá tất cả</button>
                 <button id="btnPopupQueueRight" class="tiny" title="Mở popup riêng">📤</button>
                 <button class="tiny rps-collapse" data-rps-target="queue" title="Thu gọn / mở">▼</button>
               </div>

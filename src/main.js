@@ -282,6 +282,25 @@ function createWindow() {
   });
   win.setMenuBarVisibility(false);
   win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
+  // Confirm khi đóng app — tránh user bấm nhầm X làm mất session
+  win.on('close', (e) => {
+    if (win._allowClose) return;
+    e.preventDefault();
+    const { dialog } = require('electron');
+    const r = dialog.showMessageBoxSync(win, {
+      type: 'question',
+      buttons: ['Hủy', 'Thoát'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'HP Action - BIGO LIVE',
+      message: 'Thoát ứng dụng?',
+      detail: 'Mọi session/queue/chat đang chạy sẽ bị mất. Bạn chắc chắn muốn thoát?',
+    });
+    if (r === 1) {
+      win._allowClose = true;
+      win.close();
+    }
+  });
   win.on('closed', () => { win = null; });
   trackWindowBounds(win, 'main');
   if (process.argv.includes('--dev')) win.webContents.openDevTools({ mode: 'detach' });
