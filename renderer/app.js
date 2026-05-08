@@ -216,6 +216,35 @@ function getQueueDisplayList() {
   return [...playing, ...queued];
 }
 
+// Layout chuẩn (theo yêu cầu user):
+//   [avatar] [gift_icon] [user (top, large) / "tặng <effect> ×N" (bottom)] [✕ del]
+// Đang phát hiển thị border-left đỏ + badge "▶ ĐANG PHÁT" cạnh tên user.
+function renderQueueRowHtml(q, opts = {}) {
+  const isPlaying = q.status === 'playing';
+  const avUrl = resolveAvatarForUser(q.user, q.avatar);
+  const avHtml = avUrl ? `<img class="qrow-avatar" src="${escapeHtml(avUrl)}" loading="lazy" />` : '';
+  const giftIconHtml = q.gift_icon
+    ? `<img class="qrow-gift-icon" src="${escapeHtml(q.gift_icon)}" loading="lazy" />`
+    : '<div class="qrow-gift-icon-empty"></div>';
+  const playingBadge = isPlaying
+    ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>'
+    : '';
+  const cntInline = q.count > 1 || q.total > 1
+    ? `<span class="cnt-inline">×${q.count}</span>` : '';
+  const beansInline = q.diamond != null
+    ? `<span class="beans-inline">💎 ${q.diamond.toLocaleString('en-US')}</span>` : '';
+  const rowClass = opts.rowClass || 'mini-queue-row';
+  return `<div class="${rowClass} ${q.status}" data-id="${escapeHtml(q.id)}">
+    ${avHtml}
+    ${giftIconHtml}
+    <div class="qrow-meta">
+      <div class="qrow-user">${escapeHtml(q.user)}${playingBadge}</div>
+      <div class="qrow-effect">tặng <b>${escapeHtml(q.gift_name)}</b>${cntInline}${beansInline}</div>
+    </div>
+    <button class="qrow-del" data-qid="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
+  </div>`;
+}
+
 function renderMiniQueue() {
   const el = document.getElementById('miniQueue');
   if (!el) return;
@@ -224,39 +253,9 @@ function renderMiniQueue() {
     el.innerHTML = '<div style="color:#555;text-align:center;padding:14px;font-size:11px">Chưa có hiệu ứng</div>';
     return;
   }
-  // Top 10 entries — playing trên cùng (STT ▶), tiếp là STT 1, 2, 3...
-  let playingCount = 0;
-  el.innerHTML = list.slice(0, 10).map((q, i) => {
-    const isPlaying = q.status === 'playing';
-    if (isPlaying) playingCount++;
-    const stt = isPlaying ? '▶' : String(i - playingCount + 1);
-    const iconHtml = q.gift_icon
-      ? `<img class="gift-icon" src="${escapeHtml(q.gift_icon)}" loading="lazy" />`
-      : '<div class="gift-icon"></div>';
-    const status = isPlaying ? '<span class="badge-status playing">▶</span>'
-      : '<span class="badge-status queued">⏳</span>';
-    const cntLabel = q.total > 1 ? `<span class="step">${q.step}/${q.total}</span>` : `×${q.count}`;
-    // Avatar (NHPHUNG → logo HP, user khác → raw nếu scrape được, ngược lại bỏ)
-    const avUrl = resolveAvatarForUser(q.user, q.avatar);
-    const avHtml = avUrl ? `<img class="avatar" src="${escapeHtml(avUrl)}" loading="lazy" />` : '';
-    return `<div class="mini-queue-row ${q.status}">
-      <span class="mini-stt ${isPlaying ? 'playing' : ''}" title="${isPlaying ? 'Đang phát' : 'STT ' + (i - playingCount + 1)}">${stt}</span>
-      ${avHtml}
-      ${iconHtml}
-      <div class="mini-meta">
-        <div class="who">${escapeHtml(q.user)}</div>
-        <div class="what"><b>${escapeHtml(q.gift_name)}</b> ${cntLabel}</div>
-      </div>
-      ${status}
-      <button class="mini-del" data-qid="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
-    </div>`;
-  }).join('');
-  // Wire delete buttons
+  el.innerHTML = list.slice(0, 10).map(q => renderQueueRowHtml(q, { rowClass: 'mini-queue-row' })).join('');
   el.querySelectorAll('[data-qid]').forEach(btn => {
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      removeQueueItemById(btn.dataset.qid);
-    };
+    btn.onclick = (e) => { e.stopPropagation(); removeQueueItemById(btn.dataset.qid); };
   });
 }
 
@@ -354,15 +353,15 @@ function checkSpecialEffectsTriggers(ev) {
     triggered = true;
   }
   if (matchSpecialGift(ev, se.speedUp)) {
-    const f = parseFloat(se.speedUp.factor) || 1.25;
-    appendLog(`[se:speedUp] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → BGM ×${f}`);
-    applyBgmSpeed(f);
+    const dur = parseInt(se.speedUp.duration, 10) || 10;
+    appendLog(`[se:speedUp] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → BGM ×${se.speedUp.factor} trong ${dur}s`);
+    triggerSpeedEffect('speedUp');
     triggered = true;
   }
   if (matchSpecialGift(ev, se.speedDown)) {
-    const f = parseFloat(se.speedDown.factor) || 0.75;
-    appendLog(`[se:speedDown] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → BGM ×${f}`);
-    applyBgmSpeed(f);
+    const dur = parseInt(se.speedDown.duration, 10) || 10;
+    appendLog(`[se:speedDown] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → BGM ×${se.speedDown.factor} trong ${dur}s`);
+    triggerSpeedEffect('speedDown');
     triggered = true;
   }
   return triggered;
@@ -385,38 +384,7 @@ function renderQueue() {
     els.effectQueue.innerHTML = '<div style="color:#555;text-align:center;padding:16px">Chưa có hiệu ứng nào trong danh sách</div>';
     return;
   }
-  let playingCount = 0;
-  els.effectQueue.innerHTML = list.map((q, i) => {
-    const isPlaying = q.status === 'playing';
-    if (isPlaying) playingCount++;
-    const stt = isPlaying ? '▶' : String(i - playingCount + 1);
-    const avUrl = resolveAvatarForUser(q.user, q.avatar);
-    const avatarHtml = avUrl
-      ? `<img class="avatar" src="${escapeHtml(avUrl)}" loading="lazy" />`
-      : '';
-    const giftIconHtml = q.gift_icon
-      ? `<img class="gift-icon" src="${escapeHtml(q.gift_icon)}" loading="lazy" />`
-      : `<div class="gift-icon"></div>`;
-    const statusBadge = isPlaying
-      ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>'
-      : '<span class="badge-status queued">⏳ chờ</span>';
-    const playInfo = q.playTimes > 1 ? `<span style="color:#ffd166"> · phát ${q.playTimes} lần</span>` : '';
-    return `<div class="queue-row ${q.status}" data-id="${q.id}">
-      <span class="queue-stt ${isPlaying ? 'playing' : ''}" title="${isPlaying ? 'Đang phát' : 'STT ' + (i - playingCount + 1)}">${stt}</span>
-      ${avatarHtml}
-      ${giftIconHtml}
-      <div class="meta">
-        <div class="who">${escapeHtml(q.user)}${statusBadge}</div>
-        <div class="what">tặng <span class="name">${escapeHtml(q.gift_name)}</span>${q.gift_id ? ` <span style="color:#666">id ${q.gift_id}</span>` : ''}${playInfo}</div>
-      </div>
-      <div class="right">
-        <div class="cnt">×${q.count}${q.combo > 1 ? ` · combo ${q.combo}` : ''}</div>
-        ${q.diamond != null ? `<div class="beans">💎 ${q.diamond}</div>` : ''}
-      </div>
-      <button class="queue-del" data-qid="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
-    </div>`;
-  }).join('');
-  // Wire delete buttons
+  els.effectQueue.innerHTML = list.map(q => renderQueueRowHtml(q, { rowClass: 'queue-row' })).join('');
   els.effectQueue.querySelectorAll('[data-qid]').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); removeQueueItemById(btn.dataset.qid); };
   });
@@ -1897,8 +1865,8 @@ let appSettings = {
   // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
   specialEffects: {
     clearQueue:  { enabled: false, typeid: null, giftName: '', iconUrl: '' },
-    speedUp:     { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 1.25 },
-    speedDown:   { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 0.75 },
+    speedUp:     { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 1.25, duration: 10 },
+    speedDown:   { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 0.75, duration: 10 },
   },
   fxVolume: 100,
   maxListItems: 200,
@@ -2065,9 +2033,9 @@ if (els.preFxEnabled) {
 // có master table giống dlgMaster. User click row → save typeid+name+icon.
 
 const SE_LABELS = {
-  clearQueue: { id: 'seClearQueueLabel', enabled: 'seClearQueueEnabled', factor: null },
-  speedUp:    { id: 'seSpeedUpLabel',    enabled: 'seSpeedUpEnabled',    factor: 'seSpeedUpFactor' },
-  speedDown:  { id: 'seSpeedDownLabel',  enabled: 'seSpeedDownEnabled',  factor: 'seSpeedDownFactor' },
+  clearQueue: { id: 'seClearQueueLabel', enabled: 'seClearQueueEnabled', factor: null,                duration: null },
+  speedUp:    { id: 'seSpeedUpLabel',    enabled: 'seSpeedUpEnabled',    factor: 'seSpeedUpFactor',   duration: 'seSpeedUpDuration' },
+  speedDown:  { id: 'seSpeedDownLabel',  enabled: 'seSpeedDownEnabled',  factor: 'seSpeedDownFactor', duration: 'seSpeedDownDuration' },
 };
 
 function applySpecialEffectsUi() {
@@ -2088,6 +2056,10 @@ function applySpecialEffectsUi() {
     if (ref.factor) {
       const facEl = document.getElementById(ref.factor);
       if (facEl && cfg.factor != null) facEl.value = cfg.factor;
+    }
+    if (ref.duration) {
+      const durEl = document.getElementById(ref.duration);
+      if (durEl && cfg.duration != null) durEl.value = cfg.duration;
     }
   }
 }
@@ -2220,6 +2192,31 @@ document.querySelectorAll('.se-unpick').forEach(btn => {
       await saveAppSettings({ specialEffects: { [key]: { factor: v } } });
     });
   }
+  const durKey = SE_LABELS[key].duration;
+  if (durKey) {
+    const durEl = document.getElementById(durKey);
+    if (durEl) durEl.addEventListener('change', async () => {
+      const v = Math.max(1, Math.min(600, parseInt(durEl.value, 10) || 10));
+      appSettings.specialEffects[key].duration = v;
+      durEl.value = v;
+      await saveAppSettings({ specialEffects: { [key]: { duration: v } } });
+    });
+  }
+});
+
+// "▶ Test" button: phát thử ngay (không cần gift trigger).
+document.querySelectorAll('.se-test').forEach(btn => {
+  btn.onclick = () => {
+    const key = btn.dataset.seKey;
+    if (key === 'speedUp' || key === 'speedDown') {
+      triggerSpeedEffect(key);
+      appendLog(`[se:${key}] TEST ngay (không qua gift)`);
+    } else if (key === 'clearQueue') {
+      if (!confirm('Test xoá toàn bộ DSHT?')) return;
+      clearAllQueue();
+      appendLog(`[se:clearQueue] TEST clearAllQueue`);
+    }
+  };
 });
 // Picker filter/sort live update
 ['spMasterFilter','spMasterSort','spMasterVnOnly','spMasterFavOnly'].forEach(id => {
@@ -2240,6 +2237,25 @@ function applyBgmSpeed(rate) {
   if (els.bgmAudio) els.bgmAudio.playbackRate = r;
   const disp = document.getElementById('bgmSpeedDisplay');
   if (disp) disp.textContent = `Tốc độ hiện tại: ×${r.toFixed(2).replace(/\.?0+$/, '')}`;
+}
+
+// Trigger speed effect: apply factor + auto-revert về 1.0 sau duration giây.
+// Multiple triggers cùng key reset timer (latest wins).
+let _speedRevertTimer = null;
+function triggerSpeedEffect(key) {
+  const cfg = appSettings.specialEffects?.[key];
+  if (!cfg) return;
+  const factor = parseFloat(cfg.factor) || 1;
+  const duration = Math.max(1, parseInt(cfg.duration, 10) || 10);
+  applyBgmSpeed(factor);
+  if (_speedRevertTimer) clearTimeout(_speedRevertTimer);
+  _speedRevertTimer = setTimeout(() => {
+    applyBgmSpeed(1.0);
+    appendLog(`[se] BGM speed auto-revert ×1.0 sau ${duration}s`);
+    _speedRevertTimer = null;
+  }, duration * 1000);
+  const disp = document.getElementById('bgmSpeedDisplay');
+  if (disp) disp.textContent = `Tốc độ hiện tại: ×${factor} (revert sau ${duration}s)`;
 }
 
 if (els.btnPickBgm) {

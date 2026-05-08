@@ -58,31 +58,27 @@
 
     function renderRow(q, idx) {
       const isPlaying = q.status === 'playing';
-      // STT: playing → "▶", queued items numbered từ 1 (sau playing).
-      // Đang phát luôn nằm trên cùng (idx=0). Dưới đó STT 1, 2, ..., N.
-      const stt = isPlaying ? '▶' : String(idx); // idx đã offset (xem renderAll)
       const avatar = q.avatar
-        ? `<img class="avatar" src="${escapeHtml(q.avatar)}" />`
+        ? `<img class="qrow-avatar" src="${escapeHtml(q.avatar)}" />`
         : '';
       const giftIcon = q.gift_icon
-        ? `<img class="gift-icon" src="${escapeHtml(q.gift_icon)}" />`
-        : `<div class="gift-icon"></div>`;
-      const status = isPlaying
+        ? `<img class="qrow-gift-icon" src="${escapeHtml(q.gift_icon)}" />`
+        : `<div class="qrow-gift-icon-empty"></div>`;
+      const playingBadge = isPlaying
         ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>'
-        : q.status === 'done' ? '<span class="badge-status done">✓ xong</span>'
-        : '<span class="badge-status queued">⏳ chờ</span>';
+        : '';
+      const cntInline = (q.count > 1 || q.total > 1)
+        ? `<span class="cnt-inline">×${q.count}</span>` : '';
+      const beansInline = q.diamond != null
+        ? `<span class="beans-inline">💎 ${Number(q.diamond).toLocaleString('en-US')}</span>` : '';
       return `<div class="queue-row ${q.status}" data-id="${escapeHtml(q.id)}">
-        <span class="pop-stt" title="${isPlaying ? 'Đang phát' : 'Hàng số ' + idx}">${stt}</span>
-        ${avatar}${giftIcon}
-        <div class="meta">
-          <div class="who">${escapeHtml(q.user)}${status}</div>
-          <div class="what">tặng <span class="name">${escapeHtml(q.gift_name)}</span>${q.gift_id ? ` <span style="color:#666">id ${q.gift_id}</span>` : ''}</div>
+        ${avatar}
+        ${giftIcon}
+        <div class="qrow-meta">
+          <div class="qrow-user">${escapeHtml(q.user)}${playingBadge}</div>
+          <div class="qrow-effect">tặng <b>${escapeHtml(q.gift_name)}</b>${cntInline}${beansInline}</div>
         </div>
-        <div class="right">
-          <div class="cnt">×${q.count}${q.combo > 1 ? ` · combo ${q.combo}` : ''}</div>
-          ${q.diamond != null ? `<div class="beans">💎 ${q.diamond}</div>` : ''}
-        </div>
-        <button class="pop-del" data-del="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
+        <button class="qrow-del" data-del="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
       </div>`;
     }
 

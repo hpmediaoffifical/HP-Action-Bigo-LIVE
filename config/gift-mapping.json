@@ -177,12 +177,12 @@
       "id": "ov_mowzeyw8m6as",
       "name": "Overlay 1",
       "bgColor": "#b1f1b1",
-      "opacity": 0.25,
+      "opacity": 0,
       "bounds": {
-        "x": 2012,
-        "y": 1207,
-        "width": 468,
-        "height": 842
+        "x": 2004,
+        "y": 1204,
+        "width": 471,
+        "height": 846
       },
       "alwaysOnTop": true,
       "clickThrough": false,

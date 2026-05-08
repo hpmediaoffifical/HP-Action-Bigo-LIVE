@@ -490,21 +490,114 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   border-color: #d23046;
   opacity: 1;
 }
-/* Row layout — flex left-aligned, X delete tuyệt đối góc phải */
+/* ========== Queue row CHUẨN: avatar | gift_icon | meta(user/effect) | X del ========== */
 .mini-queue-row, .queue-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 36px 8px 10px;
+  background: #1c1f28;
+  border-radius: 6px;
+  margin-bottom: 6px;
   position: relative;
-  padding-right: 36px; /* chừa chỗ cho X button */
   text-align: left;
 }
-/* Meta CHIẾM TRÁI sát sau icons (flex 1 fill space). Force text-align left. */
-.mini-queue-row .mini-meta, .queue-row .meta {
-  flex: 1; min-width: 0;
-  text-align: left;
-  margin-right: auto; /* đẩy mọi sibling khác sang phải nếu có */
+.mini-queue-row.playing, .queue-row.playing {
+  background: linear-gradient(90deg, rgba(254,44,85,0.15), rgba(254,44,85,0.02));
+  border-left: 3px solid #fe2c55;
+  padding-left: 7px; /* offset 3px border-left */
 }
-.mini-queue-row .mini-meta > *, .queue-row .meta > * { text-align: left; }
-/* .right block (count + diamond) co lại để không chiếm hết không gian giữa */
-.queue-row .right { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.qrow-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #0f1117;
+}
+.qrow-gift-icon {
+  width: 32px; height: 32px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.qrow-gift-icon-empty {
+  width: 32px; height: 32px;
+  background: #1c1f28;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.qrow-meta {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.qrow-user {
+  color: #ffd166;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qrow-user .badge-status { font-size: 10px; }
+.qrow-effect {
+  color: #c9d6ff;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qrow-effect b { color: #fff; }
+.qrow-effect .cnt-inline {
+  color: #ff3b6f;
+  font-weight: 700;
+  margin-left: 4px;
+}
+.qrow-effect .beans-inline {
+  color: #8ad6ff;
+  margin-left: 6px;
+  font-size: 11px;
+}
+.qrow-del {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 24px; height: 24px;
+  background: transparent;
+  border: 1px solid #3a3f4b;
+  color: #8a8f9a;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: all 0.15s;
+}
+.qrow-del:hover {
+  background: #d23046;
+  color: #fff;
+  border-color: #d23046;
+  opacity: 1;
+}
+/* Force tuyệt đối: bỏ mọi sizing default kế thừa của .avatar trong queue rows.
+   Tránh trường hợp <img class="avatar"> kế thừa size từ .chat-row .avatar
+   hoặc default natural size HUGE. */
+.mini-queue-row img.avatar, .queue-row img.avatar {
+  width: 36px !important; height: 36px !important;
+  border-radius: 50%; object-fit: cover; flex-shrink: 0;
+}
+.mini-queue-row img.gift-icon, .queue-row img.gift-icon {
+  width: 32px !important; height: 32px !important;
+  object-fit: contain; flex-shrink: 0;
+}
 
 .prio-badge {
   background: linear-gradient(135deg, #fe2c55, #ff8a3d);

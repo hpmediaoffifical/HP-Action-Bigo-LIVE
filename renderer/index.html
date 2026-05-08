@@ -224,10 +224,12 @@
             <span class="se-icon">⏩</span>
             <b class="se-title">Tăng tốc nhạc nền</b>
             <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedUpFactor" step="0.05" min="1" max="3" value="1.25" style="width:60px" /></label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">⏱ <input type="number" id="seSpeedUpDuration" min="1" max="600" value="10" style="width:60px" />s</label>
             <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedUpEnabled" /> Bật</label>
           </div>
           <div class="se-row-body">
             <span id="seSpeedUpLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny primary se-test" data-se-key="speedUp" title="Phát thử ngay">▶ Test</button>
             <button type="button" class="tiny se-pick" data-se-key="speedUp">🎁 Chọn</button>
             <button type="button" class="tiny danger se-unpick" data-se-key="speedUp">🗑</button>
           </div>
@@ -238,10 +240,12 @@
             <span class="se-icon">⏪</span>
             <b class="se-title">Giảm tốc nhạc nền</b>
             <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedDownFactor" step="0.05" min="0.25" max="1" value="0.75" style="width:60px" /></label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">⏱ <input type="number" id="seSpeedDownDuration" min="1" max="600" value="10" style="width:60px" />s</label>
             <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedDownEnabled" /> Bật</label>
           </div>
           <div class="se-row-body">
             <span id="seSpeedDownLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny primary se-test" data-se-key="speedDown" title="Phát thử ngay">▶ Test</button>
             <button type="button" class="tiny se-pick" data-se-key="speedDown">🎁 Chọn</button>
             <button type="button" class="tiny danger se-unpick" data-se-key="speedDown">🗑</button>
           </div>
