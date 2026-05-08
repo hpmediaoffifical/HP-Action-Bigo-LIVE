@@ -149,6 +149,15 @@ const els = {
   liveChats: $('liveChats'), liveGifts: $('liveGifts'),
   csEffects: $('csEffects'), csDiamond: $('csDiamond'), csUsers: $('csUsers'), csGifts: $('csGifts'),
   btnPopupGifts: $('btnPopupGifts'),
+  // Settings tab
+  bgmAudio: $('bgmAudio'), bgmFileLabel: $('bgmFileLabel'),
+  btnPickBgm: $('btnPickBgm'), btnPlayBgm: $('btnPlayBgm'), btnStopBgm: $('btnStopBgm'), btnClearBgm: $('btnClearBgm'),
+  audioDevice: $('audioDevice'), btnRefreshDevices: $('btnRefreshDevices'),
+  bgmVol: $('bgmVol'), bgmVolVal: $('bgmVolVal'),
+  fxVol: $('fxVol'), fxVolVal: $('fxVolVal'),
+  maxListItems: $('maxListItems'),
+  // Gift dialog extras
+  dlgPauseBgm: $('dlgPauseBgm'),
   effectQueue: $('effectQueue'), btnClearQueue: $('btnClearQueue'),
   btnPopupQueue: $('btnPopupQueue'),
   qStatGifts: $('qStatGifts'), qStatDiamond: $('qStatDiamond'), qStatUsers: $('qStatUsers'),
@@ -214,6 +223,7 @@ document.querySelectorAll('.tab').forEach(t => {
 async function init() {
   const s = await window.bigo.settingsLoad();
   els.embedBigoId.value = s.bigoId || '';
+  await initAppSettings(s);
 
   mapping = await window.bigo.mappingLoad();
   await reloadEffects();
@@ -481,6 +491,7 @@ async function openGiftDialog(gift = null) {
     : '<option value="">(chưa có overlay)</option>';
   els.dlgOverlay.value = gift?.overlayId || mapping.overlays[0]?.id || '';
   els.dlgFile.value = gift?.mediaFile || '';
+  if (els.dlgPauseBgm) els.dlgPauseBgm.checked = !!gift?.pauseBgm;
   els.giftDialog.dataset.editingId = gift?.id || '';
   els.giftDialog.showModal();
   await ensureMasterLoaded();
@@ -499,6 +510,7 @@ els.dlgGiftSave.onclick = async (e) => {
     group: els.dlgGroup.value.trim(),
     mediaFile: els.dlgFile.value,
     overlayId: els.dlgOverlay.value,
+    pauseBgm: els.dlgPauseBgm ? els.dlgPauseBgm.checked : false,
   };
   if (id) {
     const idx = mapping.gifts.findIndex(g => g.id === id);
@@ -872,6 +884,8 @@ function renderParsed(ev) {
       for (let i = 0; i < playTimes; i++) {
         window.bigo.overlayPlay({ overlayId: matched.overlayId, file: matched.mediaFile });
       }
+      // Tạm dừng nhạc nền nếu gift cấu hình "không chạy chung"
+      if (matched.pauseBgm) pauseBgmForEffect();
       pushQueue(ev, matched, playTimes);
     }
   }
@@ -898,6 +912,143 @@ function renderEmbedEvent(ev) {
     appendLog(`embed ${ev.kind}: ${ev._frame || ev.url || ''}`);
   }
   if (ev.kind === 'scrape-error') appendLog(`scrape error: ${ev.msg}`);
+}
+
+// =================== Cài đặt chung (BGM, audio device, volume) ===================
+let appSettings = {
+  bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
+  fxVolume: 100,
+  maxListItems: 200,
+};
+
+async function saveAppSettings(patch) {
+  const s = await window.bigo.settingsLoad();
+  if (patch) {
+    if (patch.bgm) s.bgm = { ...(s.bgm || {}), ...patch.bgm };
+    if ('fxVolume' in patch) s.fxVolume = patch.fxVolume;
+    if ('maxListItems' in patch) s.maxListItems = patch.maxListItems;
+  }
+  await window.bigo.settingsSave(s);
+}
+
+async function refreshAudioDevices() {
+  if (!els.audioDevice) return;
+  try {
+    // Cần media permission để có labels
+    try { await navigator.mediaDevices.getUserMedia({ audio: true }); } catch {}
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const outputs = devs.filter(d => d.kind === 'audiooutput');
+    els.audioDevice.innerHTML = outputs.map(d =>
+      `<option value="${d.deviceId}">${escapeHtml(d.label || `Device ${d.deviceId.slice(0, 6)}`)}</option>`
+    ).join('') || '<option value="default">Mặc định</option>';
+    // Restore selected
+    if (appSettings.bgm.deviceId) {
+      els.audioDevice.value = appSettings.bgm.deviceId;
+    }
+  } catch (e) {
+    console.warn('enumerateDevices failed:', e);
+    els.audioDevice.innerHTML = '<option value="default">Mặc định</option>';
+  }
+}
+
+async function applyBgmSinkId() {
+  if (!els.bgmAudio || !els.bgmAudio.setSinkId) return;
+  try { await els.bgmAudio.setSinkId(appSettings.bgm.deviceId || 'default'); } catch (e) { console.warn('setSinkId:', e.message); }
+}
+
+async function initAppSettings(s) {
+  appSettings.bgm = { ...appSettings.bgm, ...(s.bgm || {}) };
+  appSettings.fxVolume = s.fxVolume != null ? s.fxVolume : 100;
+  appSettings.maxListItems = s.maxListItems || 200;
+  // Apply BGM
+  if (els.bgmAudio) {
+    els.bgmAudio.volume = (appSettings.bgm.volume || 80) / 100;
+    if (appSettings.bgm.file) els.bgmAudio.src = appSettings.bgm.file;
+    if (appSettings.bgm.fileName) els.bgmFileLabel.value = appSettings.bgm.fileName;
+  }
+  // Apply UI controls
+  if (els.bgmVol) { els.bgmVol.value = appSettings.bgm.volume || 80; els.bgmVolVal.textContent = els.bgmVol.value; }
+  if (els.fxVol) { els.fxVol.value = appSettings.fxVolume; els.fxVolVal.textContent = appSettings.fxVolume; }
+  if (els.maxListItems) els.maxListItems.value = appSettings.maxListItems;
+  // Devices
+  await refreshAudioDevices();
+  await applyBgmSinkId();
+}
+
+if (els.btnPickBgm) {
+  els.btnPickBgm.onclick = async () => {
+    const r = await window.bigo.pickBgmFile();
+    if (!r.ok) return;
+    appSettings.bgm.file = r.fileUrl;
+    appSettings.bgm.fileName = r.fileName;
+    els.bgmAudio.src = r.fileUrl;
+    els.bgmFileLabel.value = r.fileName;
+    await saveAppSettings({ bgm: { file: r.fileUrl, fileName: r.fileName } });
+  };
+}
+if (els.btnPlayBgm) {
+  els.btnPlayBgm.onclick = () => {
+    if (!els.bgmAudio.src) { alert('Chưa chọn file nhạc nền'); return; }
+    els.bgmAudio.play().catch(e => alert('Không phát được: ' + e.message));
+  };
+}
+if (els.btnStopBgm) {
+  els.btnStopBgm.onclick = () => { els.bgmAudio.pause(); els.bgmAudio.currentTime = 0; };
+}
+if (els.btnClearBgm) {
+  els.btnClearBgm.onclick = async () => {
+    els.bgmAudio.pause();
+    els.bgmAudio.removeAttribute('src');
+    els.bgmAudio.load();
+    els.bgmFileLabel.value = '';
+    appSettings.bgm.file = null;
+    appSettings.bgm.fileName = '';
+    await saveAppSettings({ bgm: { file: null, fileName: '' } });
+  };
+}
+if (els.btnRefreshDevices) {
+  els.btnRefreshDevices.onclick = refreshAudioDevices;
+}
+if (els.audioDevice) {
+  els.audioDevice.addEventListener('change', async () => {
+    appSettings.bgm.deviceId = els.audioDevice.value;
+    await applyBgmSinkId();
+    await saveAppSettings({ bgm: { deviceId: els.audioDevice.value } });
+  });
+}
+if (els.bgmVol) {
+  els.bgmVol.addEventListener('input', () => {
+    const v = parseInt(els.bgmVol.value, 10);
+    els.bgmVolVal.textContent = v;
+    appSettings.bgm.volume = v;
+    if (els.bgmAudio) els.bgmAudio.volume = v / 100;
+  });
+  els.bgmVol.addEventListener('change', () => saveAppSettings({ bgm: { volume: appSettings.bgm.volume } }));
+}
+if (els.fxVol) {
+  els.fxVol.addEventListener('input', () => {
+    const v = parseInt(els.fxVol.value, 10);
+    els.fxVolVal.textContent = v;
+    appSettings.fxVolume = v;
+  });
+  els.fxVol.addEventListener('change', () => saveAppSettings({ fxVolume: appSettings.fxVolume }));
+}
+if (els.maxListItems) {
+  els.maxListItems.addEventListener('change', () => {
+    appSettings.maxListItems = parseInt(els.maxListItems.value, 10) || 200;
+    saveAppSettings({ maxListItems: appSettings.maxListItems });
+  });
+}
+
+// Pause/resume BGM khi gift play. Auto resume sau 5s (giả định effect ngắn).
+let bgmResumeTimer = null;
+function pauseBgmForEffect() {
+  if (!els.bgmAudio || els.bgmAudio.paused) return;
+  els.bgmAudio.pause();
+  if (bgmResumeTimer) clearTimeout(bgmResumeTimer);
+  bgmResumeTimer = setTimeout(() => {
+    if (els.bgmAudio && els.bgmAudio.src) els.bgmAudio.play().catch(() => {});
+  }, 6000);
 }
 
 // =================== Wire up ===================

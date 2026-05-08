@@ -16,6 +16,7 @@
       <button class="tab sidebar-tab" data-tab="queue" title="Hàng đợi hiệu ứng">🎬</button>
       <button class="tab sidebar-tab" data-tab="gifts" title="Bảng quà">🎁</button>
       <button class="tab sidebar-tab" data-tab="overlays" title="Overlay">🪟</button>
+      <button class="tab sidebar-tab" data-tab="settings" title="Cài đặt chung">⚙️</button>
     </aside>
 
     <div class="main-content">
@@ -164,9 +165,54 @@
       </div>
     </section>
 
+    <!-- =================== TAB: CÀI ĐẶT CHUNG =================== -->
+    <section class="tab-panel" data-tab="settings">
+      <div class="panel">
+        <h2>⚙️ Cài đặt chung</h2>
+        <div class="row">
+          <label style="flex:2">🎵 Nhạc nền (mp3/wav/ogg)
+            <div style="display:flex; gap:6px">
+              <input id="bgmFileLabel" placeholder="Chưa chọn nhạc nền" readonly style="flex:1" />
+              <button type="button" id="btnPickBgm" class="tiny" title="Chọn file nhạc nền">📁 Chọn</button>
+              <button type="button" id="btnPlayBgm" class="tiny" title="Phát nhạc nền">▶</button>
+              <button type="button" id="btnStopBgm" class="tiny" title="Dừng">⏹</button>
+              <button type="button" id="btnClearBgm" class="tiny danger" title="Xoá">🗑</button>
+            </div>
+          </label>
+        </div>
+        <div class="row">
+          <label style="flex:2">🔊 Thiết bị phát (output)
+            <select id="audioDevice"></select>
+          </label>
+          <label>&nbsp;
+            <button type="button" id="btnRefreshDevices" class="tiny" title="Làm mới list">↻</button>
+          </label>
+        </div>
+        <div class="row">
+          <label>Âm lượng nhạc nền: <span id="bgmVolVal" style="color:#ffd166">80</span>%
+            <input type="range" id="bgmVol" min="0" max="100" value="80" />
+          </label>
+          <label>Âm lượng hiệu ứng: <span id="fxVolVal" style="color:#ffd166">100</span>%
+            <input type="range" id="fxVol" min="0" max="100" value="100" />
+          </label>
+        </div>
+        <div class="row">
+          <label>Số mục tối đa trong danh sách (tránh lag)
+            <input type="number" id="maxListItems" value="200" min="20" max="1000" />
+          </label>
+        </div>
+        <div class="hint small">
+          Nhạc nền sẽ phát loop, có thể chọn output device (loa ngoài hoặc cable virtual cho OBS).
+          Khi gift bật <b>"Tạm dừng nhạc nền khi phát"</b>, nhạc nền tự pause trong lúc effect chạy rồi resume.
+        </div>
+      </div>
+    </section>
+
   </main>
     </div>
   </div>
+  <!-- BGM audio element (hidden) -->
+  <audio id="bgmAudio" loop></audio>
 
   <!-- =================== MODAL: EDIT GIFT =================== -->
   <dialog id="giftDialog" class="modal">
@@ -228,6 +274,11 @@
         </label>
         <label>Overlay
           <select id="dlgOverlay"></select>
+        </label>
+      </div>
+      <div class="form-row">
+        <label class="checkbox-row" title="Khi BẬT: nhạc nền tự dừng trong lúc phát hiệu ứng. Khi TẮT: nhạc nền chạy chung với hiệu ứng.">
+          <input type="checkbox" id="dlgPauseBgm" /> 🔇 Tạm dừng nhạc nền khi phát
         </label>
       </div>
       <div class="modal-actions">

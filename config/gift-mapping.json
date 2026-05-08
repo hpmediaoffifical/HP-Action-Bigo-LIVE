@@ -21,7 +21,7 @@
         "Blue Flower"
       ],
       "alias": "Blue Flower",
-      "group": "",
+      "group": "TUNG HOA",
       "mediaFile": "Tơ nhện.webm",
       "overlayId": "ov_mowzeyw8m6as"
     },
@@ -31,10 +31,18 @@
         "1",
         "Flower",
         "1140",
-        "Kiss"
+        "Kiss",
+        "3121",
+        "Pink Rose",
+        "501139",
+        "502703",
+        "Fragrant",
+        "503665",
+        "وردة العائلة",
+        "9"
       ],
       "alias": "Flower",
-      "group": "",
+      "group": "NPC",
       "mediaFile": "Tơ nhện.webm",
       "overlayId": "ov_mowzeyw8m6as"
     },
@@ -46,7 +54,7 @@
         "7511"
       ],
       "alias": "Heart Lock",
-      "group": "",
+      "group": "NPC",
       "mediaFile": "Tơ nhện.webm",
       "overlayId": "ov_mowzeyw8m6as"
     }
@@ -64,7 +72,8 @@
         "height": 814
       },
       "alwaysOnTop": true,
-      "clickThrough": false
+      "clickThrough": true,
+      "autoHide": false
     }
   ],
   "groups": []

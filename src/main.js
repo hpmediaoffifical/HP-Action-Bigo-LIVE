@@ -301,6 +301,23 @@ ipcMain.handle('effects:list', () => {
   } catch { return []; }
 });
 
+// Pick BGM file - giữ nguyên ở vị trí gốc, trả về file:// URL
+ipcMain.handle('bgm:pick-file', async () => {
+  if (!win) return { ok: false };
+  const res = await dialog.showOpenDialog(win, {
+    title: 'Chọn nhạc nền (mp3/wav/ogg/m4a)',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'm4a', 'flac'] },
+      { name: 'All', extensions: ['*'] },
+    ],
+  });
+  if (res.canceled || !res.filePaths.length) return { ok: false, canceled: true };
+  const filePath = res.filePaths[0];
+  const fileUrl = 'file:///' + filePath.replace(/\\/g, '/').replace(/^\/+/, '');
+  return { ok: true, filePath, fileUrl, fileName: path.basename(filePath) };
+});
+
 // Mở dialog chọn 1 hoặc nhiều file mp3/mp4/webm/wav rồi copy vào assets/effects.
 // Trả về tên file mới (hoặc null nếu user huỷ).
 ipcMain.handle('effects:pick-files', async () => {

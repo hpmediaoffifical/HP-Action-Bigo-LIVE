@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('bigo', {
   effectsList: () => ipcRenderer.invoke('effects:list'),
   effectsPickFiles: () => ipcRenderer.invoke('effects:pick-files'),
   effectsOpenFolder: () => ipcRenderer.invoke('effects:open-folder'),
+  pickBgmFile: () => ipcRenderer.invoke('bgm:pick-file'),
 
   // Gift master catalog
   giftsMasterList: () => ipcRenderer.invoke('gifts:master-list'),
