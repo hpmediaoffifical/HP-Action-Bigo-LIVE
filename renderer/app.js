@@ -75,20 +75,30 @@ async function init() {
 
 async function refreshIconCacheStatus() {
   const s = await window.bigo.giftsIconsStatus();
-  els.iconCacheStatus.textContent = `Kho icon: ${s.count}/${s.total} đã tải · ${s.dir}`;
+  els.iconCacheStatus.textContent = `Kho icon: ${s.count}/${s.total || '?'} đã tải · ${s.dir}`;
 }
+
+// Listen progress từ cả nút Tải lẫn auto-download lúc khởi động
+window.bigo.giftsOnDownloadProgress(p => {
+  if (!p || !p.total) return;
+  els.iconProgress.style.display = 'inline-block';
+  els.iconProgress.value = (p.done / p.total) * 100;
+  els.iconCacheStatus.textContent = `Đang tải: ${p.done}/${p.total} (mới ${p.ok}, sẵn ${p.skip}, lỗi ${p.fail})`;
+  if (p.done >= p.total) {
+    setTimeout(() => {
+      els.iconProgress.style.display = 'none';
+      refreshIconCacheStatus();
+    }, 1500);
+  }
+});
 
 els.btnDownloadIcons.onclick = async () => {
   els.btnDownloadIcons.disabled = true;
   els.iconProgress.style.display = 'inline-block';
   els.iconProgress.value = 0;
   els.iconProgress.max = 100;
-  window.bigo.giftsOnDownloadProgress(p => {
-    if (p.total) els.iconProgress.value = (p.done / p.total) * 100;
-    els.iconCacheStatus.textContent = `Đang tải: ${p.done}/${p.total} (ok ${p.ok}, skip ${p.skip}, fail ${p.fail})`;
-  });
+  // Progress đã được listen ở init() → không cần đăng ký lại
   const r = await window.bigo.giftsDownloadIcons();
-  els.iconProgress.style.display = 'none';
   els.btnDownloadIcons.disabled = false;
   els.iconCacheStatus.textContent = `Hoàn tất: ${r.ok} mới · ${r.skip} bỏ qua · ${r.fail} lỗi · tổng ${r.total}`;
 };
@@ -478,7 +488,7 @@ function renderParsed(ev) {
       ? `<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span>`
       : `<span class="who">${escapeHtml(ev.user)}</span>`;
     const cntStr = ev.type === 'gift_overlay' && ev.combo > 1
-      ? `×${ev.gift_count} · combo ${ev.combo} = <b>${totalCount}</b>`
+      ? `×${ev.gift_count} · combo ${ev.combo}`
       : `×${ev.gift_count}`;
     div.innerHTML = `
       ${avatar}

@@ -116,10 +116,13 @@ function scanGiftOverlay() {
   for (const el of walkAllElements(document.body)) {
     if (el.nodeType !== 1) continue;
     const text = (el.textContent || '').trim();
-    if (text.length < 4 || text.length > 200) continue;
-    const m = text.match(/(.{1,40})\s*Send\s*[\s\S]{0,80}?[xX×](\d+)\s*combo\s*(\d+)/i);
+    if (text.length < 4 || text.length > 100) continue;
+    // Anchor ^ + non-greedy + giới hạn 30 chars cho sender (tên user)
+    const m = text.match(/^\s*([^\n]{1,30}?)\s*Send\b[\s\S]{0,40}?[xX×](\d+)\s*combo\s*(\d+)/i);
     if (!m) continue;
     const sender = m[1].trim();
+    // Sanity: sender không được chứa keyword overlay (loại element cha)
+    if (!sender || /\b(send|combo)\b/i.test(sender) || /[xX×]\d/.test(sender)) continue;
     const count = +m[2], combo = +m[3];
     const giftIconUrl = findGiftIconUrl(el);
     const avatarUrl = findAvatarUrl(el);

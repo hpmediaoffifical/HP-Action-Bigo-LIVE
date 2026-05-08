@@ -215,10 +215,23 @@ app.whenReady().then(async () => {
     },
   });
   createWindow();
-  // Background fetch — không block UI
-  ensureGiftMaster().then(r => {
+  // Background: load master → auto-download icons nếu thiếu
+  (async () => {
+    const r = await ensureGiftMaster().catch(e => ({ ok: false, error: e.message }));
     if (win) win.webContents.send('bigo:log', `[gift-master] ${r.cached ? 'cache' : 'fetch'} ${r.count || 0} quà`);
-  }).catch(() => {});
+    if (!r.ok || !giftMaster.gifts) return;
+    fs.mkdirSync(GIFT_ICONS_DIR, { recursive: true });
+    const have = fs.readdirSync(GIFT_ICONS_DIR).filter(f => /\.png$/i.test(f)).length;
+    const total = giftMaster.gifts.length;
+    if (have >= total) return; // đủ rồi
+    if (win) win.webContents.send('bigo:log', `[icons] auto-tải ${total - have} icons còn thiếu...`);
+    setTimeout(async () => {
+      const dl = await downloadAllIcons((p) => {
+        if (win) win.webContents.send('gifts:download-progress', p);
+      });
+      if (win) win.webContents.send('bigo:log', `[icons] auto xong: +${dl.ok} mới, ${dl.skip} sẵn, ${dl.fail} lỗi`);
+    }, 1500);
+  })().catch(() => {});
 });
 app.on('window-all-closed', () => {
   if (listener) listener.stop().catch(() => {});
@@ -327,7 +340,7 @@ ipcMain.handle('gifts:icons-status', () => {
   };
 });
 
-ipcMain.handle('gifts:download-icons', async (e, opts = {}) => {
+async function downloadAllIcons(progressCb) {
   if (!giftMaster.gifts || !giftMaster.gifts.length) await ensureGiftMaster();
   fs.mkdirSync(GIFT_ICONS_DIR, { recursive: true });
   const list = giftMaster.gifts || [];
@@ -336,9 +349,7 @@ ipcMain.handle('gifts:download-icons', async (e, opts = {}) => {
   const concurrency = 6;
   let idx = 0;
 
-  const sendProgress = () => {
-    try { e.sender.send('gifts:download-progress', { done, total, ok, skip, fail }); } catch {}
-  };
+  const emit = () => { try { progressCb && progressCb({ done, total, ok, skip, fail }); } catch {} };
 
   async function worker() {
     while (idx < list.length) {
@@ -355,17 +366,21 @@ ipcMain.handle('gifts:download-icons', async (e, opts = {}) => {
           fs.writeFileSync(filePath, buf);
           ok++;
         }
-      } catch (err) {
-        fail++;
-      }
+      } catch (err) { fail++; }
       done++;
-      if (done % 5 === 0 || done === total) sendProgress();
+      if (done % 10 === 0 || done === total) emit();
     }
   }
 
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
-  sendProgress();
+  emit();
   return { total, ok, skip, fail };
+}
+
+ipcMain.handle('gifts:download-icons', async (e) => {
+  return downloadAllIcons((p) => {
+    try { e.sender.send('gifts:download-progress', p); } catch {}
+  });
 });
 
 // Native drag — phải dùng ipcRenderer.send để khớp event loop của renderer dragstart
