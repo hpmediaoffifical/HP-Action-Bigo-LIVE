@@ -18,14 +18,15 @@
       "id": "ov_mowzeyw8m6as",
       "name": "Overlay 1",
       "bgColor": "#00ff00",
-      "opacity": 0,
+      "opacity": 0.42,
       "bounds": {
-        "x": 1939,
-        "y": 145,
-        "width": 442,
-        "height": 801
+        "x": 41,
+        "y": 1155,
+        "width": 447,
+        "height": 805
       },
-      "alwaysOnTop": true
+      "alwaysOnTop": true,
+      "clickThrough": false
     }
   ],
   "groups": []

@@ -54,6 +54,29 @@
           <div id="liveGifts" class="gifts"></div>
         </div>
       </div>
+
+      <div class="panel" id="effectQueuePanel">
+        <div class="panel-head">
+          <h2>🎬 Hàng đợi hiệu ứng</h2>
+          <div class="queue-stats">
+            <span>🎁 quà: <b id="qStatGifts">0</b></span>
+            <span>💎 đậu: <b id="qStatDiamond">0</b></span>
+            <span>👤 user: <b id="qStatUsers">0</b></span>
+          </div>
+        </div>
+        <div class="row" style="margin-bottom:8px; align-items:center">
+          <label>Cỡ chữ <span id="qSizeFontVal" style="color:#ffd166">13</span>px
+            <input type="range" id="qSizeFont" min="11" max="22" value="13" />
+          </label>
+          <label>Cỡ icon <span id="qSizeIconVal" style="color:#ffd166">36</span>px
+            <input type="range" id="qSizeIcon" min="24" max="72" value="36" />
+          </label>
+          <label>&nbsp;
+            <button id="btnClearQueue" class="tiny">🗑 Xoá list</button>
+          </label>
+        </div>
+        <div id="effectQueue" class="effect-queue"></div>
+      </div>
     </section>
 
     <!-- =================== TAB: GIFTS TABLE =================== -->

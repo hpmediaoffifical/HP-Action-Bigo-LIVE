@@ -98,6 +98,45 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .master-table .price { color: #ffd166; font-size: 11px; }
 .master-table .name { color: #c9d6ff; }
 
+/* ============ Effect Queue ============ */
+.queue-stats { display: flex; gap: 16px; font-size: 12px; color: #8a8f9a; }
+.queue-stats b { color: #ffd166; }
+.effect-queue {
+  background: #0f1117;
+  border-radius: 6px;
+  padding: 6px;
+  max-height: 380px;
+  overflow-y: auto;
+  --queue-font: 13px;
+  --queue-icon: 36px;
+}
+.queue-row {
+  display: grid;
+  grid-template-columns: var(--queue-icon) var(--queue-icon) 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid #1c1f28;
+  font-size: var(--queue-font);
+}
+.queue-row.playing { background: #1e2a1f; }
+.queue-row.done { opacity: 0.5; }
+.queue-row .avatar { width: var(--queue-icon); height: var(--queue-icon); border-radius: 50%; background: #2c303d; object-fit: cover; }
+.queue-row .gift-icon { width: var(--queue-icon); height: var(--queue-icon); border-radius: 6px; object-fit: contain; background: #1c1f28; }
+.queue-row .meta { min-width: 0; }
+.queue-row .who { color: #ffb84a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.queue-row .what { color: #c9d6ff; font-size: 0.85em; }
+.queue-row .what .name { color: #ffe07a; font-weight: 600; }
+.queue-row .right { text-align: right; }
+.queue-row .cnt { background: #ff3b6f; color: #fff; padding: 2px 9px; border-radius: 10px; font-weight: 700; font-size: 0.8em; }
+.queue-row .beans { color: #ffd166; font-size: 0.85em; font-weight: 600; margin-top: 2px; }
+.queue-row .badge-status {
+  display: inline-block; padding: 1px 7px; border-radius: 8px; font-size: 0.75em; margin-left: 6px;
+}
+.badge-status.queued { background: #2c303d; color: #8ad6ff; }
+.badge-status.playing { background: #1e8a4f; color: #fff; }
+.badge-status.done { background: #14161c; color: #555; }
+
 /* ============ Tables ============ */
 .table-wrap { overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
