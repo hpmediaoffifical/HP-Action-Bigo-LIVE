@@ -113,8 +113,9 @@ function applyQueueSize() {
   els.qSizeIconVal.textContent = icon;
 }
 
-// Push batch N entries (chia tách thành N hàng, đếm lùi giảm dần)
-// Dùng chung cho cả manual play và live gift event.
+// Push batch N entries (chia tách thành N hàng).
+// Quà đang phát luôn ở [0] (top). Khi overlay 'ended' → shift [0] và mark next [0] = playing.
+// Đảm bảo MỖI entry tương ứng MỘT lần play overlay (không bỏ sót).
 function pushPlayBatch(item, ev, playTimes) {
   const batchId = 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 4);
   const baseUser = ev?.user || 'NHPHUNG';
@@ -132,62 +133,64 @@ function pushPlayBatch(item, ev, playTimes) {
     batch.push({
       id: 'q_' + batchId + '_' + i,
       batchId,
-      ts: Date.now() + i, // tăng dần để stable sort
-      user: baseUser,
-      avatar: baseAvatar,
-      gift_name: baseName,
-      gift_id: baseId,
-      gift_icon: baseIcon,
+      ts: Date.now() + i,
+      user: baseUser, avatar: baseAvatar,
+      gift_name: baseName, gift_id: baseId, gift_icon: baseIcon,
       level: baseLevel,
-      count: 1,
-      step: i + 1,
-      total: playTimes,
+      count: 1, step: i + 1, total: playTimes,
       diamond: baseDiamond,
       mediaFile, overlayId,
-      status: i === 0 ? 'playing' : 'queued',
+      status: 'queued', // tất cả queued — processor sẽ pick first
       playTimes: 1,
     });
   }
-  // Priority: 0 = chèn lên top (mới nhất ở đầu, default).
+
+  // Priority: 0 = append cuối queue (FIFO chuẩn).
   // N > 0 = chèn vào index N (sau quà đang phát + N-1 quà chờ).
   const priority = item?.priority || 0;
   if (priority > 0 && queueItems.length > 0) {
     const insertIdx = Math.min(priority, queueItems.length);
     queueItems.splice(insertIdx, 0, ...batch);
   } else {
-    queueItems.unshift(...batch);
+    queueItems.push(...batch); // FIFO append cuối
   }
-  while (queueItems.length > QUEUE_MAX) queueItems.pop();
+  while (queueItems.length > QUEUE_MAX) queueItems.shift();
+
+  // Đảm bảo chỉ có 1 entry 'playing' tại 1 thời điểm. Nếu chưa có ai playing → mark [0]
+  if (!queueItems.some(q => q.status === 'playing') && queueItems.length > 0) {
+    queueItems[0].status = 'playing';
+  }
   renderQueue(); renderMiniQueue(); updateQueueStats();
   batch.forEach(forwardToQueuePopup);
-
-  // Schedule progression: mỗi PLAY_DURATION_MS, entry kế tiếp → playing, entry hiện → done → remove
-  for (let i = 0; i < playTimes; i++) {
-    setTimeout(() => {
-      const entry = queueItems.find(q => q.id === `q_${batchId}_${i}`);
-      if (entry) {
-        entry.status = 'done';
-        forwardToQueuePopup({ ...entry });
-      }
-      const next = queueItems.find(q => q.id === `q_${batchId}_${i + 1}`);
-      if (next) {
-        next.status = 'playing';
-        forwardToQueuePopup({ ...next });
-      }
-      renderQueue(); renderMiniQueue();
-      // Remove entry done sau 600ms để có hiệu ứng giảm dần
-      setTimeout(() => {
-        const idx = queueItems.findIndex(q => q.id === `q_${batchId}_${i}`);
-        if (idx !== -1) {
-          queueItems.splice(idx, 1);
-          renderQueue(); renderMiniQueue();
-        }
-      }, 600);
-    }, (i + 1) * PLAY_DURATION_MS);
-  }
 }
 
-// Backward-compat wrapper (giữ tên cũ trong case còn ai gọi)
+// Hook: overlay:effect-ended từ overlay window (player/audio fire 'ended')
+// → advance UI queue: shift entry đang playing, mark new [0] playing.
+if (window.bigo.onOverlayEffectEnded) {
+  window.bigo.onOverlayEffectEnded(() => {
+    if (queueItems.length === 0) return;
+    // Tìm entry đang playing (thường là [0]) và mark done
+    const playingIdx = queueItems.findIndex(q => q.status === 'playing');
+    if (playingIdx !== -1) {
+      const finished = queueItems[playingIdx];
+      finished.status = 'done';
+      forwardToQueuePopup({ ...finished });
+      renderQueue(); renderMiniQueue();
+      // Sau 400ms remove + advance
+      setTimeout(() => {
+        const idx = queueItems.findIndex(q => q.id === finished.id);
+        if (idx !== -1) queueItems.splice(idx, 1);
+        // Mark new top as playing nếu còn
+        if (queueItems.length > 0 && !queueItems.some(q => q.status === 'playing')) {
+          queueItems[0].status = 'playing';
+          forwardToQueuePopup({ ...queueItems[0] });
+        }
+        renderQueue(); renderMiniQueue();
+      }, 400);
+    }
+  });
+}
+
 function pushQueueManual(item, group, playTimes) { pushPlayBatch(item, null, playTimes); }
 
 function renderMiniQueue() {

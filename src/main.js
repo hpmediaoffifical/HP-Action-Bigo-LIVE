@@ -733,6 +733,14 @@ ipcMain.handle('overlay:delete', (_e, overlayId) => {
   saveJson(MAPPING_PATH, mapping);
   return { ok: true };
 });
+// overlay:effect-ended — fire mỗi khi 1 video/audio kết thúc trong overlay window.
+// Forward về renderer chính để advance UI queue (chính xác theo playback thực tế).
+ipcMain.on('overlay:effect-ended', (_e) => {
+  if (win && !win.isDestroyed()) {
+    try { win.webContents.send('overlay:effect-ended'); } catch {}
+  }
+});
+
 // overlay queue-empty: từ overlay window khi đã play hết → hide nếu autoHide bật
 // + forward sang main window để renderer resume BGM
 ipcMain.on('overlay:queue-empty', (e) => {

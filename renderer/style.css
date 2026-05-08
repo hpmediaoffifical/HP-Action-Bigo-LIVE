@@ -276,8 +276,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .mini-queue-row { transition: opacity 0.4s, transform 0.3s; }
 .mini-queue-row.done { opacity: 0.3; }
 
-/* Item row: input số lượng để phát nhanh N lần */
-.group-item .grow-actions .play-count { width: 48px; padding: 2px 4px; font-size: 11px; text-align: center; }
+/* Item row: input số lượng để phát nhanh N lần — to dễ nhập */
+.group-item .grow-actions .play-count {
+  width: 60px; padding: 6px 8px; font-size: 13px; text-align: center;
+  font-weight: 600; color: #ffd166;
+}
+.group-item .grow-actions .play-count:focus { outline: 2px solid #ff8a3d; }
 
 /* ============ Received gifts row (right panel) ============ */
 .rcv-row { display: grid; grid-template-columns: 36px 1fr auto auto; gap: 10px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #1c1f28; cursor: default; user-select: none; }

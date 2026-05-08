@@ -76,10 +76,13 @@ function playNext() {
 
 player.addEventListener('ended', () => {
   clearPlayer();
+  // Báo main để renderer chính advance UI queue
+  try { ipcRenderer.send('overlay:effect-ended'); } catch {}
   playNext();
 });
 audio.addEventListener('ended', () => {
   clearAudio();
+  try { ipcRenderer.send('overlay:effect-ended'); } catch {}
   playNext();
 });
 // Defensive: nếu lỗi cũng tiếp tục queue
