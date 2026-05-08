@@ -19,8 +19,8 @@
     🎁 Lịch sử quà
     <span class="pop-stats">💎<b id="popDiamond">0</b> · 🎁<b id="popCount">0</b> · 👤<b id="popUsers">0</b></span>
   </h1>
-  <div class="pop-controls">
-    <button id="popClearAll" class="tiny danger" title="Xoá toàn bộ lịch sử quà (cả ở trang chính)">🗑 Xoá tất cả</button>
+  <div class="pop-controls" style="font-size:11px; color:#8a8f9a">
+    📌 Lịch sử quà chỉ xem (read-only) — quà mới ở trên cùng. NPC theo dõi để biết user nào tặng gì.
   </div>
   <div id="popGifts"></div>
   <script>
@@ -85,7 +85,6 @@
         </div>
         <span class="rcv-count">×${g.count || 1}</span>
         ${beansHtml}
-        <button class="rcv-del" data-del="${escapeHtml(g.id)}" title="Xoá">🗑</button>
       </div>`;
     }
 
@@ -96,12 +95,7 @@
         return;
       }
       cont.innerHTML = snapshot.map(renderRow).join('');
-      cont.querySelectorAll('[data-del]').forEach(btn => {
-        btn.onclick = (e) => {
-          e.stopPropagation();
-          ipcRenderer.send('popup-gifts:remove', btn.dataset.del);
-        };
-      });
+      // Read-only: không wire delete buttons.
     }
 
     // Snapshot từ app → replace + render
@@ -117,10 +111,7 @@
       recomputeStats();
     });
 
-    document.getElementById('popClearAll').onclick = () => {
-      ipcRenderer.send('popup-gifts:clear-all');
-    };
-
+    // popClearAll button đã bỏ vì popup là read-only (theo user yêu cầu).
     renderAll();
     // Khi popup load xong, request snapshot từ app (đảm bảo sync mọi lúc)
     ipcRenderer.send('popup-gifts:request-snapshot');

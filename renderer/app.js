@@ -257,6 +257,8 @@ function renderMiniQueue() {
   el.querySelectorAll('[data-qid]').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); removeQueueItemById(btn.dataset.qid); };
   });
+  // Right-click context menu cho mỗi row
+  el.querySelectorAll('.mini-queue-row').forEach(row => wireQueueContextMenu(row));
 }
 
 function removeQueueItemById(id) {
@@ -389,6 +391,60 @@ function renderQueue() {
   els.effectQueue.querySelectorAll('[data-qid]').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); removeQueueItemById(btn.dataset.qid); };
   });
+  els.effectQueue.querySelectorAll('.queue-row').forEach(row => wireQueueContextMenu(row));
+}
+
+// Wire right-click context menu cho 1 queue row (mini hoặc main).
+// Actions: Ưu tiên lên đầu / Lên 1 hàng / Xuống 1 hàng / Xoá.
+function wireQueueContextMenu(row) {
+  row.oncontextmenu = (e) => {
+    e.preventDefault();
+    const id = row.dataset.id || row.querySelector('[data-qid]')?.dataset.qid;
+    if (!id) return;
+    const idx = queueItems.findIndex(q => q.id === id);
+    if (idx === -1) return;
+    showContextMenu(e.clientX, e.clientY, [
+      { icon: '🔝', label: 'Ưu tiên lên đầu', action: () => queueMoveTop(id) },
+      { icon: '⬆️', label: 'Di chuyển lên 1 hàng', action: () => queueMoveUp(id) },
+      { icon: '⬇️', label: 'Di chuyển xuống 1 hàng', action: () => queueMoveDown(id) },
+      { divider: true },
+      { icon: '🗑', label: 'Xoá', danger: true, action: () => removeQueueItemById(id) },
+    ]);
+  };
+}
+
+// Helpers reorder queueItems. Bỏ qua items 'playing' (không di chuyển playing item).
+function queueMoveTop(id) {
+  const idx = queueItems.findIndex(q => q.id === id);
+  if (idx === -1) return;
+  const item = queueItems[idx];
+  if (item.status === 'playing') return; // playing không di chuyển
+  queueItems.splice(idx, 1);
+  // Chèn ngay sau playing (idx 1 nếu playing ở [0]) hoặc top nếu không có playing
+  const playingIdx = queueItems.findIndex(q => q.status === 'playing');
+  const insertAt = playingIdx >= 0 ? playingIdx + 1 : 0;
+  queueItems.splice(insertAt, 0, item);
+  renderQueue(); renderMiniQueue(); updateQueueStats(); forwardQueueSnapshot();
+}
+function queueMoveUp(id) {
+  const idx = queueItems.findIndex(q => q.id === id);
+  if (idx <= 0) return;
+  const item = queueItems[idx];
+  const above = queueItems[idx - 1];
+  if (item.status === 'playing' || above.status === 'playing') return;
+  queueItems[idx - 1] = item;
+  queueItems[idx] = above;
+  renderQueue(); renderMiniQueue(); updateQueueStats(); forwardQueueSnapshot();
+}
+function queueMoveDown(id) {
+  const idx = queueItems.findIndex(q => q.id === id);
+  if (idx === -1 || idx >= queueItems.length - 1) return;
+  const item = queueItems[idx];
+  const below = queueItems[idx + 1];
+  if (item.status === 'playing') return;
+  queueItems[idx + 1] = item;
+  queueItems[idx] = below;
+  renderQueue(); renderMiniQueue(); updateQueueStats(); forwardQueueSnapshot();
 }
 
 function updateQueueStats() {
@@ -1640,30 +1696,11 @@ function renderReceivedGifts() {
       </div>
       <span class="rcv-count">×${g.count}</span>
       ${beansHtml}
-      <button class="rcv-del" data-gid="${g.id}" title="Xoá">🗑</button>
     </div>`;
   }).join('');
-  // Wire delete + context menu
-  cont.querySelectorAll('.rcv-row').forEach(row => {
-    const id = row.dataset.gid;
-    const delBtn = row.querySelector('.rcv-del');
-    if (delBtn) delBtn.onclick = (e) => {
-      e.stopPropagation();
-      removeReceivedGift(id);
-    };
-    row.oncontextmenu = (e) => {
-      e.preventDefault();
-      const idx = receivedGifts.findIndex(g => g.id === id);
-      if (idx === -1) return;
-      showContextMenu(e.clientX, e.clientY, [
-        { icon: '🔝', label: 'Ưu tiên lên đầu', action: () => priorityTopReceived(idx) },
-        { icon: '⬆️', label: 'Di chuyển lên 1 hàng', action: () => moveUpReceived(idx) },
-        { icon: '⬇️', label: 'Di chuyển xuống 1 hàng', action: () => moveDownReceived(idx) },
-        { divider: true },
-        { icon: '🗑', label: 'Xoá', danger: true, action: () => removeReceivedGift(id) },
-      ]);
-    };
-  });
+  // QUÀ ĐÃ NHẬN: read-only — không có delete button, không có context menu.
+  // User: NPC chỉ xem để nắm thông tin, không xoá. Quà mới nhất ở trên cùng
+  // (đã handled bởi receivedGifts.unshift trong addReceivedGift).
 }
 
 function priorityTopReceived(idx) {
