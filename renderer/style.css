@@ -1,4 +1,16 @@
 * { box-sizing: border-box; }
+
+/* ============ Custom thin scrollbar (toàn app) ============ */
+* { scrollbar-width: thin; scrollbar-color: rgba(255, 138, 61, 0.35) transparent; }
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 138, 61, 0.35);
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(255, 138, 61, 0.7); }
+*::-webkit-scrollbar-corner { background: transparent; }
 body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #14161c; color: #e6e8ee; font-size: 13px; }
 
 /* ============ Layout: Sidebar + Main ============ */
@@ -67,9 +79,8 @@ main { padding: 16px 24px; }
 .tab-panel.active { display: block; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-/* Embed tab: layout center + right sticky.
-   User yêu cầu thu gọn Bảng quà bên trái, dành chỗ cho Lịch sử bên phải. */
-.embed-layout { display: grid; grid-template-columns: 380px 1fr; gap: 16px; align-items: start; }
+/* Embed tab: layout 3fr left + 2fr right (60:40 ratio per user request) */
+.embed-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; align-items: start; }
 .embed-center { min-width: 0; }
 .embed-right { position: sticky; top: 16px; }
 .embed-right .panel { margin-bottom: 0; }
@@ -194,6 +205,32 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Item row: input số lượng để phát nhanh N lần */
 .group-item .grow-actions .play-count { width: 48px; padding: 2px 4px; font-size: 11px; text-align: center; }
+
+/* ============ Received gifts row (right panel) ============ */
+.rcv-row { display: grid; grid-template-columns: 36px 1fr auto auto; gap: 10px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #1c1f28; cursor: default; user-select: none; }
+.rcv-row:hover { background: #20242f; }
+.rcv-row .rcv-icon { width: 36px; height: 36px; border-radius: 6px; object-fit: contain; background: #0f1117; }
+.rcv-row .rcv-icon-empty { width: 36px; height: 36px; border-radius: 6px; background: #1c1f28; }
+.rcv-row .rcv-meta { min-width: 0; }
+.rcv-row .rcv-who { color: #ffb84a; font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rcv-row .rcv-gift { color: #c9d6ff; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rcv-row .rcv-count { background: #ff3b6f; color: #fff; padding: 3px 9px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.rcv-row .rcv-del { background: transparent; border: 0; cursor: pointer; font-size: 14px; color: #555; padding: 4px 6px; }
+.rcv-row .rcv-del:hover { color: #ff6b6b; }
+
+/* ============ Custom context menu ============ */
+.ctx-menu {
+  position: fixed; z-index: 9999;
+  background: #1c1f28; border: 1px solid #262a35; border-radius: 8px;
+  padding: 4px 0; min-width: 200px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+  animation: ctxFadeIn 0.1s ease-out;
+}
+@keyframes ctxFadeIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+.ctx-item { padding: 8px 14px; font-size: 13px; cursor: pointer; color: #e6e8ee; display: flex; gap: 10px; align-items: center; }
+.ctx-item:hover { background: #2c303d; color: #ff8a3d; }
+.ctx-item.danger:hover { color: #ff6b6b; }
+.ctx-divider { height: 1px; background: #262a35; margin: 4px 0; }
 
 /* ============ Subtab nav (gift/comment) ============ */
 .subtab-row { display: flex; gap: 0; margin-bottom: 10px; border-bottom: 1px solid #262a35; }

@@ -1002,7 +1002,8 @@ function resetEmbedUi() {
   if (els.metaPanel) els.metaPanel.style.display = 'none';
   if (els.metaInfo) els.metaInfo.innerHTML = '';
   els.liveChats.innerHTML = '';
-  els.liveGifts.innerHTML = '';
+  receivedGifts.length = 0;
+  renderReceivedGifts();
   resetSessionStats();
   // Reset popup nếu đang mở
   if (window.bigo.popupResetGifts) window.bigo.popupResetGifts().catch(() => {});
@@ -1107,6 +1108,134 @@ els.btnEmbedShow.onclick = async () => {
   if (!r.ok) appendLog('embed-show: ' + (r.error || 'no listener'));
 };
 
+// =================== Context menu helper ===================
+function showContextMenu(x, y, items) {
+  removeContextMenu();
+  const menu = document.createElement('div');
+  menu.className = 'ctx-menu';
+  // Tính position để không tràn viewport
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const w = 200, h = items.length * 36 + 8;
+  if (x + w > vw) x = vw - w - 8;
+  if (y + h > vh) y = vh - h - 8;
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  menu.innerHTML = items.map((it, i) => {
+    if (it.divider) return '<div class="ctx-divider"></div>';
+    return `<div class="ctx-item ${it.danger ? 'danger' : ''}" data-i="${i}">
+      <span style="width:18px">${it.icon || ''}</span><span>${escapeHtml(it.label)}</span>
+    </div>`;
+  }).join('');
+  document.body.appendChild(menu);
+  menu.querySelectorAll('.ctx-item').forEach(el => {
+    el.onclick = () => {
+      const i = +el.dataset.i;
+      removeContextMenu();
+      try { items[i].action(); } catch (e) { console.error(e); }
+    };
+  });
+  setTimeout(() => {
+    document.addEventListener('click', removeContextMenu, { once: true });
+    document.addEventListener('contextmenu', removeContextMenu, { once: true });
+    document.addEventListener('keydown', escContextMenu, { once: true });
+  }, 0);
+}
+function removeContextMenu() {
+  document.querySelectorAll('.ctx-menu').forEach(m => m.remove());
+}
+function escContextMenu(e) { if (e.key === 'Escape') removeContextMenu(); }
+
+// =================== Received gifts (right panel) ===================
+const receivedGifts = [];
+const RECEIVED_MAX = 200;
+
+function addReceivedGift(ev) {
+  if (!ev || ev.type !== 'gift') return;
+  const total = ev.total_count != null ? ev.total_count : ((ev.gift_count || 1) * (ev.combo || 1));
+  receivedGifts.unshift({
+    id: 'rg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+    ts: Date.now(),
+    user: ev.user || '?',
+    avatar: ev.user_avatar_url || '',
+    gift_name: ev.gift_name || '?',
+    gift_id: ev.gift_id,
+    gift_icon: ev.gift_icon || ev.gift_icon_url || '',
+    count: total,
+    diamond: ev.total_diamond,
+    level: ev.level,
+  });
+  if (receivedGifts.length > RECEIVED_MAX) receivedGifts.length = RECEIVED_MAX;
+  renderReceivedGifts();
+}
+
+function renderReceivedGifts() {
+  const cont = els.liveGifts;
+  if (!cont) return;
+  if (receivedGifts.length === 0) {
+    cont.innerHTML = '';
+    return;
+  }
+  cont.innerHTML = receivedGifts.map(g => {
+    const iconHtml = g.gift_icon
+      ? `<img class="rcv-icon" src="${escapeHtml(g.gift_icon)}" loading="lazy" />`
+      : '<div class="rcv-icon-empty"></div>';
+    return `<div class="rcv-row" data-gid="${g.id}">
+      ${iconHtml}
+      <div class="rcv-meta">
+        <div class="rcv-who">${escapeHtml(g.user)}</div>
+        <div class="rcv-gift">${escapeHtml(g.gift_name)}${g.gift_id != null ? ` <span style="color:#666">#${g.gift_id}</span>` : ''}</div>
+      </div>
+      <span class="rcv-count">×${g.count}</span>
+      <button class="rcv-del" data-gid="${g.id}" title="Xoá">🗑</button>
+    </div>`;
+  }).join('');
+  // Wire delete + context menu
+  cont.querySelectorAll('.rcv-row').forEach(row => {
+    const id = row.dataset.gid;
+    const delBtn = row.querySelector('.rcv-del');
+    if (delBtn) delBtn.onclick = (e) => {
+      e.stopPropagation();
+      removeReceivedGift(id);
+    };
+    row.oncontextmenu = (e) => {
+      e.preventDefault();
+      const idx = receivedGifts.findIndex(g => g.id === id);
+      if (idx === -1) return;
+      showContextMenu(e.clientX, e.clientY, [
+        { icon: '🔝', label: 'Ưu tiên lên đầu', action: () => priorityTopReceived(idx) },
+        { icon: '⬆️', label: 'Di chuyển lên 1 hàng', action: () => moveUpReceived(idx) },
+        { icon: '⬇️', label: 'Di chuyển xuống 1 hàng', action: () => moveDownReceived(idx) },
+        { divider: true },
+        { icon: '🗑', label: 'Xoá', danger: true, action: () => removeReceivedGift(id) },
+      ]);
+    };
+  });
+}
+
+function priorityTopReceived(idx) {
+  if (idx <= 0 || idx >= receivedGifts.length) return;
+  const [item] = receivedGifts.splice(idx, 1);
+  receivedGifts.unshift(item);
+  renderReceivedGifts();
+}
+function moveUpReceived(idx) {
+  if (idx <= 0 || idx >= receivedGifts.length) return;
+  [receivedGifts[idx], receivedGifts[idx - 1]] = [receivedGifts[idx - 1], receivedGifts[idx]];
+  renderReceivedGifts();
+}
+function moveDownReceived(idx) {
+  if (idx < 0 || idx >= receivedGifts.length - 1) return;
+  [receivedGifts[idx], receivedGifts[idx + 1]] = [receivedGifts[idx + 1], receivedGifts[idx]];
+  renderReceivedGifts();
+}
+function removeReceivedGift(id) {
+  const idx = receivedGifts.findIndex(g => g.id === id);
+  if (idx === -1) return;
+  receivedGifts.splice(idx, 1);
+  renderReceivedGifts();
+}
+
 // =================== Embed parsed events ===================
 function findGiftByName(name) {
   if (!name) return null;
@@ -1195,52 +1324,9 @@ function renderParsed(ev) {
         sessionStats.effects += Math.max(1, Math.min(50, ev.total_count || ev.gift_count || 1));
       }
       updateConnectStats();
+      // Push vào received gifts list (right panel) — layout mới gọn
+      addReceivedGift(ev);
     }
-    const div = document.createElement('div');
-    div.className = 'gift-row';
-    const avatar = ev.user_avatar_url
-      ? `<img class="avatar" src="${escapeHtml(ev.user_avatar_url)}" loading="lazy" />`
-      : `<div class="avatar"></div>`;
-    const giftIconUrl = ev.gift_icon || ev.gift_icon_url || '';
-    const dragAttrs = ev.gift_id != null ? `draggable="true" data-typeid="${ev.gift_id}" title="Kéo ra desktop để lưu ${ev.gift_id}.png"` : '';
-    const giftIcon = giftIconUrl ? `<img class="gift-icon" src="${escapeHtml(giftIconUrl)}" loading="lazy" ${dragAttrs} />` : '';
-    const idText = ev.gift_id != null
-      ? `id <b>${ev.gift_id}</b>${ev.gift_value != null ? ` · 💎 ${ev.gift_value}` : ''}`
-      : (ev.gift_ambiguous ? `<span style="color:#ff9a4a">${ev.gift_ambiguous} match</span>` : '<span style="color:#666">chưa map id</span>');
-    const totalCount = ev.total_count != null ? ev.total_count : (ev.gift_count || 1) * (ev.combo || 1);
-    const totalDiamond = ev.total_diamond != null
-      ? ev.total_diamond
-      : (ev.gift_value != null ? totalCount * ev.gift_value : null);
-    const beansLine = totalDiamond != null
-      ? `<span class="beans">💎 ${totalDiamond}</span>`
-      : '';
-    const matchedBadge = matched ? `<span class="matched">▶ ${escapeHtml(matched.alias || matched.matchKeys.join(','))}</span>` : '';
-    const userLine = ev.level != null
-      ? `<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span>`
-      : `<span class="who">${escapeHtml(ev.user)}</span>`;
-    const cntStr = ev.type === 'gift_overlay' && ev.combo > 1
-      ? `×${ev.gift_count} · combo ${ev.combo}`
-      : `×${ev.gift_count}`;
-    div.innerHTML = `
-      ${avatar}
-      <div class="body">
-        <div class="row1">${userLine}${matchedBadge}</div>
-        <div class="row2">${giftIcon}<span class="what">${escapeHtml(ev.gift_name || '?')}</span><span class="gift-id">${idText}</span></div>
-      </div>
-      <div class="right"><span class="cnt">${cntStr}</span>${beansLine}</div>
-    `;
-    els.liveGifts.prepend(div);
-    while (els.liveGifts.children.length > 200) els.liveGifts.lastChild.remove();
-
-    // Native drag handler cho icon trong panel quà nhận
-    const draggableImg = div.querySelector('img[draggable]');
-    if (draggableImg) {
-      draggableImg.ondragstart = (e) => {
-        e.preventDefault();
-        window.bigo.giftsStartDrag(parseInt(draggableImg.dataset.typeid, 10));
-      };
-    }
-
     if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
       // Combo: tặng N lần thì phát N lần. total_count = gift_count × combo.
       const playTimes = Math.max(1, Math.min(50, ev.total_count || ev.gift_count || 1));
