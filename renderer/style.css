@@ -72,8 +72,14 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #1
   height: 100vh;
 }
 
-/* Header trong main-content */
-header { padding: 10px 20px; background: linear-gradient(90deg, #ff3b6f, #ff8a3d); display: flex; align-items: center; gap: 14px; }
+/* Header trong main-content - STICKY ở trên cùng */
+header {
+  padding: 10px 20px;
+  background: linear-gradient(90deg, #ff3b6f, #ff8a3d);
+  display: flex; align-items: center; gap: 14px;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
 header h1 { margin: 0; font-size: 18px; }
 .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; background: rgba(0,0,0,0.35); font-size: 12px; margin-left: 8px; }
 .badge.on { background: #1e8a4f; }
@@ -145,8 +151,17 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .live-info.live { color: #4ad07a; }
 .live-info.dead { color: #ff6b6b; }
 
-/* Compact connect row */
+/* Compact connect row - STICKY ngay dưới header trong tab Tương tác */
 .panel-compact { padding: 10px 14px; }
+.tab-panel[data-tab="embed"] > .panel-compact {
+  position: sticky;
+  top: 56px;
+  z-index: 99;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  /* Đè lên content scrolling phía dưới */
+  background: #1c1f28;
+}
 .connect-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .connect-input { flex: 0 1 220px; min-width: 160px; }
 .live-info-inline { flex: 1; min-width: 180px; font-family: 'Consolas', monospace; font-size: 12px; color: #8ad6ff; padding: 4px 0; background: #0f1117; border-radius: 6px; white-space: nowrap; overflow: hidden; }

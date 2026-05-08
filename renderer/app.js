@@ -871,6 +871,12 @@ async function openGiftDialog(gift = null, groupId = null) {
     if (found) groupName = found.group.name;
   }
   els.dlgGroup.value = groupName;
+  // Refresh datalist với toàn bộ tên nhóm hiện có (case khi user mở dialog
+  // trước khi renderGroupsInto chạy — vẫn phải thấy đầy đủ groups)
+  if (els.groupList) {
+    const allNames = (mapping.groups || []).map(g => g.name).filter(Boolean);
+    els.groupList.innerHTML = allNames.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+  }
   els.giftDialog.dataset.editingGroupId = groupId || '';
   els.dlgMasterFilter.value = '';
   els.dlgMasterSort.value = 'kc-asc';
