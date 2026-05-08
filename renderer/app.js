@@ -918,8 +918,8 @@ els.btnAddOverlay.onclick = () => openOverlayDialog();
 
 // =================== Embed flow (auto-listen) ===================
 function resetEmbedUi() {
-  els.metaPanel.style.display = 'none';
-  els.metaInfo.innerHTML = '';
+  if (els.metaPanel) els.metaPanel.style.display = 'none';
+  if (els.metaInfo) els.metaInfo.innerHTML = '';
   els.liveChats.innerHTML = '';
   els.liveGifts.innerHTML = '';
   resetSessionStats();
@@ -1178,11 +1178,14 @@ function forwardToQueuePopup(item) {
 function renderEmbedEvent(ev) {
   if (ev.kind === 'parsed') return renderParsed(ev);
   if (ev.kind === 'meta') {
-    els.metaPanel.style.display = 'block';
-    const parts = [];
-    if (ev.bigoId) parts.push(`<span><b>BIGO ID</b>: ${escapeHtml(ev.bigoId)}</span>`);
-    if (ev.title) parts.push(`<span><b>Title</b>: ${escapeHtml(ev.title)}</span>`);
-    els.metaInfo.innerHTML = parts.join('');
+    // Panel "Room hiện tại" đã bỏ - silently ignore meta event
+    if (els.metaPanel && els.metaInfo) {
+      els.metaPanel.style.display = 'block';
+      const parts = [];
+      if (ev.bigoId) parts.push(`<span><b>BIGO ID</b>: ${escapeHtml(ev.bigoId)}</span>`);
+      if (ev.title) parts.push(`<span><b>Title</b>: ${escapeHtml(ev.title)}</span>`);
+      els.metaInfo.innerHTML = parts.join('');
+    }
     return;
   }
   if (ev.kind === 'dom-attached' || ev.kind === 'ready') {
