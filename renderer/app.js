@@ -1,28 +1,50 @@
 const $ = (id) => document.getElementById(id);
-const els = {
-  status: $('status'), log: $('log'),
-  // Open API tab
-  env: $('env'), bigoId: $('bigoId'), openid: $('openid'),
-  gameId: $('gameId'), accessToken: $('accessToken'),
-  btnSave: $('btnSave'), btnStart: $('btnStart'), btnStop: $('btnStop'),
-  events: $('events'),
-  // Effects tab
-  fxVideo: $('fxVideo'), fxAudio: $('fxAudio'), stageEmpty: $('stageEmpty'),
-  mappingList: $('mappingList'), mapGiftId: $('mapGiftId'), mapFile: $('mapFile'),
-  btnAddMap: $('btnAddMap'), btnReloadFx: $('btnReloadFx'),
-  btnTestGift: $('btnTestGift'), btnTestHeart: $('btnTestHeart'), btnTestMsg: $('btnTestMsg'),
-  // Embed tab
-  embedBigoId: $('embedBigoId'), btnCheckLive: $('btnCheckLive'), liveInfo: $('liveInfo'),
-  btnEmbedStart: $('btnEmbedStart'), btnEmbedStop: $('btnEmbedStop'),
-  btnEmbedShow: $('btnEmbedShow'),
-  metaPanel: $('metaPanel'), metaInfo: $('metaInfo'),
-  liveChats: $('liveChats'), liveGifts: $('liveGifts'),
-};
 
-let mapping = { gifts: {}, hearts: null, msg: null };
+// =================== State ===================
+let mapping = { version: 2, gifts: [], overlays: [], groups: [] };
 let effects = [];
 
-// ---- Tabs ----
+// =================== DOM refs ===================
+const els = {
+  status: $('status'), log: $('log'),
+  // Embed tab
+  embedBigoId: $('embedBigoId'),
+  btnConnect: $('btnConnect'), btnEmbedStop: $('btnEmbedStop'), btnEmbedShow: $('btnEmbedShow'),
+  liveInfo: $('liveInfo'),
+  metaPanel: $('metaPanel'), metaInfo: $('metaInfo'),
+  liveChats: $('liveChats'), liveGifts: $('liveGifts'),
+  // Open API tab
+  env: $('env'), bigoId: $('bigoId'), openid: $('openid'), gameId: $('gameId'), accessToken: $('accessToken'),
+  btnSave: $('btnSave'), btnStart: $('btnStart'), btnStop: $('btnStop'),
+  btnTestHeart: $('btnTestHeart'), btnTestMsg: $('btnTestMsg'),
+  events: $('events'),
+  // Gifts tab
+  giftTableBody: $('giftTableBody'), btnAddGift: $('btnAddGift'), btnTestGift: $('btnTestGift'),
+  // Overlays tab
+  overlayTableBody: $('overlayTableBody'), btnAddOverlay: $('btnAddOverlay'),
+  // Gift modal
+  giftDialog: $('giftDialog'), giftDialogTitle: $('giftDialogTitle'),
+  dlgMatchKeys: $('dlgMatchKeys'), dlgAlias: $('dlgAlias'),
+  dlgGroup: $('dlgGroup'), dlgFile: $('dlgFile'), dlgOverlay: $('dlgOverlay'),
+  dlgGiftSave: $('dlgGiftSave'), groupList: $('groupList'),
+  // Overlay modal
+  overlayDialog: $('overlayDialog'), overlayDialogTitle: $('overlayDialogTitle'),
+  ovName: $('ovName'), ovBgColor: $('ovBgColor'), ovOpacity: $('ovOpacity'), ovOpacityVal: $('ovOpacityVal'),
+  ovW: $('ovW'), ovH: $('ovH'), ovTop: $('ovTop'), dlgOverlaySave: $('dlgOverlaySave'),
+};
+
+// =================== Utils ===================
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function appendLog(msg) {
+  const t = new Date().toLocaleTimeString();
+  els.log.textContent = `[${t}] ${msg}\n` + els.log.textContent;
+  if (els.log.textContent.length > 12000) els.log.textContent = els.log.textContent.slice(0, 12000);
+}
+function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// =================== Tabs ===================
 document.querySelectorAll('.tab').forEach(t => {
   t.onclick = () => {
     document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
@@ -32,7 +54,7 @@ document.querySelectorAll('.tab').forEach(t => {
   };
 });
 
-// ---- Init ----
+// =================== Init ===================
 async function init() {
   const s = await window.bigo.settingsLoad();
   els.env.value = s.env || 'prod';
@@ -41,73 +63,299 @@ async function init() {
   els.openid.value = s.openid || '';
   els.gameId.value = s.gameId || '';
   els.accessToken.value = s.accessToken || '';
+
   mapping = await window.bigo.mappingLoad();
   await reloadEffects();
-  renderMapping();
+  renderGiftTable();
+  renderOverlayTable();
 }
 
 async function reloadEffects() {
   effects = await window.bigo.effectsList();
-  els.mapFile.innerHTML = effects.length
-    ? effects.map(e => `<option value="${e.file}">${e.file}</option>`).join('')
-    : '<option value="">(chưa có file trong assets/effects)</option>';
+  const opts = ['<option value="">— chọn file —</option>',
+    ...effects.map(e => `<option value="${escapeHtml(e.file)}">${escapeHtml(e.file)}</option>`)];
+  els.dlgFile.innerHTML = opts.join('');
 }
 
-function renderMapping() {
-  const rows = Object.entries(mapping.gifts || {}).map(([gid, file]) =>
-    `<div class="map-row"><span>${escapeHtml(gid)} → ${escapeHtml(file)}</span><button data-gid="${escapeHtml(gid)}">xoá</button></div>`
-  );
-  els.mappingList.innerHTML = rows.join('') || '<div style="color:#555;padding:8px">chưa có mapping</div>';
-  els.mappingList.querySelectorAll('button').forEach(b => {
-    b.onclick = async () => {
-      delete mapping.gifts[b.dataset.gid];
-      await window.bigo.mappingSave(mapping);
-      renderMapping();
-    };
+async function persistMapping() {
+  await window.bigo.mappingSave(mapping);
+}
+
+// =================== Gift Table ===================
+function renderGiftTable() {
+  const overlayMap = new Map(mapping.overlays.map(o => [o.id, o]));
+  if (mapping.gifts.length === 0) {
+    els.giftTableBody.innerHTML = '<tr><td colspan="6" style="color:#555;text-align:center;padding:20px">Chưa có quà nào — bấm "+ Thêm quà"</td></tr>';
+  } else {
+    els.giftTableBody.innerHTML = mapping.gifts.map(g => {
+      const ov = overlayMap.get(g.overlayId);
+      return `<tr data-id="${g.id}">
+        <td>${g.matchKeys.map(k => `<code>${escapeHtml(k)}</code>`).join(' ')}</td>
+        <td>${escapeHtml(g.alias || '')}</td>
+        <td>${escapeHtml(g.group || '')}</td>
+        <td>${g.mediaFile ? `<code>${escapeHtml(g.mediaFile)}</code>` : '<span style="color:#666">—</span>'}</td>
+        <td>${ov ? escapeHtml(ov.name) : '<span style="color:#ff6b6b">overlay đã xoá</span>'}</td>
+        <td class="actions-col">
+          <button class="tiny" data-act="play" data-id="${g.id}">▶ Phát</button>
+          <button class="tiny" data-act="edit" data-id="${g.id}">✏️</button>
+          <button class="tiny danger" data-act="del" data-id="${g.id}">🗑</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+  els.giftTableBody.querySelectorAll('button[data-act]').forEach(b => {
+    b.onclick = () => giftAction(b.dataset.act, b.dataset.id);
+  });
+  // Update group datalist
+  const groups = [...new Set(mapping.gifts.map(g => g.group).filter(Boolean))];
+  els.groupList.innerHTML = groups.map(g => `<option value="${escapeHtml(g)}"></option>`).join('');
+}
+
+async function giftAction(act, id) {
+  const g = mapping.gifts.find(x => x.id === id);
+  if (!g) return;
+  if (act === 'edit') openGiftDialog(g);
+  else if (act === 'del') {
+    if (!confirm(`Xoá "${g.alias || g.matchKeys.join(',')}"?`)) return;
+    mapping.gifts = mapping.gifts.filter(x => x.id !== id);
+    await persistMapping();
+    renderGiftTable();
+  } else if (act === 'play') {
+    if (!g.mediaFile || !g.overlayId) { alert('Quà chưa có file hoặc overlay'); return; }
+    const r = await window.bigo.overlayPlay({ overlayId: g.overlayId, file: g.mediaFile });
+    if (!r.ok) alert('Không phát được: ' + (r.error || 'unknown'));
+  }
+}
+
+function openGiftDialog(gift = null) {
+  els.giftDialogTitle.textContent = gift ? 'Sửa quà' : 'Thêm quà';
+  els.dlgMatchKeys.value = gift ? gift.matchKeys.join(', ') : '';
+  els.dlgAlias.value = gift?.alias || '';
+  els.dlgGroup.value = gift?.group || '';
+  // refresh overlay options
+  els.dlgOverlay.innerHTML = mapping.overlays.length
+    ? mapping.overlays.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('')
+    : '<option value="">(chưa có overlay)</option>';
+  els.dlgOverlay.value = gift?.overlayId || mapping.overlays[0]?.id || '';
+  els.dlgFile.value = gift?.mediaFile || '';
+  els.giftDialog.dataset.editingId = gift?.id || '';
+  els.giftDialog.showModal();
+}
+
+els.dlgGiftSave.onclick = async (e) => {
+  // dialog default behavior closes form; we hijack save
+  if (!els.dlgMatchKeys.value.trim()) { e.preventDefault(); alert('Match keys không được trống'); return; }
+  const id = els.giftDialog.dataset.editingId;
+  const matchKeys = els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean);
+  const data = {
+    id: id || uid('g_'),
+    matchKeys,
+    alias: els.dlgAlias.value.trim(),
+    group: els.dlgGroup.value.trim(),
+    mediaFile: els.dlgFile.value,
+    overlayId: els.dlgOverlay.value,
+  };
+  if (id) {
+    const idx = mapping.gifts.findIndex(g => g.id === id);
+    if (idx !== -1) mapping.gifts[idx] = data;
+  } else {
+    mapping.gifts.push(data);
+  }
+  await persistMapping();
+  renderGiftTable();
+};
+
+els.btnAddGift.onclick = () => {
+  if (mapping.overlays.length === 0) { alert('Tạo ít nhất 1 overlay trước (tab Overlay)'); return; }
+  openGiftDialog();
+};
+
+els.btnTestGift.onclick = async () => {
+  if (mapping.gifts.length === 0) { alert('Chưa có quà nào'); return; }
+  const g = mapping.gifts[0];
+  await window.bigo.overlayPlay({ overlayId: g.overlayId, file: g.mediaFile });
+};
+
+// =================== Overlay Table ===================
+function renderOverlayTable() {
+  if (mapping.overlays.length === 0) {
+    els.overlayTableBody.innerHTML = '<tr><td colspan="7" style="color:#555;text-align:center;padding:20px">Chưa có overlay — bấm "+ Thêm overlay"</td></tr>';
+  } else {
+    els.overlayTableBody.innerHTML = mapping.overlays.map(o => {
+      const b = o.bounds || {};
+      return `<tr data-id="${o.id}">
+        <td>${escapeHtml(o.name)}</td>
+        <td><span class="color-swatch" style="background:${o.bgColor}"></span><code>${escapeHtml(o.bgColor)}</code></td>
+        <td>${Math.round((o.opacity ?? 1) * 100)}%</td>
+        <td>${b.width || '?'} × ${b.height || '?'}</td>
+        <td>${b.x != null ? `${Math.round(b.x)}, ${Math.round(b.y)}` : 'auto'}</td>
+        <td>${o.alwaysOnTop ? '✓' : '—'}</td>
+        <td class="actions-col">
+          <button class="tiny" data-act="show" data-id="${o.id}">👁 Hiện</button>
+          <button class="tiny" data-act="hide" data-id="${o.id}">🙈 Ẩn</button>
+          <button class="tiny" data-act="edit" data-id="${o.id}">✏️</button>
+          <button class="tiny danger" data-act="del" data-id="${o.id}">🗑</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+  els.overlayTableBody.querySelectorAll('button[data-act]').forEach(b => {
+    b.onclick = () => overlayAction(b.dataset.act, b.dataset.id);
   });
 }
 
-function appendLog(msg) {
-  const t = new Date().toLocaleTimeString();
-  els.log.textContent = `[${t}] ${msg}\n` + els.log.textContent;
-  if (els.log.textContent.length > 12000) els.log.textContent = els.log.textContent.slice(0, 12000);
+async function overlayAction(act, id) {
+  const o = mapping.overlays.find(x => x.id === id);
+  if (!o) return;
+  if (act === 'show') {
+    const r = await window.bigo.overlayShow(id);
+    if (!r.ok) alert('Lỗi: ' + (r.error || 'unknown'));
+  } else if (act === 'hide') {
+    await window.bigo.overlayHide(id);
+  } else if (act === 'edit') {
+    openOverlayDialog(o);
+  } else if (act === 'del') {
+    const usingGifts = mapping.gifts.filter(g => g.overlayId === id);
+    let msg = `Xoá overlay "${o.name}"?`;
+    if (usingGifts.length) msg += `\n${usingGifts.length} quà đang dùng overlay này sẽ bị unmap.`;
+    if (!confirm(msg)) return;
+    await window.bigo.overlayDelete(id);
+    mapping.overlays = mapping.overlays.filter(x => x.id !== id);
+    mapping.gifts.forEach(g => { if (g.overlayId === id) g.overlayId = mapping.overlays[0]?.id || ''; });
+    await persistMapping();
+    renderOverlayTable();
+    renderGiftTable();
+  }
 }
 
-function appendOpenApiEvent(ev) {
-  const div = document.createElement('div');
-  div.className = `event ${ev.type || 'msg'}`;
-  let line = '';
-  if (ev.type === 'gift') line = `🎁 [${ev.nick_name || ev.user}] ${ev.gift_name || ev.gift_id} ×${ev.gift_count || 1}`;
-  else if (ev.type === 'heart') line = `❤ [${ev.nick_name || ev.user}] +${ev.count || 1}`;
-  else if (ev.type === 'msg') line = `💬 [${ev.nick_name || ev.user}] ${ev.content || ''}`;
-  else line = JSON.stringify(ev);
-  div.textContent = `${new Date().toLocaleTimeString()} ${line}`;
-  els.events.prepend(div);
-  while (els.events.children.length > 200) els.events.lastChild.remove();
+els.ovOpacity.oninput = () => { els.ovOpacityVal.textContent = els.ovOpacity.value; };
+
+function openOverlayDialog(ov = null) {
+  els.overlayDialogTitle.textContent = ov ? 'Sửa overlay' : 'Thêm overlay';
+  els.ovName.value = ov?.name || `Overlay ${mapping.overlays.length + 1}`;
+  els.ovBgColor.value = ov?.bgColor || '#00FF00';
+  const op = Math.round((ov?.opacity ?? 1) * 100);
+  els.ovOpacity.value = op; els.ovOpacityVal.textContent = op;
+  els.ovW.value = ov?.bounds?.width || 540;
+  els.ovH.value = ov?.bounds?.height || 960;
+  els.ovTop.checked = ov?.alwaysOnTop !== false;
+  els.overlayDialog.dataset.editingId = ov?.id || '';
+  els.overlayDialog.showModal();
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+els.dlgOverlaySave.onclick = async (e) => {
+  if (!els.ovName.value.trim()) { e.preventDefault(); alert('Tên overlay không được trống'); return; }
+  const id = els.overlayDialog.dataset.editingId;
+  const existing = id ? mapping.overlays.find(o => o.id === id) : null;
+  const data = {
+    id: id || uid('ov_'),
+    name: els.ovName.value.trim(),
+    bgColor: els.ovBgColor.value,
+    opacity: parseInt(els.ovOpacity.value, 10) / 100,
+    bounds: {
+      x: existing?.bounds?.x ?? null,
+      y: existing?.bounds?.y ?? null,
+      width: parseInt(els.ovW.value, 10) || 540,
+      height: parseInt(els.ovH.value, 10) || 960,
+    },
+    alwaysOnTop: els.ovTop.checked,
+  };
+  if (existing) {
+    Object.assign(existing, data);
+    await window.bigo.overlayApplyConfig(existing);
+  } else {
+    mapping.overlays.push(data);
+    await persistMapping();
+  }
+  renderOverlayTable();
+  renderGiftTable();
+};
+
+els.btnAddOverlay.onclick = () => openOverlayDialog();
+
+// =================== Embed flow (auto-listen) ===================
+function resetEmbedUi() {
+  els.metaPanel.style.display = 'none';
+  els.metaInfo.innerHTML = '';
+  els.liveChats.innerHTML = '';
+  els.liveGifts.innerHTML = '';
 }
 
-function playEffect(file) {
-  if (!file) return;
-  const path = `../assets/effects/${file}`;
-  els.stageEmpty.style.display = 'none';
-  if (/\.(mp4|webm)$/i.test(file)) { els.fxVideo.src = path; els.fxVideo.muted = false; els.fxVideo.play().catch(() => {}); }
-  else if (/\.(mp3|wav|ogg)$/i.test(file)) { els.fxAudio.src = path; els.fxAudio.play().catch(() => {}); }
+els.btnConnect.onclick = async () => {
+  const id = els.embedBigoId.value.trim();
+  if (!id) { alert('Nhập BIGO ID'); return; }
+
+  els.btnConnect.disabled = true;
+  els.status.textContent = 'checking...';
+  els.status.classList.remove('on');
+
+  // 1. Stop session cũ + clear UI
+  await window.bigo.embedStop();
+  resetEmbedUi();
+
+  // 2. Check live
+  const check = await window.bigo.checkLive(id);
+  if (!check.ok) {
+    els.liveInfo.textContent = `Lỗi check live: ${check.error}`;
+    els.liveInfo.className = 'live-info dead';
+    els.btnConnect.disabled = false;
+    return;
+  }
+  const d = check.data?.data || {};
+  if (d.alive !== 1) {
+    els.liveInfo.className = 'live-info dead';
+    els.liveInfo.textContent = `🔴 OFFLINE — ${d.nick_name || 'không tìm thấy ID'}`;
+    els.status.textContent = 'offline';
+    els.btnConnect.disabled = false;
+    return;
+  }
+
+  els.liveInfo.className = 'live-info live';
+  els.liveInfo.textContent = `🟢 LIVE — ${d.nick_name} · roomId=${d.roomId} · uid=${d.uid} · "${d.roomTopic || ''}"`;
+
+  // 3. Lưu BIGO ID
+  const s = await window.bigo.settingsLoad();
+  s.bigoId = id;
+  await window.bigo.settingsSave(s);
+
+  // 4. Start embed listener
+  els.status.textContent = 'connecting...';
+  const res = await window.bigo.embedStart({ bigoId: id, visible: false });
+  if (!res.ok) {
+    els.btnConnect.disabled = false;
+    appendLog(`embed failed: ${res.error}`);
+    alert(`Lỗi: ${res.error}`);
+    return;
+  }
+  els.status.textContent = `listening · ${id}`;
+  els.status.classList.add('on');
+  els.btnConnect.disabled = false;
+  els.btnEmbedStop.disabled = false;
+  els.btnEmbedShow.disabled = false;
+  appendLog(`connected to ${id}`);
+};
+
+els.btnEmbedStop.onclick = async () => {
+  await window.bigo.embedStop();
+  els.status.textContent = 'disconnected';
+  els.status.classList.remove('on');
+  els.btnEmbedStop.disabled = true;
+  els.btnEmbedShow.disabled = true;
+  resetEmbedUi();
+};
+
+els.btnEmbedShow.onclick = async () => {
+  const r = await window.bigo.embedShow();
+  if (!r.ok) appendLog('embed-show: ' + (r.error || 'no listener'));
+};
+
+// =================== Embed parsed events ===================
+function findGiftByName(name) {
+  if (!name) return null;
+  const lower = name.toLowerCase();
+  return mapping.gifts.find(g => g.matchKeys.some(k => k.toLowerCase() === lower));
 }
 
-function handleOpenApiEvent(ev) {
-  appendOpenApiEvent(ev);
-  let file = null;
-  if (ev.type === 'gift') file = mapping.gifts?.[String(ev.gift_id)] || mapping.gifts?.[ev.gift_name];
-  else if (ev.type === 'heart') file = mapping.hearts;
-  else if (ev.type === 'msg') file = mapping.msg;
-  if (file) playEffect(file);
-}
-
-// ---- Embed parsed events ----
 function renderParsed(ev) {
   if (ev.type === 'chat') {
     const div = document.createElement('div');
@@ -118,28 +366,31 @@ function renderParsed(ev) {
     return;
   }
   if (ev.type === 'gift') {
+    const matched = findGiftByName(ev.gift_name);
     const div = document.createElement('div');
     div.className = 'gift-row';
-    div.innerHTML = `<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span><span>tặng</span><span class="what">${escapeHtml(ev.gift_name)}</span><span class="cnt">×${ev.gift_count}</span>`;
+    const matchedBadge = matched ? `<span class="matched">▶ ${escapeHtml(matched.alias || '')}</span>` : '';
+    div.innerHTML = `<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span><span>tặng</span><span class="what">${escapeHtml(ev.gift_name)}</span><span class="cnt">×${ev.gift_count}</span>${matchedBadge}`;
     els.liveGifts.prepend(div);
     while (els.liveGifts.children.length > 200) els.liveGifts.lastChild.remove();
-    const file = mapping.gifts?.[ev.gift_name];
-    if (file) playEffect(file);
+    if (matched && matched.mediaFile && matched.overlayId) {
+      window.bigo.overlayPlay({ overlayId: matched.overlayId, file: matched.mediaFile });
+    }
     return;
   }
   if (ev.type === 'gift_overlay') {
+    // Bigo's animated gift overlay — chỉ log, không trigger (đã trigger từ gift event)
     const div = document.createElement('div');
     div.className = 'gift-row';
     const iconHtml = ev.icon ? `<img class="icon" src="${ev.icon}" />` : '';
     div.innerHTML = `${iconHtml}<span class="who">${escapeHtml(ev.user)}</span><span>combo</span><span class="cnt">×${ev.gift_count} · ${ev.combo}</span>`;
     els.liveGifts.prepend(div);
     while (els.liveGifts.children.length > 200) els.liveGifts.lastChild.remove();
-    return;
   }
 }
 
 function renderEmbedEvent(ev) {
-  if (ev.kind === 'parsed') { renderParsed(ev); return; }
+  if (ev.kind === 'parsed') return renderParsed(ev);
   if (ev.kind === 'meta') {
     els.metaPanel.style.display = 'block';
     const parts = [];
@@ -150,12 +401,11 @@ function renderEmbedEvent(ev) {
   }
   if (ev.kind === 'dom-attached' || ev.kind === 'ready') {
     appendLog(`embed ${ev.kind}: ${ev._frame || ev.url || ''}`);
-    return;
   }
   if (ev.kind === 'scrape-error') appendLog(`scrape error: ${ev.msg}`);
 }
 
-// ---- Open API actions ----
+// =================== Open API tab ===================
 els.btnSave.onclick = async () => {
   await window.bigo.settingsSave({
     env: els.env.value, bigoId: els.bigoId.value.trim(),
@@ -164,7 +414,6 @@ els.btnSave.onclick = async () => {
   });
   appendLog('settings saved');
 };
-
 els.btnStart.onclick = async () => {
   await els.btnSave.onclick();
   els.btnStart.disabled = true;
@@ -174,17 +423,16 @@ els.btnStart.onclick = async () => {
     gameId: els.gameId.value.trim(), openid: els.openid.value.trim(),
   });
   if (res.ok) {
-    els.status.textContent = `OAuth connected · sess=${res.gameSess.slice(0, 8)}`;
+    els.status.textContent = `OAuth · sess=${res.gameSess.slice(0, 8)}`;
     els.status.classList.add('on');
     els.btnStop.disabled = false;
   } else {
     els.status.textContent = 'error';
     els.btnStart.disabled = false;
-    appendLog(`start failed: ${res.error}`);
+    appendLog(`OAuth start failed: ${res.error}`);
     alert(`Không kết nối được: ${res.error}`);
   }
 };
-
 els.btnStop.onclick = async () => {
   await window.bigo.stop();
   els.status.textContent = 'disconnected';
@@ -192,76 +440,28 @@ els.btnStop.onclick = async () => {
   els.btnStop.disabled = true;
   els.btnStart.disabled = false;
 };
-
-// ---- Effects test buttons ----
-els.btnTestGift.onclick = () => window.bigo.testEvent('gift');
 els.btnTestHeart.onclick = () => window.bigo.testEvent('heart');
 els.btnTestMsg.onclick = () => window.bigo.testEvent('msg');
-els.btnReloadFx.onclick = reloadEffects;
 
-els.btnAddMap.onclick = async () => {
-  const gid = els.mapGiftId.value.trim();
-  const file = els.mapFile.value;
-  if (!gid || !file) { alert('Nhập gift_name/gift_id và chọn file'); return; }
-  mapping.gifts[gid] = file;
-  await window.bigo.mappingSave(mapping);
-  els.mapGiftId.value = '';
-  renderMapping();
-};
+function handleOpenApiEvent(ev) {
+  const div = document.createElement('div');
+  div.className = `event ${ev.type || 'msg'}`;
+  let line;
+  if (ev.type === 'gift') {
+    line = `🎁 [${ev.nick_name || ev.user}] ${ev.gift_name || ev.gift_id} ×${ev.gift_count || 1}`;
+    const matched = findGiftByName(ev.gift_name);
+    if (matched && matched.mediaFile && matched.overlayId) {
+      window.bigo.overlayPlay({ overlayId: matched.overlayId, file: matched.mediaFile });
+    }
+  } else if (ev.type === 'heart') line = `❤ [${ev.nick_name || ev.user}] +${ev.count || 1}`;
+  else if (ev.type === 'msg') line = `💬 [${ev.nick_name || ev.user}] ${ev.content || ''}`;
+  else line = JSON.stringify(ev);
+  div.textContent = `${new Date().toLocaleTimeString()} ${line}`;
+  els.events.prepend(div);
+  while (els.events.children.length > 200) els.events.lastChild.remove();
+}
 
-// ---- Embed actions ----
-els.btnCheckLive.onclick = async () => {
-  const id = els.embedBigoId.value.trim();
-  if (!id) return;
-  els.liveInfo.textContent = 'checking...';
-  els.liveInfo.className = 'live-info';
-  const res = await window.bigo.checkLive(id);
-  if (!res.ok) {
-    els.liveInfo.textContent = `Lỗi: ${res.error}`;
-    els.liveInfo.classList.add('dead');
-    return;
-  }
-  const d = res.data?.data || {};
-  if (d.alive === 1) {
-    els.liveInfo.classList.add('live');
-    els.liveInfo.textContent = `🟢 LIVE — ${d.nick_name} · roomId=${d.roomId} · uid=${d.uid} · "${d.roomTopic || ''}"`;
-  } else {
-    els.liveInfo.classList.add('dead');
-    els.liveInfo.textContent = `🔴 OFFLINE — ${d.nick_name || 'không tìm thấy'}`;
-  }
-};
-
-els.btnEmbedStart.onclick = async () => {
-  const id = els.embedBigoId.value.trim();
-  if (!id) { alert('Nhập BIGO ID'); return; }
-  const s = await window.bigo.settingsLoad();
-  s.bigoId = id;
-  await window.bigo.settingsSave(s);
-  els.btnEmbedStart.disabled = true;
-  els.status.textContent = 'embed connecting...';
-  const res = await window.bigo.embedStart({ bigoId: id, visible: false });
-  if (res.ok) {
-    els.status.textContent = `listening · ${id}`;
-    els.status.classList.add('on');
-    els.btnEmbedStop.disabled = false;
-    appendLog(`embed started for ${id}`);
-  } else {
-    els.btnEmbedStart.disabled = false;
-    appendLog(`embed failed: ${res.error}`);
-    alert(`Lỗi: ${res.error}`);
-  }
-};
-
-els.btnEmbedStop.onclick = async () => {
-  await window.bigo.embedStop();
-  els.status.textContent = 'disconnected';
-  els.status.classList.remove('on');
-  els.btnEmbedStop.disabled = true;
-  els.btnEmbedStart.disabled = false;
-};
-
-els.btnEmbedShow.onclick = () => window.bigo.embedShow();
-
+// =================== Wire up ===================
 window.bigo.onEvent(handleOpenApiEvent);
 window.bigo.onLog(appendLog);
 window.bigo.onEmbedEvent(renderEmbedEvent);

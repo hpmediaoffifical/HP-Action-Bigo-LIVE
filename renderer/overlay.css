@@ -1,0 +1,42 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #00FF00;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+#dragHandle {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 24px;
+  -webkit-app-region: drag;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  text-align: center;
+  line-height: 24px;
+  z-index: 10;
+  cursor: move;
+  user-select: none;
+  letter-spacing: 0.05em;
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#player {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: transparent;
+}
+
+#audio { display: none; }

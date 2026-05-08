@@ -13,30 +13,31 @@
 
   <nav class="tabs">
     <button class="tab active" data-tab="embed">🌐 Web Listener</button>
-    <button class="tab" data-tab="oauth">🔐 Open API (OAuth)</button>
-    <button class="tab" data-tab="effects">🎬 Hiệu ứng &amp; Mapping</button>
+    <button class="tab" data-tab="gifts">🎁 Bảng quà</button>
+    <button class="tab" data-tab="overlays">🪟 Overlay</button>
+    <button class="tab" data-tab="oauth">🔐 Open API</button>
   </nav>
 
   <main>
-    <!-- TAB 1: WEB EMBED LISTENER -->
+    <!-- =================== TAB: WEB LISTENER =================== -->
     <section class="tab-panel active" data-tab="embed">
       <div class="panel">
         <h2>Kết nối phòng live</h2>
         <div class="row">
-          <label>BIGO ID
-            <input id="embedBigoId" placeholder="vd: 1066691535" />
+          <label style="flex:2">BIGO ID
+            <input id="embedBigoId" placeholder="vd: 1066691535 hoặc kurumiyu0308" />
           </label>
           <label>&nbsp;
-            <button id="btnCheckLive">🔍 Check live</button>
+            <button id="btnConnect" class="primary">🔌 Kết nối phòng</button>
+          </label>
+          <label>&nbsp;
+            <button id="btnEmbedStop" disabled>⏹ Dừng</button>
+          </label>
+          <label>&nbsp;
+            <button id="btnEmbedShow" disabled>👁 Hiện cửa sổ Bigo</button>
           </label>
         </div>
-        <div id="liveInfo" class="live-info">Chưa check.</div>
-
-        <div class="actions">
-          <button id="btnEmbedStart" class="primary">▶ Bắt đầu nghe</button>
-          <button id="btnEmbedStop" disabled>⏹ Dừng</button>
-          <button id="btnEmbedShow">👁 Hiện cửa sổ Bigo</button>
-        </div>
+        <div id="liveInfo" class="live-info">Nhập BIGO ID rồi bấm Kết nối phòng — app tự check live và bắt đầu nghe.</div>
       </div>
 
       <div class="panel" id="metaPanel" style="display:none">
@@ -56,81 +57,174 @@
       </div>
     </section>
 
-    <!-- TAB 2: OAUTH -->
+    <!-- =================== TAB: GIFTS TABLE =================== -->
+    <section class="tab-panel" data-tab="gifts">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Bảng quà → hiệu ứng</h2>
+          <div>
+            <button id="btnAddGift" class="primary">+ Thêm quà</button>
+            <button id="btnTestGift">🎁 Test phát</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="min-width:130px">Match keys</th>
+                <th>Alias</th>
+                <th>Nhóm</th>
+                <th>File</th>
+                <th>Overlay</th>
+                <th class="actions-col">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="giftTableBody"></tbody>
+          </table>
+        </div>
+        <div class="hint small">
+          <b>Match keys</b>: tên quà mà Bigo render trong chat (vd <code>お面</code>, <code>Rose</code>) — cách nhau bằng dấu phẩy. Có thể nhập nhiều cái cho 1 hiệu ứng.
+        </div>
+      </div>
+    </section>
+
+    <!-- =================== TAB: OVERLAYS =================== -->
+    <section class="tab-panel" data-tab="overlays">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Cửa sổ overlay</h2>
+          <button id="btnAddOverlay" class="primary">+ Thêm overlay</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tên</th>
+                <th>Màu nền</th>
+                <th>Độ trong</th>
+                <th>Kích thước</th>
+                <th>Vị trí</th>
+                <th>Always on top</th>
+                <th class="actions-col">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="overlayTableBody"></tbody>
+          </table>
+        </div>
+        <div class="hint small">
+          Overlay là cửa sổ riêng phát mp4/webm/mp3 với phông xanh chroma key — đặt trong OBS bằng <b>Color Key</b> filter.
+          Mặc định 540×960 (vertical, scale 50% của 1080×1920). Bấm "Hiện" để mở cửa sổ rồi kéo/resize tự do — vị trí và kích thước được nhớ tự động.
+        </div>
+      </div>
+    </section>
+
+    <!-- =================== TAB: OPEN API =================== -->
     <section class="tab-panel" data-tab="oauth">
       <div class="panel">
-        <h2>Bigo Open API (cần streamer authorize app của bạn)</h2>
+        <h2>Bigo Open API (cần streamer authorize app)</h2>
         <div class="row">
           <label>Môi trường
             <select id="env">
-              <option value="prod">prod (oauth.bigolive.tv)</option>
+              <option value="prod">prod</option>
               <option value="gray">gray</option>
               <option value="test">test</option>
             </select>
           </label>
-          <label>BIGO ID (hiển thị)
-            <input id="bigoId" placeholder="vd: 20200995" />
-          </label>
+          <label>BIGO ID hiển thị<input id="bigoId" /></label>
         </div>
         <div class="row">
-          <label>openid streamer
-            <input id="openid" placeholder="openid từ OAuth callback" />
-          </label>
-          <label>game_id
-            <input id="gameId" placeholder="Bigo cấp" />
-          </label>
+          <label>openid streamer<input id="openid" /></label>
+          <label>game_id<input id="gameId" /></label>
         </div>
         <div class="row">
-          <label>access_token
-            <input id="accessToken" placeholder="OAuth access_token" />
-          </label>
+          <label>access_token<input id="accessToken" /></label>
         </div>
         <div class="actions">
           <button id="btnSave">💾 Lưu</button>
           <button id="btnStart" class="primary">▶ Kết nối Open API</button>
           <button id="btnStop" disabled>⏹ Dừng</button>
+          <button id="btnTestHeart">❤ Test heart</button>
+          <button id="btnTestMsg">💬 Test msg</button>
         </div>
         <h3>Sự kiện Open API</h3>
         <div id="events" class="events"></div>
       </div>
     </section>
 
-    <!-- TAB 3: EFFECTS & MAPPING -->
-    <section class="tab-panel" data-tab="effects">
-      <div class="panel">
-        <h2>Stage hiệu ứng</h2>
-        <div class="stage">
-          <video id="fxVideo" muted playsinline></video>
-          <audio id="fxAudio"></audio>
-          <div class="stage-empty" id="stageEmpty">Chưa có hiệu ứng. Bấm Test gift để xem demo.</div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>Mapping gift_name → file hiệu ứng</h2>
-        <div id="mappingList"></div>
-        <div class="row">
-          <input id="mapGiftId" placeholder="gift_name (vd: お面) hoặc gift_id" />
-          <select id="mapFile"></select>
-          <button id="btnAddMap">+ Thêm mapping</button>
-          <button id="btnReloadFx">↻ Quét lại assets/effects</button>
-        </div>
-        <div class="actions">
-          <button id="btnTestGift">🎁 Test gift</button>
-          <button id="btnTestHeart">❤ Test heart</button>
-          <button id="btnTestMsg">💬 Test msg</button>
-        </div>
-        <div class="hint small">
-          Đặt file <code>.mp4 / .webm / .mp3 / .wav</code> vào <code>assets/effects/</code>.
-        </div>
-      </div>
-    </section>
-
+    <!-- Log panel chung -->
     <section class="panel log-panel">
       <h2>Log</h2>
       <pre id="log" class="log"></pre>
     </section>
   </main>
+
+  <!-- =================== MODAL: EDIT GIFT =================== -->
+  <dialog id="giftDialog" class="modal">
+    <form method="dialog">
+      <h3 id="giftDialogTitle">Quà</h3>
+      <div class="form-row">
+        <label>Match keys (cách nhau bằng dấu phẩy)
+          <input id="dlgMatchKeys" required placeholder="お面, Rose" />
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Alias hiển thị
+          <input id="dlgAlias" placeholder="Mặt nạ" />
+        </label>
+        <label>Nhóm
+          <input id="dlgGroup" list="groupList" placeholder="Quà Hot" />
+          <datalist id="groupList"></datalist>
+        </label>
+      </div>
+      <div class="form-row">
+        <label>File hiệu ứng
+          <select id="dlgFile"></select>
+        </label>
+        <label>Overlay
+          <select id="dlgOverlay"></select>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button value="cancel">Huỷ</button>
+        <button id="dlgGiftSave" class="primary" value="default">Lưu</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- =================== MODAL: EDIT OVERLAY =================== -->
+  <dialog id="overlayDialog" class="modal">
+    <form method="dialog">
+      <h3 id="overlayDialogTitle">Overlay</h3>
+      <div class="form-row">
+        <label style="flex:2">Tên
+          <input id="ovName" required />
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Màu nền (chroma)
+          <input type="color" id="ovBgColor" value="#00FF00" />
+        </label>
+        <label>Độ trong suốt: <span id="ovOpacityVal">100</span>%
+          <input type="range" id="ovOpacity" min="0" max="100" value="100" />
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Width
+          <input type="number" id="ovW" min="100" max="3840" value="540" />
+        </label>
+        <label>Height
+          <input type="number" id="ovH" min="100" max="3840" value="960" />
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="ovTop" checked /> Always on top
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button value="cancel">Huỷ</button>
+        <button id="dlgOverlaySave" class="primary" value="default">Lưu</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="app.js"></script>
 </body>

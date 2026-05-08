@@ -58,7 +58,21 @@ class BigoWebListener {
     }
   }
 
-  show() { if (this.win) this.win.show(); }
+  // Bring embed window forward — restore nếu minimized, focus, toggle alwaysOnTop ngắn để pop lên
+  showAndFocus() {
+    if (!this.win || this.win.isDestroyed()) return false;
+    try {
+      if (this.win.isMinimized()) this.win.restore();
+      this.win.show();
+      this.win.setAlwaysOnTop(true);
+      this.win.focus();
+      this.win.moveTop();
+      setTimeout(() => {
+        try { if (this.win && !this.win.isDestroyed()) this.win.setAlwaysOnTop(false); } catch {}
+      }, 600);
+      return true;
+    } catch { return false; }
+  }
 }
 
 module.exports = { BigoWebListener };

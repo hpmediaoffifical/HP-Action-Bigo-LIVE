@@ -1,5 +1,20 @@
 {
-  "gifts": {},
-  "hearts": null,
-  "msg": null
+  "version": 2,
+  "gifts": [],
+  "overlays": [
+    {
+      "id": "ov_mowzeyw8m6as",
+      "name": "Overlay 1",
+      "bgColor": "#00FF00",
+      "opacity": 1,
+      "bounds": {
+        "x": null,
+        "y": null,
+        "width": 540,
+        "height": 960
+      },
+      "alwaysOnTop": true
+    }
+  ],
+  "groups": []
 }
