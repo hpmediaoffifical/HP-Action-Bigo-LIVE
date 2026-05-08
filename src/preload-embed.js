@@ -14,19 +14,22 @@ function send(channel, payload) {
 const seenChats = new Map();
 const seenGifts = new Map();
 
+// First-match wins. Tat ca pattern cho phep username "ID:394471037" qua alternation.
+// \b word boundary sau level de xu ly textContent thieu space giua badge va name.
 const CHAT_PATTERNS = [
-  /^\s*Lv\.?\s*(\d+)\s+([^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
-  /^\s*\[Lv\.?(\d+)\]\s*([^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
-  // Bigo.tv UI mới: level hiện dạng badge tròn "36", text content khong co "Lv." prefix.
-  // Format: "<level> <username>: content" — username co the la "ID:394471037" voi colon.
-  // Alternation (?:ID:\d+|[^:：\n]{1,80}?) cho phep username chua "ID:xxx".
-  /^\s*(\d{1,3})\s+(ID:\d+|[^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
+  /^\s*Lv\.?\s*(\d+)\b\s*(ID:\d+|[^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
+  /^\s*\[Lv\.?(\d+)\]\s*(ID:\d+|[^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
+  /^\s*(\d{1,3})\b\s*(ID:\d+|[^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
+  // Fallback khong co level — yeu cau space quanh ":" giam false positive.
+  /^\s*(ID:\d+|[^:：\n\d][^:：\n]{0,79}?)\s+[:：]\s+(.{1,500})\s*$/u,
 ];
 
 function tryMatchChat(text) {
-  for (const re of CHAT_PATTERNS) {
-    const m = text.match(re);
-    if (m) return { level: +m[1], user: m[2].trim(), content: m[3].trim() };
+  for (let i = 0; i < CHAT_PATTERNS.length; i++) {
+    const m = text.match(CHAT_PATTERNS[i]);
+    if (!m) continue;
+    if (i === 3) return { level: 0, user: m[1].trim(), content: m[2].trim() };
+    return { level: +m[1], user: m[2].trim(), content: m[3].trim() };
   }
   return null;
 }
@@ -206,9 +209,25 @@ function attach() {
   send('embed:dom-attached', { url: location.href, isMain: true, ts: Date.now() });
 
   let lastMeta = '';
+  let tickCount = 0;
+  let totalChats = 0;
+  let totalGifts = 0;
+  let totalElements = 0;
   const tick = () => {
     try {
+      tickCount++;
+      // Đếm tổng elements cho diagnostic (chỉ tick đầu để không tốn CPU)
+      if (tickCount === 5 || tickCount === 30) {
+        let count = 0;
+        for (const _ of walkAllElements(document.body)) count++;
+        totalElements = count;
+        send('embed:scrape-error', {
+          msg: `[diag tick=${tickCount}] DOM elements=${count}, accumulated chats=${totalChats}, gifts=${totalGifts}`,
+        });
+      }
       const { chats, gifts } = scanChatsAndGifts();
+      totalChats += chats.length;
+      totalGifts += gifts.length;
       for (const ev of chats) send('embed:parsed', { ...ev, ts: Date.now() });
       for (const ev of gifts) send('embed:parsed', { ...ev, ts: Date.now() });
       for (const ev of scanGiftOverlay()) send('embed:parsed', { ...ev, ts: Date.now() });

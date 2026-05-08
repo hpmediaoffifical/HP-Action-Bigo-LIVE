@@ -52,7 +52,8 @@ class BigoWebListener {
     });
     this.win.setMenuBarVisibility(false);
     this.win.on('closed', () => { this.win = null; });
-    const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+    // UA Chrome 131 (2025) — bigo có thể serve UI khác cho UA cũ.
+    const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
     await this.win.loadURL(`https://www.bigo.tv/${bigoId}`, { userAgent: ua });
     this.onLog('loaded');
   }
