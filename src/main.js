@@ -51,38 +51,71 @@ function defaultOverlay(name = 'Overlay 1') {
   };
 }
 
+function defaultGroup(name = 'Mặc định', type = 'gift') {
+  return {
+    id: uid('g_'), name, type,
+    enabled: true, collapsed: false,
+    bigoId: '', // Optional: BIGO ID auto-load khi nhóm này active
+    items: [],
+  };
+}
+
 function defaultMapping() {
-  return { version: 2, gifts: [], overlays: [defaultOverlay()], groups: [] };
+  return {
+    version: 3,
+    groups: [defaultGroup('Mặc định', 'gift')],
+    overlays: [defaultOverlay()],
+  };
 }
 
 function migrateMapping(raw) {
   if (!raw || typeof raw !== 'object') return defaultMapping();
-  if (raw.version === 2 && Array.isArray(raw.gifts) && Array.isArray(raw.overlays)) return raw;
+  // v3 = current
+  if (raw.version === 3 && Array.isArray(raw.groups) && Array.isArray(raw.overlays)) return raw;
 
-  // Migrate v1: { gifts: { key: file, ... }, hearts, msg }
-  const overlays = [defaultOverlay()];
-  const ovId = overlays[0].id;
-  const gifts = [];
+  // Convert v2 (flat gifts array) → v3 (single group)
+  if (raw.version === 2 && Array.isArray(raw.gifts)) {
+    const items = raw.gifts.map(g => ({
+      id: g.id || uid('i_'),
+      matchKeys: g.matchKeys || [],
+      alias: g.alias || '',
+      mediaFile: g.mediaFile || '',
+      overlayId: g.overlayId || '',
+      pauseBgm: !!g.pauseBgm,
+    }));
+    return {
+      version: 3,
+      groups: [{ ...defaultGroup('Mặc định', 'gift'), items }],
+      overlays: raw.overlays || [defaultOverlay()],
+    };
+  }
+
+  // Convert v1 (legacy {gifts:{key:file}}) → v3
   if (raw.gifts && typeof raw.gifts === 'object' && !Array.isArray(raw.gifts)) {
+    const overlays = [defaultOverlay()];
+    const ovId = overlays[0].id;
+    const items = [];
     for (const [key, file] of Object.entries(raw.gifts)) {
       if (!key || !file) continue;
-      gifts.push({
-        id: uid('g_'),
-        matchKeys: [key],
-        alias: key,
-        group: '',
-        mediaFile: file,
-        overlayId: ovId,
+      items.push({
+        id: uid('i_'), matchKeys: [key], alias: key,
+        mediaFile: file, overlayId: ovId, pauseBgm: false,
       });
     }
+    return {
+      version: 3,
+      groups: [{ ...defaultGroup('Mặc định', 'gift'), items }],
+      overlays,
+    };
   }
-  return { version: 2, gifts, overlays, groups: [] };
+
+  return defaultMapping();
 }
 
 function loadMapping() {
   const raw = loadJson(MAPPING_PATH, null);
   const m = migrateMapping(raw);
-  if (!raw || raw.version !== 2) saveJson(MAPPING_PATH, m); // upgrade on disk
+  if (!raw || raw.version !== 3) saveJson(MAPPING_PATH, m); // upgrade on disk
   return m;
 }
 

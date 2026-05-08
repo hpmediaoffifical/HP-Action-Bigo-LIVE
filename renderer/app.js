@@ -1,8 +1,44 @@
 const $ = (id) => document.getElementById(id);
 
 // =================== State ===================
-let mapping = { version: 2, gifts: [], overlays: [], groups: [] };
+let mapping = { version: 3, groups: [], overlays: [] };
 let effects = [];
+
+// =================== Helper: groups & items ===================
+// v3: mapping.groups = [{ id, name, type, enabled, collapsed, bigoId, items: [...] }]
+// Backward-compat: nếu mapping.gifts (v2 flat) tồn tại, treat như 1 group default
+function getAllItems() {
+  if (Array.isArray(mapping.groups)) {
+    return mapping.groups.flatMap(g => (g.items || []).map(item => ({ ...item, _group: g })));
+  }
+  return (mapping.gifts || []).map(item => ({ ...item, _group: null }));
+}
+function getEnabledGiftItems() {
+  if (Array.isArray(mapping.groups)) {
+    return mapping.groups
+      .filter(g => g.enabled !== false && g.type !== 'comment')
+      .flatMap(g => (g.items || []).map(item => ({ ...item, _group: g })));
+  }
+  return (mapping.gifts || []).map(item => ({ ...item, _group: null }));
+}
+function getEnabledCommentItems() {
+  if (Array.isArray(mapping.groups)) {
+    return mapping.groups
+      .filter(g => g.enabled !== false && g.type === 'comment')
+      .flatMap(g => (g.items || []).map(item => ({ ...item, _group: g })));
+  }
+  return [];
+}
+function findGroupById(gid) {
+  return (mapping.groups || []).find(g => g.id === gid);
+}
+function findItemById(itemId) {
+  for (const grp of (mapping.groups || [])) {
+    const item = (grp.items || []).find(i => i.id === itemId);
+    if (item) return { item, group: grp };
+  }
+  return null;
+}
 
 // Stats tổng tracking - reset khi connect/disconnect room mới
 const sessionStats = {
@@ -309,55 +345,148 @@ function getGiftIcon(g) {
 }
 
 function renderGiftTable() {
-  const overlayMap = new Map(mapping.overlays.map(o => [o.id, o]));
-  if (mapping.gifts.length === 0) {
-    els.giftTableBody.innerHTML = '<tr><td colspan="7" style="color:#555;text-align:center;padding:20px">Chưa có quà nào — bấm "+ Thêm quà"</td></tr>';
+  // v3: render groups list. Replace #giftTableBody (table) bằng container chứa groups card
+  const container = els.giftTableBody.parentElement?.parentElement;
+  if (!container) return;
+  // Tạo div #groupsContainer thay table nếu chưa có
+  let groupsContainer = $('groupsContainer');
+  if (!groupsContainer) {
+    const tableWrap = els.giftTableBody.closest('.table-wrap');
+    if (tableWrap) {
+      groupsContainer = document.createElement('div');
+      groupsContainer.id = 'groupsContainer';
+      groupsContainer.className = 'groups-container';
+      tableWrap.replaceWith(groupsContainer);
+      els.groupsContainer = groupsContainer;
+    }
+  }
+  els.groupsContainer = groupsContainer || $('groupsContainer');
+  if (!els.groupsContainer) return;
+
+  const overlayMap = new Map((mapping.overlays || []).map(o => [o.id, o]));
+  const groups = mapping.groups || [];
+
+  if (groups.length === 0 || groups.every(g => (g.items || []).length === 0)) {
+    els.groupsContainer.innerHTML = '<div style="color:#555;text-align:center;padding:24px">Chưa có quà nào — bấm "+ Thêm quà" hoặc "+ Thêm nhóm"</div>';
   } else {
-    els.giftTableBody.innerHTML = mapping.gifts.map(g => {
-      const ov = overlayMap.get(g.overlayId);
-      const iconUrl = getGiftIcon(g);
-      const iconCell = iconUrl
-        ? `<img src="${escapeHtml(iconUrl)}" style="width:40px;height:40px;border-radius:6px;object-fit:contain;background:#0f1117" loading="lazy" />`
-        : '<div style="width:40px;height:40px;border-radius:6px;background:#1c1f28"></div>';
-      return `<tr data-id="${g.id}">
-        <td>${iconCell}</td>
-        <td>${g.matchKeys.map(k => `<code>${escapeHtml(k)}</code>`).join(' ')}</td>
-        <td>${escapeHtml(g.alias || '')}</td>
-        <td>${escapeHtml(g.group || '')}</td>
-        <td>${g.mediaFile ? `<code>${escapeHtml(g.mediaFile)}</code>` : '<span style="color:#666">—</span>'}</td>
-        <td>${ov ? escapeHtml(ov.name) : '<span style="color:#ff6b6b">overlay đã xoá</span>'}</td>
-        <td class="actions-col">
-          <button class="tiny" data-act="play" data-id="${g.id}">▶ Phát</button>
-          <button class="tiny" data-act="edit" data-id="${g.id}">✏️</button>
-          <button class="tiny danger" data-act="del" data-id="${g.id}">🗑</button>
-        </td>
-      </tr>`;
+    els.groupsContainer.innerHTML = groups.map(grp => {
+      const enabled = grp.enabled !== false;
+      const collapsed = !!grp.collapsed;
+      const itemsHtml = (grp.items || []).map(item => {
+        const ov = overlayMap.get(item.overlayId);
+        const iconUrl = getGiftIcon(item);
+        const iconCell = iconUrl
+          ? `<img src="${escapeHtml(iconUrl)}" class="grow-icon" loading="lazy" />`
+          : '<div class="grow-icon-empty"></div>';
+        const matchKeys = (item.matchKeys || []).map(k => `<code>${escapeHtml(k)}</code>`).join(' ');
+        return `<div class="group-item" data-iid="${item.id}" data-gid="${grp.id}">
+          ${iconCell}
+          <div class="grow-meta">
+            <div class="grow-name"><b>${escapeHtml(item.alias || (item.matchKeys || [])[0] || '?')}</b> ${matchKeys}</div>
+            <div class="grow-sub">${item.mediaFile ? `<code>${escapeHtml(item.mediaFile)}</code>` : '<span style="color:#666">—</span>'} → ${ov ? escapeHtml(ov.name) : '<span style="color:#ff6b6b">overlay xoá</span>'}</div>
+          </div>
+          <div class="grow-actions">
+            <button class="tiny" data-act="play" data-iid="${item.id}">▶</button>
+            <button class="tiny" data-act="edit-item" data-iid="${item.id}">✏️</button>
+            <button class="tiny danger" data-act="del-item" data-iid="${item.id}">🗑</button>
+          </div>
+        </div>`;
+      }).join('') || '<div style="color:#555;padding:8px;font-size:11px">Nhóm trống</div>';
+
+      return `<div class="group-card ${enabled ? 'on' : 'off'} ${collapsed ? 'collapsed' : ''}" data-gid="${grp.id}">
+        <div class="group-head">
+          <span class="group-name">${escapeHtml(grp.name)}</span>
+          <span class="group-badge">${(grp.items || []).length} mục</span>
+          <span class="group-status">${enabled ? 'Đang bật' : 'Đang tắt'}</span>
+          <label class="switch" title="Bật/tắt nhóm">
+            <input type="checkbox" data-act="toggle-group" data-gid="${grp.id}" ${enabled ? 'checked' : ''} />
+            <span class="slider"></span>
+          </label>
+          <button class="tiny" data-act="add-item" data-gid="${grp.id}" title="Thêm quà vào nhóm">+ mục</button>
+          <button class="tiny" data-act="edit-group" data-gid="${grp.id}" title="Sửa tên nhóm">✏️</button>
+          <button class="tiny danger" data-act="del-group" data-gid="${grp.id}" title="Xoá nhóm">🗑</button>
+          <button class="tiny" data-act="collapse" data-gid="${grp.id}" title="Thu gọn/Mở">${collapsed ? '▶' : '▼'}</button>
+        </div>
+        ${collapsed ? '' : `<div class="group-items">${itemsHtml}</div>`}
+      </div>`;
     }).join('');
   }
-  els.giftTableBody.querySelectorAll('button[data-act]').forEach(b => {
-    b.onclick = () => giftAction(b.dataset.act, b.dataset.id);
+
+  // Wire actions
+  els.groupsContainer.querySelectorAll('[data-act]').forEach(el => {
+    const act = el.dataset.act;
+    if (el.tagName === 'INPUT' && el.type === 'checkbox') {
+      el.onchange = () => groupAction(act, el.dataset.gid, el.checked);
+    } else {
+      el.onclick = () => groupAction(act, el.dataset.gid, undefined, el.dataset.iid);
+    }
   });
-  // Update group datalist
-  const groups = [...new Set(mapping.gifts.map(g => g.group).filter(Boolean))];
-  els.groupList.innerHTML = groups.map(g => `<option value="${escapeHtml(g)}"></option>`).join('');
+
+  // Update group datalist (cho dialog Thêm quà)
+  if (els.groupList) {
+    const groupNames = groups.map(g => g.name).filter(Boolean);
+    els.groupList.innerHTML = groupNames.map(g => `<option value="${escapeHtml(g)}"></option>`).join('');
+  }
 }
 
-async function giftAction(act, id) {
-  const g = mapping.gifts.find(x => x.id === id);
-  if (!g) return;
-  if (act === 'edit') openGiftDialog(g);
-  else if (act === 'del') {
-    if (!confirm(`Xoá "${g.alias || g.matchKeys.join(',')}"?`)) return;
-    mapping.gifts = mapping.gifts.filter(x => x.id !== id);
+async function groupAction(act, gid, value, itemId) {
+  const grp = findGroupById(gid);
+  if (act === 'toggle-group') {
+    if (grp) { grp.enabled = !!value; await persistMapping(); renderGiftTable(); }
+    return;
+  }
+  if (act === 'collapse') {
+    if (grp) { grp.collapsed = !grp.collapsed; await persistMapping(); renderGiftTable(); }
+    return;
+  }
+  if (act === 'edit-group') {
+    if (!grp) return;
+    const newName = prompt('Tên nhóm:', grp.name);
+    if (!newName) return;
+    grp.name = newName.trim();
     await persistMapping();
     renderGiftTable();
-  } else if (act === 'play') {
-    if (!g.mediaFile || !g.overlayId) { alert('Quà chưa có file hoặc overlay'); return; }
-    // Tạm dừng nhạc nền nếu gift cấu hình
-    if (g.pauseBgm) pauseBgmForEffect();
-    const r = await window.bigo.overlayPlay({ overlayId: g.overlayId, file: g.mediaFile });
-    if (!r.ok) alert('Không phát được: ' + (r.error || 'unknown'));
+    return;
   }
+  if (act === 'del-group') {
+    if (!grp) return;
+    if (!confirm(`Xoá nhóm "${grp.name}" và ${(grp.items || []).length} quà bên trong?`)) return;
+    mapping.groups = mapping.groups.filter(g => g.id !== gid);
+    if (mapping.groups.length === 0) mapping.groups.push({
+      id: 'g_default_' + Date.now().toString(36),
+      name: 'Mặc định', type: 'gift', enabled: true, collapsed: false, bigoId: '', items: [],
+    });
+    await persistMapping();
+    renderGiftTable();
+    return;
+  }
+  if (act === 'add-item') {
+    openGiftDialog(null, gid);
+    return;
+  }
+  // Item-level actions
+  if (act === 'play' || act === 'edit-item' || act === 'del-item') {
+    const found = findItemById(itemId);
+    if (!found) return;
+    if (act === 'play') {
+      if (!found.item.mediaFile || !found.item.overlayId) { alert('Quà chưa có file hoặc overlay'); return; }
+      if (found.item.pauseBgm) pauseBgmForEffect();
+      const r = await window.bigo.overlayPlay({ overlayId: found.item.overlayId, file: found.item.mediaFile });
+      if (!r.ok) alert('Không phát được: ' + (r.error || 'unknown'));
+    } else if (act === 'edit-item') {
+      openGiftDialog(found.item, found.group.id);
+    } else if (act === 'del-item') {
+      if (!confirm(`Xoá "${found.item.alias || found.item.matchKeys.join(',')}"?`)) return;
+      found.group.items = found.group.items.filter(i => i.id !== itemId);
+      await persistMapping();
+      renderGiftTable();
+    }
+  }
+}
+
+// Legacy: giftAction giữ làm noop wrapper, code v3 dùng groupAction
+async function giftAction(act, id) {
+  return groupAction(act, null, undefined, id);
 }
 
 // Cache master list 1 lần khi mở modal đầu tiên
@@ -480,11 +609,21 @@ els.dlgMasterSort.addEventListener('change', renderMasterTable);
 if (els.dlgMasterVnOnly) els.dlgMasterVnOnly.addEventListener('change', renderMasterTable);
 if (els.dlgMasterFavOnly) els.dlgMasterFavOnly.addEventListener('change', renderMasterTable);
 
-async function openGiftDialog(gift = null) {
+async function openGiftDialog(gift = null, groupId = null) {
   els.giftDialogTitle.textContent = gift ? 'Sửa quà' : 'Thêm quà';
   els.dlgMatchKeys.value = gift ? gift.matchKeys.join(', ') : '';
   els.dlgAlias.value = gift?.alias || '';
-  els.dlgGroup.value = gift?.group || '';
+  // Group: nếu pass groupId thì dùng tên group đó, fallback gift._group hoặc empty
+  let groupName = '';
+  if (groupId) {
+    const grp = findGroupById(groupId);
+    if (grp) groupName = grp.name;
+  } else if (gift) {
+    const found = findItemById(gift.id);
+    if (found) groupName = found.group.name;
+  }
+  els.dlgGroup.value = groupName;
+  els.giftDialog.dataset.editingGroupId = groupId || '';
   els.dlgMasterFilter.value = '';
   els.dlgMasterSort.value = 'kc-asc';
   // refresh overlay options
@@ -501,24 +640,42 @@ async function openGiftDialog(gift = null) {
 }
 
 els.dlgGiftSave.onclick = async (e) => {
-  // dialog default behavior closes form; we hijack save
   if (!els.dlgMatchKeys.value.trim()) { e.preventDefault(); alert('Match keys không được trống'); return; }
-  const id = els.giftDialog.dataset.editingId;
+  const itemId = els.giftDialog.dataset.editingId;
+  const targetGroupName = els.dlgGroup.value.trim() || 'Mặc định';
   const matchKeys = els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean);
   const data = {
-    id: id || uid('g_'),
+    id: itemId || uid('i_'),
     matchKeys,
     alias: els.dlgAlias.value.trim(),
-    group: els.dlgGroup.value.trim(),
     mediaFile: els.dlgFile.value,
     overlayId: els.dlgOverlay.value,
     pauseBgm: els.dlgPauseBgm ? els.dlgPauseBgm.checked : false,
   };
-  if (id) {
-    const idx = mapping.gifts.findIndex(g => g.id === id);
-    if (idx !== -1) mapping.gifts[idx] = data;
+  // Tìm/tạo group theo tên
+  if (!Array.isArray(mapping.groups)) mapping.groups = [];
+  let targetGroup = mapping.groups.find(g => g.name === targetGroupName && g.type === 'gift');
+  if (!targetGroup) {
+    targetGroup = { id: uid('g_'), name: targetGroupName, type: 'gift', enabled: true, collapsed: false, bigoId: '', items: [] };
+    mapping.groups.push(targetGroup);
+  }
+  if (itemId) {
+    // Edit: tìm item trong group hiện tại; nếu group đổi, move
+    const found = findItemById(itemId);
+    if (found) {
+      if (found.group.id === targetGroup.id) {
+        const idx = found.group.items.findIndex(i => i.id === itemId);
+        if (idx !== -1) found.group.items[idx] = data;
+      } else {
+        // Move to new group
+        found.group.items = found.group.items.filter(i => i.id !== itemId);
+        targetGroup.items.push(data);
+      }
+    } else {
+      targetGroup.items.push(data);
+    }
   } else {
-    mapping.gifts.push(data);
+    targetGroup.items.push(data);
   }
   await persistMapping();
   renderGiftTable();
@@ -530,8 +687,10 @@ els.btnAddGift.onclick = () => {
 };
 
 els.btnTestGift.onclick = async () => {
-  if (mapping.gifts.length === 0) { alert('Chưa có quà nào'); return; }
-  const g = mapping.gifts[0];
+  const allItems = getAllItems();
+  if (allItems.length === 0) { alert('Chưa có quà nào'); return; }
+  const g = allItems[0];
+  if (!g.mediaFile || !g.overlayId) { alert('Quà đầu tiên chưa có file hoặc overlay'); return; }
   await window.bigo.overlayPlay({ overlayId: g.overlayId, file: g.mediaFile });
 };
 
@@ -754,14 +913,18 @@ els.btnEmbedShow.onclick = async () => {
 function findGiftByName(name) {
   if (!name) return null;
   const lower = name.toLowerCase();
-  return mapping.gifts.find(g => g.matchKeys.some(k => k.toLowerCase() === lower));
+  for (const item of getEnabledGiftItems()) {
+    if ((item.matchKeys || []).some(k => String(k).toLowerCase() === lower)) return item;
+  }
+  return null;
 }
 
 function findGiftByEvent(ev) {
-  // Ưu tiên match theo gift_id (chính xác nhất nếu master đã enrich)
+  // Ưu tiên match theo gift_id (chính xác nhất sau enrich master)
   if (ev.gift_id != null) {
-    const byId = mapping.gifts.find(g => g.matchKeys.some(k => String(k) === String(ev.gift_id)));
-    if (byId) return byId;
+    for (const item of getEnabledGiftItems()) {
+      if ((item.matchKeys || []).some(k => String(k) === String(ev.gift_id))) return item;
+    }
   }
   return findGiftByName(ev.gift_name);
 }
