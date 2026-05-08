@@ -30,13 +30,6 @@ function applyQueueSize() {
   els.qSizeFontVal.textContent = font;
   els.qSizeIconVal.textContent = icon;
 }
-els.qSizeFont.addEventListener('input', () => { applyQueueSize(); saveQueueSettings(); });
-els.qSizeIcon.addEventListener('input', () => { applyQueueSize(); saveQueueSettings(); });
-els.btnClearQueue.onclick = () => {
-  queueItems.length = 0;
-  renderQueue();
-  updateQueueStats();
-};
 
 function pushQueue(ev, matched, playTimes) {
   // Chỉ push gift events có hiệu ứng được map
@@ -166,6 +159,15 @@ function appendLog(msg) {
   if (els.log.textContent.length > 12000) els.log.textContent = els.log.textContent.slice(0, 12000);
 }
 function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// =================== Queue listeners (sau khi els đã declared) ===================
+els.qSizeFont.addEventListener('input', () => { applyQueueSize(); saveQueueSettings(); });
+els.qSizeIcon.addEventListener('input', () => { applyQueueSize(); saveQueueSettings(); });
+els.btnClearQueue.onclick = () => {
+  queueItems.length = 0;
+  renderQueue();
+  updateQueueStats();
+};
 
 // =================== Tabs ===================
 document.querySelectorAll('.tab').forEach(t => {
