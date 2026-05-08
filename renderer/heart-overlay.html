@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Heart Goal — HP Action</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    html, body {
+      width: 100%; height: 100%;
+      background: transparent;
+      font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+      overflow: hidden;
+      color: #fff;
+    }
+    body { display: flex; align-items: center; justify-content: center; padding: 20px; }
+
+    .heart-stage {
+      position: relative;
+      width: 280px; height: 280px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* SVG circular progress */
+    .heart-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .heart-svg .ring-bg {
+      fill: none;
+      stroke: var(--ring-bg, #3a3f4b);
+      stroke-width: 14;
+      opacity: 0.85;
+    }
+    .heart-svg .ring-progress {
+      fill: none;
+      stroke: var(--ring-color, #4a8ef7);
+      stroke-width: 14;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.6s ease, stroke 0.4s ease;
+      filter: drop-shadow(0 0 8px var(--ring-glow, rgba(74, 142, 247, 0.6)));
+    }
+    body.complete .heart-svg .ring-progress {
+      stroke: var(--ring-complete, #4ad07a);
+      filter: drop-shadow(0 0 14px rgba(74, 208, 122, 0.8));
+    }
+
+    /* Center content */
+    .center {
+      position: absolute;
+      inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 4px;
+    }
+    .heart-icon {
+      font-size: 42px;
+      line-height: 1;
+      filter: drop-shadow(0 0 6px rgba(255, 80, 120, 0.6));
+      animation: heart-beat 1.2s ease-in-out infinite;
+    }
+    body.complete .heart-icon { animation: heart-pop 0.8s ease-in-out infinite; }
+    @keyframes heart-beat {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.12); }
+    }
+    @keyframes heart-pop {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.25) rotate(8deg); }
+    }
+    .count {
+      font-size: 56px;
+      font-weight: 800;
+      color: var(--text-color, #fff);
+      letter-spacing: -1px;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      line-height: 1;
+    }
+    .target-line {
+      font-size: 16px;
+      color: var(--text-color, #fff);
+      opacity: 0.85;
+      font-weight: 500;
+    }
+    .target-line b { font-weight: 700; opacity: 1; }
+    .complete-msg {
+      position: absolute;
+      bottom: -10px;
+      font-size: 18px;
+      font-weight: 800;
+      color: #4ad07a;
+      text-shadow: 0 0 10px rgba(74, 208, 122, 0.8);
+      animation: pop-in 0.4s ease-out;
+      display: none;
+    }
+    body.complete .complete-msg { display: block; }
+    @keyframes pop-in {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="heart-stage">
+    <svg class="heart-svg" viewBox="0 0 200 200">
+      <circle class="ring-bg" cx="100" cy="100" r="88"></circle>
+      <circle class="ring-progress" cx="100" cy="100" r="88"
+              stroke-dasharray="552.92" stroke-dashoffset="552.92"></circle>
+    </svg>
+    <div class="center">
+      <div class="heart-icon">❤</div>
+      <div class="count" id="count">0</div>
+      <div class="target-line">Mục tiêu: <b id="target">100</b></div>
+    </div>
+    <div class="complete-msg">🎉 ĐẠT MỤC TIÊU!</div>
+  </div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    const RING_R = 88;
+    const RING_CIRC = 2 * Math.PI * RING_R; // ≈ 552.92
+
+    const countEl = document.getElementById('count');
+    const targetEl = document.getElementById('target');
+    const ringEl = document.querySelector('.ring-progress');
+    ringEl.setAttribute('stroke-dasharray', String(RING_CIRC));
+
+    function update(current, target) {
+      const cur = Math.max(0, parseInt(current, 10) || 0);
+      const tgt = Math.max(1, parseInt(target, 10) || 100);
+      const pct = Math.min(1, cur / tgt);
+      const offset = RING_CIRC * (1 - pct);
+      ringEl.setAttribute('stroke-dashoffset', String(offset));
+      countEl.textContent = cur.toLocaleString('en-US');
+      targetEl.textContent = tgt.toLocaleString('en-US');
+      document.body.classList.toggle('complete', pct >= 1);
+    }
+
+    function applyConfig(cfg) {
+      if (!cfg) return;
+      const root = document.documentElement;
+      if (cfg.ringColor) root.style.setProperty('--ring-color', cfg.ringColor);
+      if (cfg.ringBg) root.style.setProperty('--ring-bg', cfg.ringBg);
+      if (cfg.ringComplete) root.style.setProperty('--ring-complete', cfg.ringComplete);
+      if (cfg.textColor) root.style.setProperty('--text-color', cfg.textColor);
+    }
+
+    ipcRenderer.on('heart-overlay:update', (_e, payload) => {
+      if (!payload) return;
+      if (payload.config) applyConfig(payload.config);
+      if (payload.current != null || payload.target != null) {
+        update(payload.current, payload.target);
+      }
+    });
+
+    // Khởi tạo defaults
+    update(0, 100);
+  </script>
+</body>
+</html>

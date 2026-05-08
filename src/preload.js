@@ -52,6 +52,11 @@ contextBridge.exposeInMainWorld('bigo', {
   // App info
   appGetVersion: () => ipcRenderer.invoke('app:get-version'),
 
+  // Heart Goal overlay (vòng tròn progress)
+  heartOverlayShow: () => ipcRenderer.invoke('heart-overlay:show'),
+  heartOverlayHide: () => ipcRenderer.invoke('heart-overlay:hide'),
+  heartOverlayUpdate: (payload) => ipcRenderer.invoke('heart-overlay:update', payload),
+
   // License (Google Apps Script)
   licenseMachineId: () => ipcRenderer.invoke('license:machine-id'),
   licenseVerify: (opts) => ipcRenderer.invoke('license:verify', opts),

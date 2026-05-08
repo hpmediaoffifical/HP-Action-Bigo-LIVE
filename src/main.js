@@ -836,6 +836,49 @@ ipcMain.on('popup-queue:action', (_e, payload) => {
   }
 });
 
+// =================== Heart Goal Overlay window ===================
+// Cửa sổ riêng hiển thị vòng tròn progress cho TÁP TIM. OBS-friendly:
+// frameless + transparent, drag/resize, persist bounds.
+let heartOverlay = null;
+function ensureHeartOverlay() {
+  if (heartOverlay && !heartOverlay.isDestroyed()) return heartOverlay;
+  const saved = getSavedBounds('heartOverlay', { width: 320, height: 320, x: null, y: null });
+  heartOverlay = new BrowserWindow({
+    width: saved.width || 320, height: saved.height || 320,
+    x: saved.x, y: saved.y,
+    title: 'Heart Goal — HP Action',
+    icon: APP_ICON || undefined,
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    alwaysOnTop: true,
+    resizable: true,
+    skipTaskbar: false,
+    webPreferences: { nodeIntegration: true, contextIsolation: false, backgroundThrottling: false },
+  });
+  heartOverlay.setMenuBarVisibility(false);
+  heartOverlay.loadFile(path.join(ROOT, 'renderer', 'heart-overlay.html'));
+  heartOverlay.setAlwaysOnTop(true, 'screen-saver');
+  heartOverlay.on('closed', () => { heartOverlay = null; });
+  trackWindowBounds(heartOverlay, 'heartOverlay');
+  return heartOverlay;
+}
+ipcMain.handle('heart-overlay:show', () => {
+  const w = ensureHeartOverlay();
+  w.show(); w.focus();
+  return { ok: true };
+});
+ipcMain.handle('heart-overlay:hide', () => {
+  if (heartOverlay && !heartOverlay.isDestroyed()) heartOverlay.hide();
+  return { ok: true };
+});
+ipcMain.handle('heart-overlay:update', (_e, payload) => {
+  if (heartOverlay && !heartOverlay.isDestroyed()) {
+    try { heartOverlay.webContents.send('heart-overlay:update', payload || {}); } catch {}
+  }
+  return { ok: true };
+});
+
 // =================== Popup window (Tương tác - chats) ===================
 let chatsPopup = null;
 function ensureChatsPopup() {

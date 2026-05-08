@@ -311,6 +311,7 @@
           </div>
           <div class="se-row-body">
             <span id="seHeartProgress" class="se-gift-label" style="flex:1">Hiện tại: <b id="seHeartCount">0</b> / <b id="seHeartTargetDisp">100</b> tym</span>
+            <button type="button" class="tiny primary" id="btnHeartTest" title="+10 tym để test vòng tròn overlay">+10 Test</button>
             <button type="button" class="tiny" id="btnHeartReset" title="Đặt lại bộ đếm">🔄 Reset</button>
           </div>
           <div class="se-row-body" style="margin-top:6px">
@@ -318,9 +319,18 @@
             <button type="button" class="tiny" id="btnHeartPickFile" title="Chọn file mp3/mp4 phát khi đạt mục tiêu">📁 File</button>
             <select id="seHeartOverlay" style="padding:4px 8px; background:#1c1f28; color:#fff; border:1px solid #3a3f4b; border-radius:4px"></select>
           </div>
+          <div class="se-row-body" style="margin-top:6px; flex-wrap:wrap; gap:8px">
+            <b style="color:#ffd166; font-size:12px">🎨 Vòng tròn overlay:</b>
+            <label style="font-size:11px; color:#8a8f9a; display:flex; align-items:center; gap:4px">Vòng <input type="color" id="seHeartRingColor" value="#4a8ef7" style="width:32px; height:24px; padding:0; border:none; background:transparent; cursor:pointer" /></label>
+            <label style="font-size:11px; color:#8a8f9a; display:flex; align-items:center; gap:4px">Hoàn thành <input type="color" id="seHeartRingComplete" value="#4ad07a" style="width:32px; height:24px; padding:0; border:none; background:transparent; cursor:pointer" /></label>
+            <label style="font-size:11px; color:#8a8f9a; display:flex; align-items:center; gap:4px">Chữ <input type="color" id="seHeartTextColor" value="#ffffff" style="width:32px; height:24px; padding:0; border:none; background:transparent; cursor:pointer" /></label>
+            <button type="button" class="tiny primary" id="btnHeartOverlayShow" title="Hiện vòng tròn overlay (OBS capture window)">🎯 Hiện overlay</button>
+            <button type="button" class="tiny" id="btnHeartOverlayHide">🚫 Ẩn</button>
+          </div>
           <div class="hint small" style="margin-top:6px">
-            📌 Khi tổng số tym viewer tap đạt <b>mục tiêu</b> → app phát file đã chọn. Counter reset sau khi đạt.
-            <span style="color:#ffb627">⚠️ Cần test trên live: scraper detect heart count đang trong development.</span>
+            📌 Khi tổng số tym đạt <b>mục tiêu</b> → app phát file đã chọn + vòng tròn overlay đổi màu xanh "🎉 ĐẠT MỤC TIÊU!".
+            Counter reset sau 2.5s. Bấm <b>🎯 Hiện overlay</b> để OBS capture window vòng tròn.
+            <span style="color:#ffb627">⚠️ Scraper detect heart count đang trong development — dùng <b>+10 Test</b> để test vòng tròn ngay.</span>
           </div>
         </div>
 

@@ -598,6 +598,9 @@ document.querySelectorAll('.tab').forEach(t => {
     if (t.dataset.tab === 'settings') {
       try { renderSettingsGroupsList(); } catch (e) { console.warn(e); }
     }
+    if (t.dataset.tab === 'special') {
+      try { applyHeartGoalUi(); } catch (e) { console.warn(e); }
+    }
   };
 });
 
@@ -967,6 +970,9 @@ async function init() {
   await reloadEffects();
   renderGiftTable();
   renderOverlayTable();
+  // Re-apply heart goal UI sau khi mapping load (vì lần đầu chạy trong initAppSettings,
+  // mapping chưa có → overlay dropdown trống "(chưa có overlay)").
+  applyHeartGoalUi();
   refreshIconCacheStatus();
   loadQueueSettings();
   renderQueue();
@@ -2654,9 +2660,27 @@ function applyHeartGoalUi() {
   // Populate overlay dropdown
   const ovEl = document.getElementById('seHeartOverlay');
   if (ovEl) {
-    ovEl.innerHTML = (mapping?.overlays || []).map(o =>
-      `<option value="${o.id}"${cfg.overlayId === o.id ? ' selected' : ''}>${escapeHtml(o.name)}</option>`
-    ).join('') || '<option value="">(chưa có overlay)</option>';
+    const overlays = mapping?.overlays || [];
+    if (overlays.length) {
+      ovEl.innerHTML = overlays.map(o =>
+        `<option value="${o.id}"${cfg.overlayId === o.id ? ' selected' : ''}>${escapeHtml(o.name)}</option>`
+      ).join('');
+      // Auto-select first overlay nếu cfg chưa set
+      if (!cfg.overlayId && overlays[0]) {
+        appSettings.specialEffects.heartGoal.overlayId = overlays[0].id;
+        ovEl.value = overlays[0].id;
+      }
+    } else {
+      ovEl.innerHTML = '<option value="">(chưa có overlay)</option>';
+    }
+  }
+  // Color pickers — load saved values
+  const colorMap = { seHeartRingColor: cfg.ringColor || '#4a8ef7',
+                     seHeartRingComplete: cfg.ringComplete || '#4ad07a',
+                     seHeartTextColor: cfg.textColor || '#ffffff' };
+  for (const [id, val] of Object.entries(colorMap)) {
+    const el = document.getElementById(id);
+    if (el) el.value = val;
   }
 }
 
@@ -2666,17 +2690,38 @@ function bumpHeartCount(n = 1) {
   cfg.currentCount = (cfg.currentCount || 0) + n;
   const countEl = document.getElementById('seHeartCount');
   if (countEl) countEl.textContent = cfg.currentCount;
+  // Update vòng tròn overlay nếu đang mở
+  pushHeartOverlayUpdate();
   if (cfg.currentCount >= (cfg.target || 100)) {
-    // Reach target → fire media + reset counter
     appendLog(`[se:heartGoal] Đạt ${cfg.currentCount}/${cfg.target} tym → phát media`);
     if (cfg.mediaFile && cfg.overlayId) {
       const payload = resolveMediaPayload(cfg.mediaFile);
       window.bigo.overlayPlay({ overlayId: cfg.overlayId, ...payload }).catch(() => {});
     }
-    cfg.currentCount = 0;
-    if (countEl) countEl.textContent = 0;
-    saveAppSettings({ specialEffects: { heartGoal: { currentCount: 0 } } });
+    // Hold complete state 2.5s rồi reset (cho overlay show animation)
+    setTimeout(() => {
+      cfg.currentCount = 0;
+      if (countEl) countEl.textContent = 0;
+      saveAppSettings({ specialEffects: { heartGoal: { currentCount: 0 } } });
+      pushHeartOverlayUpdate();
+    }, 2500);
   }
+}
+
+// Gửi update tới heart overlay window (nếu đang mở).
+function pushHeartOverlayUpdate() {
+  if (!window.bigo.heartOverlayUpdate) return;
+  const cfg = appSettings.specialEffects?.heartGoal || {};
+  window.bigo.heartOverlayUpdate({
+    current: cfg.currentCount || 0,
+    target: cfg.target || 100,
+    config: {
+      ringColor: cfg.ringColor || '#4a8ef7',
+      ringBg: cfg.ringBg || '#3a3f4b',
+      ringComplete: cfg.ringComplete || '#4ad07a',
+      textColor: cfg.textColor || '#ffffff',
+    },
+  }).catch(() => {});
 }
 
 // Wire UI
@@ -2725,7 +2770,41 @@ function bumpHeartCount(n = 1) {
     appSettings.specialEffects.heartGoal.currentCount = 0;
     document.getElementById('seHeartCount').textContent = 0;
     saveAppSettings({ specialEffects: { heartGoal: { currentCount: 0 } } });
+    pushHeartOverlayUpdate();
   };
+  // +10 Test button: bump counter để test vòng tròn overlay khi chưa có heart event thật.
+  const testBtn = document.getElementById('btnHeartTest');
+  if (testBtn) testBtn.onclick = () => {
+    if (!appSettings.specialEffects.heartGoal.enabled) {
+      appSettings.specialEffects.heartGoal.enabled = true;
+      const enEl = document.getElementById('seHeartEnabled');
+      if (enEl) enEl.checked = true;
+      saveAppSettings({ specialEffects: { heartGoal: { enabled: true } } });
+    }
+    bumpHeartCount(10);
+  };
+  // Show/Hide overlay window
+  const showOvBtn = document.getElementById('btnHeartOverlayShow');
+  const hideOvBtn = document.getElementById('btnHeartOverlayHide');
+  if (showOvBtn) showOvBtn.onclick = async () => {
+    if (window.bigo.heartOverlayShow) await window.bigo.heartOverlayShow();
+    pushHeartOverlayUpdate(); // sync state ngay
+  };
+  if (hideOvBtn) hideOvBtn.onclick = () => {
+    if (window.bigo.heartOverlayHide) window.bigo.heartOverlayHide();
+  };
+  // Color pickers — save + update overlay realtime
+  for (const [id, key] of [['seHeartRingColor','ringColor'],['seHeartRingComplete','ringComplete'],['seHeartTextColor','textColor']]) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.addEventListener('input', () => {
+      appSettings.specialEffects.heartGoal[key] = el.value;
+      pushHeartOverlayUpdate();
+    });
+    el.addEventListener('change', () => {
+      saveAppSettings({ specialEffects: { heartGoal: { [key]: el.value } } });
+    });
+  }
 })();
 
 // "▶ Test" button: phát thử ngay (không cần gift trigger).
