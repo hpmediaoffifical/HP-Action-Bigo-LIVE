@@ -52,6 +52,10 @@ contextBridge.exposeInMainWorld('bigo', {
   // App info
   appGetVersion: () => ipcRenderer.invoke('app:get-version'),
 
+  // License (Google Apps Script)
+  licenseMachineId: () => ipcRenderer.invoke('license:machine-id'),
+  licenseVerify: (opts) => ipcRenderer.invoke('license:verify', opts),
+
   // Open API mode
   start: (opts) => ipcRenderer.invoke('bigo:start', opts),
   stop: () => ipcRenderer.invoke('bigo:stop'),

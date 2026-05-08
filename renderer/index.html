@@ -358,14 +358,20 @@
           <div class="dev-row"><span class="dev-key">Phiên bản hiện tại:</span><span class="dev-val"><b id="appVersion">—</b></span></div>
           <div class="dev-row">
             <span class="dev-key">Key bản quyền:</span>
-            <span class="dev-val">
-              <input id="licenseKey" placeholder="Nhập key (sẽ verify với Google Sheet)" style="flex:1; min-width:200px" />
-              <button type="button" id="btnVerifyLicense" class="tiny primary" style="margin-left:6px">Xác minh</button>
-              <span id="licenseStatus" style="margin-left:8px; font-size:11px"></span>
+            <span class="dev-val" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+              <input id="licenseKey" placeholder="Nhập mã key (12 ký tự)" style="flex:1; min-width:200px" />
+              <button type="button" id="btnVerifyLicense" class="tiny primary" title="Kiểm tra trạng thái key">🔍 Xác minh</button>
+              <button type="button" id="btnActivateLicense" class="tiny" title="Kích hoạt key (gắn với máy này)">🔑 Kích hoạt</button>
             </span>
           </div>
-          <div class="hint small" style="margin-top:6px">
-            📌 Tính năng key bản quyền sẽ fetch từ Google Sheet (sắp ra mắt). Hiện tại nhập để lưu local.
+          <div class="dev-row">
+            <span class="dev-key">Trạng thái:</span>
+            <span class="dev-val"><span id="licenseStatus" style="font-size:13px">— chưa xác minh —</span></span>
+          </div>
+          <div id="licenseDetail" style="margin-top:8px; display:flex; flex-direction:column; gap:6px"></div>
+          <div class="hint small" style="margin-top:8px">
+            📌 Sau khi nhập key + bấm <b>Xác minh</b> → app gọi Google Apps Script để kiểm tra. Bấm <b>Kích hoạt</b> để bind key vào máy này (lần đầu).
+            Sau đó app tự verify mỗi lần khởi động (cache 24h cho offline grace).
           </div>
         </div>
       </div>

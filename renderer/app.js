@@ -663,7 +663,92 @@ if (els.btnResetStats) {
   });
 })();
 
-// Phiên bản hiện tại + license key (tab ℹ️)
+// Phiên bản hiện tại + license key (tab ℹ️) — wire với Google Apps Script.
+let _machineId = null;
+async function ensureMachineId() {
+  if (_machineId) return _machineId;
+  try { _machineId = await window.bigo.licenseMachineId(); } catch { _machineId = ''; }
+  return _machineId || '';
+}
+
+function renderLicenseStatus(data) {
+  const statusEl = document.getElementById('licenseStatus');
+  const detailEl = document.getElementById('licenseDetail');
+  if (!statusEl) return;
+  if (!data) { statusEl.textContent = ''; if (detailEl) detailEl.innerHTML = ''; return; }
+  const trang = String(data.TRANG_THAI || data.status || '').toUpperCase();
+  const tier = String(data.TINH_NANG || data.tier || data.tinh_nang || 'BASIC').toUpperCase();
+  const expiry = data.HAN_SU_DUNG || data.expiry || data.han_su_dung || '';
+  const quotaMax = data.SL_QUA_TOI_DA ?? data.quota_max ?? '?';
+  const quotaUsed = data.SL_QUA_DA_DUNG ?? data.quota_used ?? 0;
+  const tenKh = data.TEN_KH || data.customer || '';
+  const isOk = trang === 'ACTIVE' || trang === 'INACTIVE'; // INACTIVE = chưa kích hoạt nhưng valid
+  const isExpired = trang === 'EXPIRED' || (expiry && new Date(expiry) < new Date());
+  const isBanned = trang === 'BANNED' || trang === 'REVOKED';
+
+  let icon, color, msg;
+  if (isBanned) { icon = '🚫'; color = '#ff6b6b'; msg = `Key bị ${trang === 'BANNED' ? 'cấm' : 'thu hồi'}`; }
+  else if (isExpired) { icon = '⏰'; color = '#ff6b6b'; msg = 'Key đã HẾT HẠN'; }
+  else if (isOk) { icon = '✓'; color = '#4ad07a'; msg = trang === 'ACTIVE' ? 'Key hợp lệ + đã kích hoạt' : 'Key hợp lệ, sẵn sàng kích hoạt'; }
+  else { icon = '?'; color = '#ffd166'; msg = `Trạng thái: ${trang || 'không rõ'}`; }
+  statusEl.textContent = `${icon} ${msg}`;
+  statusEl.style.color = color;
+
+  if (detailEl) {
+    detailEl.innerHTML = `
+      <div class="dev-row"><span class="dev-key">Khách hàng:</span><span class="dev-val"><b>${escapeHtml(tenKh || '—')}</b></span></div>
+      <div class="dev-row"><span class="dev-key">Gói:</span><span class="dev-val"><b style="color:${tier === 'SVIP' ? '#ffb627' : tier === 'VIP' ? '#a447e8' : '#8ad6ff'}">${escapeHtml(tier)}</b></span></div>
+      <div class="dev-row"><span class="dev-key">Hạn sử dụng:</span><span class="dev-val"><b>${escapeHtml(String(expiry || '—'))}</b></span></div>
+      <div class="dev-row"><span class="dev-key">Quota quà:</span><span class="dev-val"><b>${escapeHtml(String(quotaUsed))}/${escapeHtml(String(quotaMax))}</b></span></div>
+      <div class="dev-row"><span class="dev-key">Trạng thái:</span><span class="dev-val"><b style="color:${color}">${escapeHtml(trang || '?')}</b></span></div>
+    `;
+  }
+}
+
+async function verifyLicense(key, action = 'verify') {
+  const statusEl = document.getElementById('licenseStatus');
+  if (!key) {
+    if (statusEl) { statusEl.textContent = '⚠️ Chưa nhập key'; statusEl.style.color = '#ff6b6b'; }
+    return null;
+  }
+  if (statusEl) { statusEl.textContent = '⏳ Đang xác minh...'; statusEl.style.color = '#8a8f9a'; }
+  const machineId = await ensureMachineId();
+  const r = await window.bigo.licenseVerify({ key, machineId, action });
+  if (!r.ok) {
+    if (statusEl) {
+      statusEl.textContent = `✗ Lỗi: ${r.error}`;
+      statusEl.style.color = '#ff6b6b';
+    }
+    return null;
+  }
+  // Apps Script có thể trả { ok: false, error } hoặc { ... data ... }
+  const data = r.data;
+  if (data && data.error) {
+    if (statusEl) {
+      statusEl.textContent = `✗ ${data.error}`;
+      statusEl.style.color = '#ff6b6b';
+    }
+    return null;
+  }
+  if (data && data.ok === false) {
+    if (statusEl) {
+      statusEl.textContent = `✗ ${data.message || data.error || 'Key không hợp lệ'}`;
+      statusEl.style.color = '#ff6b6b';
+    }
+    return null;
+  }
+  // Apps Script có thể wrap { ok: true, data: {...} } hoặc trả thẳng row data
+  const info = data?.data || data || {};
+  renderLicenseStatus(info);
+  // Cache local
+  try {
+    localStorage.setItem('hp_license_key', key);
+    localStorage.setItem('hp_license_info', JSON.stringify(info));
+    localStorage.setItem('hp_license_verified_at', String(Date.now()));
+  } catch {}
+  return info;
+}
+
 (async function wireInfoTab() {
   const verEl = document.getElementById('appVersion');
   if (verEl && window.bigo.appGetVersion) {
@@ -671,25 +756,39 @@ if (els.btnResetStats) {
   }
   const keyInput = document.getElementById('licenseKey');
   const verifyBtn = document.getElementById('btnVerifyLicense');
-  const statusEl = document.getElementById('licenseStatus');
+  const activateBtn = document.getElementById('btnActivateLicense');
+
   if (keyInput) {
-    // Restore từ localStorage
     try { keyInput.value = localStorage.getItem('hp_license_key') || ''; } catch {}
     keyInput.addEventListener('change', () => {
       try { localStorage.setItem('hp_license_key', keyInput.value.trim()); } catch {}
     });
   }
   if (verifyBtn) {
-    verifyBtn.onclick = () => {
-      const k = keyInput?.value.trim() || '';
-      if (!k) { statusEl.textContent = '⚠️ Chưa nhập key'; statusEl.style.color = '#ff6b6b'; return; }
-      // Placeholder: chưa fetch Google Sheet — chỉ lưu local + show "đã lưu".
-      // Khi triển khai: fetch GSheet API → check key tồn tại + thời hạn.
-      statusEl.textContent = '✓ Đã lưu (chưa kết nối Google Sheet)';
-      statusEl.style.color = '#4ad07a';
-      try { localStorage.setItem('hp_license_key', k); } catch {}
+    verifyBtn.onclick = async () => {
+      verifyBtn.disabled = true;
+      try { await verifyLicense(keyInput?.value.trim() || '', 'verify'); }
+      finally { verifyBtn.disabled = false; }
     };
   }
+  if (activateBtn) {
+    activateBtn.onclick = async () => {
+      activateBtn.disabled = true;
+      try { await verifyLicense(keyInput?.value.trim() || '', 'activate'); }
+      finally { activateBtn.disabled = false; }
+    };
+  }
+
+  // Auto-load cached info on app start
+  try {
+    const cached = localStorage.getItem('hp_license_info');
+    if (cached) renderLicenseStatus(JSON.parse(cached));
+    const cachedKey = localStorage.getItem('hp_license_key');
+    if (cachedKey) {
+      // Background re-verify (silent)
+      setTimeout(() => verifyLicense(cachedKey, 'verify').catch(() => {}), 2000);
+    }
+  } catch {}
 })();
 
 // Mọi link có data-ext → mở trong trình duyệt mặc định (panel Thông tin NPT)

@@ -363,6 +363,58 @@ ipcMain.handle('app:get-version', () => {
   try { return require(path.join(ROOT, 'package.json')).version || '0.0.0'; } catch { return '0.0.0'; }
 });
 
+// =================== License (Google Apps Script) ===================
+const LICENSE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyvwvktzjYgOkhvJE9CwJAkilrcz5WrvO__1QrbkkHdvSx8ucBooayEw9GJF-d_2tXBwg/exec';
+
+// Generate machine ID — hash hardware để bind 1 key vào 1 máy.
+ipcMain.handle('license:machine-id', () => {
+  const os = require('os');
+  const crypto = require('crypto');
+  const parts = [os.hostname(), os.platform(), os.arch(), os.cpus()[0]?.model || ''];
+  const ifaces = os.networkInterfaces();
+  // Lấy MAC đầu tiên non-virtual
+  for (const name of Object.keys(ifaces)) {
+    for (const i of (ifaces[name] || [])) {
+      if (!i.internal && i.mac && i.mac !== '00:00:00:00:00:00') {
+        parts.push(i.mac);
+        break;
+      }
+    }
+  }
+  return crypto.createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 32);
+});
+
+// Call Apps Script endpoint với key + machineId + action.
+// Response expect: { ok, data: { status, tinh_nang, han_su_dung, sl_qua_toi_da, ... } }
+ipcMain.handle('license:verify', async (_e, { key, machineId, action }) => {
+  if (!key) return { ok: false, error: 'Thiếu mã key' };
+  try {
+    const params = new URLSearchParams({
+      action: action || 'verify',
+      key: String(key).trim(),
+      machineId: String(machineId || ''),
+    });
+    const url = `${LICENSE_ENDPOINT}?${params.toString()}`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    let res;
+    try {
+      res = await fetch(url, { method: 'GET', redirect: 'follow', signal: ctrl.signal });
+    } finally { clearTimeout(timer); }
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}`, status: res.status };
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch {}
+    if (!json) {
+      // Apps Script trả HTML khi script lỗi hoặc deploy cấu hình sai
+      return { ok: false, error: 'Phản hồi không phải JSON. Có thể script chưa deploy đúng hoặc cần access "Anyone".', raw: text.slice(0, 300) };
+    }
+    return { ok: true, data: json };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+});
+
 ipcMain.handle('mapping:load', () => mapping);
 ipcMain.handle('mapping:save', (_e, data) => {
   // Preserve overlay bounds từ mapping hiện tại (đã được track qua move/resize events).
