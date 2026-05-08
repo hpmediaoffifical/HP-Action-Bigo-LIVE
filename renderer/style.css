@@ -169,6 +169,22 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .master-table .fav-btn.on { color: #ffd166; }
 .master-table .fav-btn:hover { color: #ffd166; transform: scale(1.2); }
 
+/* ============ Subtab nav (gift/comment) ============ */
+.subtab-row { display: flex; gap: 0; margin-bottom: 10px; border-bottom: 1px solid #262a35; }
+.subtab-btn {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #8a8f9a;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  border-radius: 0;
+}
+.subtab-btn:hover { color: #e6e8ee; background: #20242f; }
+.subtab-btn.active { color: #ff8a3d; border-bottom-color: #ff8a3d; background: #20242f; }
+
 /* ============ Groups view (v3) ============ */
 .groups-container { display: flex; flex-direction: column; gap: 10px; }
 .group-card { background: #1c1f28; border: 1px solid #262a35; border-radius: 8px; overflow: hidden; }

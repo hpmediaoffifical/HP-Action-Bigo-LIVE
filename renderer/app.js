@@ -344,13 +344,13 @@ function getGiftIcon(g) {
   return '';
 }
 
+// State cho subtab type filter (per container)
+const subtypeByContainer = new WeakMap();
+
 function renderGiftTable() {
-  // v3: render groups list. Replace #giftTableBody (table) bằng container chứa groups card
-  const container = els.giftTableBody.parentElement?.parentElement;
-  if (!container) return;
-  // Tạo div #groupsContainer thay table nếu chưa có
+  // v3: render groups list trong container của tab Bảng quà
   let groupsContainer = $('groupsContainer');
-  if (!groupsContainer) {
+  if (!groupsContainer && els.giftTableBody) {
     const tableWrap = els.giftTableBody.closest('.table-wrap');
     if (tableWrap) {
       groupsContainer = document.createElement('div');
@@ -361,59 +361,38 @@ function renderGiftTable() {
     }
   }
   els.groupsContainer = groupsContainer || $('groupsContainer');
-  if (!els.groupsContainer) return;
+  if (els.groupsContainer) renderGroupsInto(els.groupsContainer, { subtype: 'gift' });
+  // Render cả container trong tab Tương tác
+  if (els.embedGroupsContainer) {
+    const subtype = subtypeByContainer.get(els.embedGroupsContainer) || 'gift';
+    const search = els.embedGroupSearch?.value.toLowerCase().trim() || '';
+    renderGroupsInto(els.embedGroupsContainer, { subtype, search });
+  }
+}
+
+function renderGroupsInto(container, opts) {
+  const subtype = opts?.subtype || 'gift';
+  const search = (opts?.search || '').toLowerCase().trim();
+  if (!container) return;
 
   const overlayMap = new Map((mapping.overlays || []).map(o => [o.id, o]));
-  const groups = mapping.groups || [];
+  let groups = (mapping.groups || []).filter(g => (g.type || 'gift') === subtype);
+  if (search) groups = groups.filter(g => (g.name || '').toLowerCase().includes(search));
 
-  if (groups.length === 0 || groups.every(g => (g.items || []).length === 0)) {
-    els.groupsContainer.innerHTML = '<div style="color:#555;text-align:center;padding:24px">Chưa có quà nào — bấm "+ Thêm quà" hoặc "+ Thêm nhóm"</div>';
-  } else {
-    els.groupsContainer.innerHTML = groups.map(grp => {
-      const enabled = grp.enabled !== false;
-      const collapsed = !!grp.collapsed;
-      const itemsHtml = (grp.items || []).map(item => {
-        const ov = overlayMap.get(item.overlayId);
-        const iconUrl = getGiftIcon(item);
-        const iconCell = iconUrl
-          ? `<img src="${escapeHtml(iconUrl)}" class="grow-icon" loading="lazy" />`
-          : '<div class="grow-icon-empty"></div>';
-        const matchKeys = (item.matchKeys || []).map(k => `<code>${escapeHtml(k)}</code>`).join(' ');
-        return `<div class="group-item" data-iid="${item.id}" data-gid="${grp.id}">
-          ${iconCell}
-          <div class="grow-meta">
-            <div class="grow-name"><b>${escapeHtml(item.alias || (item.matchKeys || [])[0] || '?')}</b> ${matchKeys}</div>
-            <div class="grow-sub">${item.mediaFile ? `<code>${escapeHtml(item.mediaFile)}</code>` : '<span style="color:#666">—</span>'} → ${ov ? escapeHtml(ov.name) : '<span style="color:#ff6b6b">overlay xoá</span>'}</div>
-          </div>
-          <div class="grow-actions">
-            <button class="tiny" data-act="play" data-iid="${item.id}">▶</button>
-            <button class="tiny" data-act="edit-item" data-iid="${item.id}">✏️</button>
-            <button class="tiny danger" data-act="del-item" data-iid="${item.id}">🗑</button>
-          </div>
-        </div>`;
-      }).join('') || '<div style="color:#555;padding:8px;font-size:11px">Nhóm trống</div>';
-
-      return `<div class="group-card ${enabled ? 'on' : 'off'} ${collapsed ? 'collapsed' : ''}" data-gid="${grp.id}">
-        <div class="group-head">
-          <span class="group-name">${escapeHtml(grp.name)}</span>
-          <span class="group-badge">${(grp.items || []).length} mục</span>
-          <span class="group-status">${enabled ? 'Đang bật' : 'Đang tắt'}</span>
-          <label class="switch" title="Bật/tắt nhóm">
-            <input type="checkbox" data-act="toggle-group" data-gid="${grp.id}" ${enabled ? 'checked' : ''} />
-            <span class="slider"></span>
-          </label>
-          <button class="tiny" data-act="add-item" data-gid="${grp.id}" title="Thêm quà vào nhóm">+ mục</button>
-          <button class="tiny" data-act="edit-group" data-gid="${grp.id}" title="Sửa tên nhóm">✏️</button>
-          <button class="tiny danger" data-act="del-group" data-gid="${grp.id}" title="Xoá nhóm">🗑</button>
-          <button class="tiny" data-act="collapse" data-gid="${grp.id}" title="Thu gọn/Mở">${collapsed ? '▶' : '▼'}</button>
-        </div>
-        ${collapsed ? '' : `<div class="group-items">${itemsHtml}</div>`}
-      </div>`;
-    }).join('');
+  if (groups.length === 0) {
+    container.innerHTML = `<div style="color:#555;text-align:center;padding:24px">Chưa có nhóm ${subtype === 'comment' ? 'comment' : 'quà'} nào</div>`;
+    return;
   }
 
+  if (groups.every(g => (g.items || []).length === 0)) {
+    // Render groups vẫn hiển thị nhưng thông báo không có item
+    container.innerHTML = groups.map(grp => renderGroupCard(grp, overlayMap)).join('') ||
+      '<div style="color:#555;text-align:center;padding:24px">Chưa có quà</div>';
+  } else {
+    container.innerHTML = groups.map(grp => renderGroupCard(grp, overlayMap)).join('');
+  }
   // Wire actions
-  els.groupsContainer.querySelectorAll('[data-act]').forEach(el => {
+  container.querySelectorAll('[data-act]').forEach(el => {
     const act = el.dataset.act;
     if (el.tagName === 'INPUT' && el.type === 'checkbox') {
       el.onchange = () => groupAction(act, el.dataset.gid, el.checked);
@@ -421,12 +400,53 @@ function renderGiftTable() {
       el.onclick = () => groupAction(act, el.dataset.gid, undefined, el.dataset.iid);
     }
   });
-
-  // Update group datalist (cho dialog Thêm quà)
+  // Update group datalist
   if (els.groupList) {
-    const groupNames = groups.map(g => g.name).filter(Boolean);
+    const groupNames = (mapping.groups || []).map(g => g.name).filter(Boolean);
     els.groupList.innerHTML = groupNames.map(g => `<option value="${escapeHtml(g)}"></option>`).join('');
   }
+}
+
+function renderGroupCard(grp, overlayMap) {
+  const enabled = grp.enabled !== false;
+  const collapsed = !!grp.collapsed;
+  const itemsHtml = (grp.items || []).map(item => {
+    const ov = overlayMap.get(item.overlayId);
+    const iconUrl = getGiftIcon(item);
+    const iconCell = iconUrl
+      ? `<img src="${escapeHtml(iconUrl)}" class="grow-icon" loading="lazy" />`
+      : '<div class="grow-icon-empty"></div>';
+    const matchKeys = (item.matchKeys || []).map(k => `<code>${escapeHtml(k)}</code>`).join(' ');
+    return `<div class="group-item" data-iid="${item.id}" data-gid="${grp.id}">
+      ${iconCell}
+      <div class="grow-meta">
+        <div class="grow-name"><b>${escapeHtml(item.alias || (item.matchKeys || [])[0] || '?')}</b> ${matchKeys}</div>
+        <div class="grow-sub">${item.mediaFile ? `<code>${escapeHtml(item.mediaFile)}</code>` : '<span style="color:#666">—</span>'} → ${ov ? escapeHtml(ov.name) : '<span style="color:#ff6b6b">overlay xoá</span>'}</div>
+      </div>
+      <div class="grow-actions">
+        <button class="tiny" data-act="play" data-iid="${item.id}">▶</button>
+        <button class="tiny" data-act="edit-item" data-iid="${item.id}">✏️</button>
+        <button class="tiny danger" data-act="del-item" data-iid="${item.id}">🗑</button>
+      </div>
+    </div>`;
+  }).join('') || '<div style="color:#555;padding:8px;font-size:11px">Nhóm trống</div>';
+
+  return `<div class="group-card ${enabled ? 'on' : 'off'} ${collapsed ? 'collapsed' : ''}" data-gid="${grp.id}">
+    <div class="group-head">
+      <span class="group-name">${escapeHtml(grp.name)}</span>
+      <span class="group-badge">${(grp.items || []).length} mục</span>
+      <span class="group-status">${enabled ? 'Đang bật' : 'Đang tắt'}</span>
+      <label class="switch" title="Bật/tắt nhóm">
+        <input type="checkbox" data-act="toggle-group" data-gid="${grp.id}" ${enabled ? 'checked' : ''} />
+        <span class="slider"></span>
+      </label>
+      <button class="tiny" data-act="add-item" data-gid="${grp.id}" title="Thêm vào nhóm">+ mục</button>
+      <button class="tiny" data-act="edit-group" data-gid="${grp.id}" title="Sửa tên nhóm">✏️</button>
+      <button class="tiny danger" data-act="del-group" data-gid="${grp.id}" title="Xoá nhóm">🗑</button>
+      <button class="tiny" data-act="collapse" data-gid="${grp.id}" title="Thu gọn/Mở">${collapsed ? '▶' : '▼'}</button>
+    </div>
+    ${collapsed ? '' : `<div class="group-items">${itemsHtml}</div>`}
+  </div>`;
 }
 
 async function groupAction(act, gid, value, itemId) {
@@ -685,6 +705,46 @@ els.btnAddGift.onclick = () => {
   if (mapping.overlays.length === 0) { alert('Tạo ít nhất 1 overlay trước (tab Overlay)'); return; }
   openGiftDialog();
 };
+
+// Tab Tương tác: nút Thêm quà / Thêm nhóm + search nhóm + sub-tabs
+if (els.btnAddGiftEmbed) {
+  els.btnAddGiftEmbed.onclick = () => {
+    if (mapping.overlays.length === 0) { alert('Tạo ít nhất 1 overlay trước (tab Overlay)'); return; }
+    openGiftDialog();
+  };
+}
+if (els.btnAddGroupEmbed) {
+  els.btnAddGroupEmbed.onclick = async () => {
+    const subtype = subtypeByContainer.get(els.embedGroupsContainer) || 'gift';
+    const name = prompt(`Tên nhóm ${subtype === 'comment' ? 'Comment' : 'Quà tặng'} mới:`);
+    if (!name || !name.trim()) return;
+    if (!Array.isArray(mapping.groups)) mapping.groups = [];
+    mapping.groups.push({
+      id: uid('g_'), name: name.trim(), type: subtype,
+      enabled: true, collapsed: false, bigoId: '', items: [],
+    });
+    await persistMapping();
+    renderGiftTable();
+  };
+}
+if (els.embedGroupSearch) {
+  let searchTimer = null;
+  els.embedGroupSearch.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(renderGiftTable, 150);
+  });
+}
+// Sub-tab Comment/Quà tặng trong tab Tương tác
+document.querySelectorAll('.subtab-btn').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.subtab-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    if (els.embedGroupsContainer) {
+      subtypeByContainer.set(els.embedGroupsContainer, b.dataset.subtype);
+      renderGiftTable();
+    }
+  };
+});
 
 els.btnTestGift.onclick = async () => {
   const allItems = getAllItems();
