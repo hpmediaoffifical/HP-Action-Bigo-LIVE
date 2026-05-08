@@ -207,7 +207,13 @@ function processElement(rootEl) {
       const chatHash = `c|${m.level}|${normalize(m.user)}|${normalize(m.content)}`;
       if (seenChats.has(chatHash)) continue;
       seenChats.set(chatHash, Date.now());
-      chats.push({ type: 'chat', level: m.level, user: m.user, content: m.content, user_avatar_url: avatarUrl, raw: text });
+      // Detect VIP/SVIP/Top/Family badges từ FULL text (badges thường nằm
+      // ngoài m.content — trước colon).
+      const badges = detectBadges(text);
+      chats.push({
+        type: 'chat', level: m.level, user: m.user, content: m.content,
+        user_avatar_url: avatarUrl, raw: text, badges,
+      });
     }
   }
 
@@ -280,6 +286,39 @@ function scanGiftOverlay() {
   }
   pruneMap(seenGifts);
   return out;
+}
+
+// VIP/SVIP/Top/Family badges — extract từ chat row text để NPC nhận biết
+// user quan trọng. Dựa trên screenshot user (WEEK Top1, SASHA♥, SVIP5, etc.).
+// Patterns conservative để tránh false positive.
+const BADGE_PATTERNS = {
+  svip:   /SVIP\s*(\d+)/i,
+  vip:    /(?:^|[^S])VIP\s*(\d+)/i,
+  top:    /(WEEK|DAY|MONTH|TUẦN|NGÀY|THÁNG)\s+Top\s*(\d+)/iu,
+  family: /(\d+)\s+([A-Za-z][A-Za-z0-9_]{2,15})\s*♥/u,
+};
+
+function detectBadges(text) {
+  const badges = [];
+  if (!text) return badges;
+  let m;
+  if ((m = BADGE_PATTERNS.svip.exec(text))) {
+    badges.push({ type: 'svip', tier: parseInt(m[1], 10) || 0 });
+  }
+  if ((m = BADGE_PATTERNS.vip.exec(text)) && !/SVIP/i.test(text)) {
+    badges.push({ type: 'vip', tier: parseInt(m[1], 10) || 0 });
+  }
+  if ((m = BADGE_PATTERNS.top.exec(text))) {
+    badges.push({
+      type: 'top',
+      period: m[1].toUpperCase().replace('TUẦN', 'WEEK').replace('NGÀY', 'DAY').replace('THÁNG', 'MONTH'),
+      rank: parseInt(m[2], 10) || 0,
+    });
+  }
+  if ((m = BADGE_PATTERNS.family.exec(text))) {
+    badges.push({ type: 'family', level: parseInt(m[1], 10) || 0, name: m[2] });
+  }
+  return badges;
 }
 
 // CHAT-BASED heart detection (cách BIGO LIVE thật sự dùng).

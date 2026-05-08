@@ -341,6 +341,33 @@ function resolveAvatarForUser(user, rawAvatar) {
   return rawAvatar || '';
 }
 
+// Render VIP/SVIP/Top/Family badges → chips trước user name. NPC nhận biết user
+// quan trọng (VIP cao, top contributor, family member) để chăm sóc tốt hơn.
+function renderUserBadges(badges) {
+  if (!Array.isArray(badges) || !badges.length) return '';
+  const order = { svip: 0, vip: 1, top: 2, family: 3 };
+  const sorted = [...badges].sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9));
+  return sorted.map(b => {
+    if (b.type === 'svip') return `<span class="user-badge badge-svip" title="Super VIP tier ${b.tier} — VIP cao, hãy chú ý!">👑 SVIP${b.tier}</span>`;
+    if (b.type === 'vip')  return `<span class="user-badge badge-vip" title="VIP tier ${b.tier}">💜 VIP${b.tier}</span>`;
+    if (b.type === 'top')  {
+      const lbl = { WEEK: 'tuần', DAY: 'ngày', MONTH: 'tháng' }[b.period] || b.period.toLowerCase();
+      return `<span class="user-badge badge-top" title="Top ${b.rank} contributor ${lbl}">⭐ Top${b.rank}</span>`;
+    }
+    if (b.type === 'family') return `<span class="user-badge badge-family" title="Family ${escapeHtml(b.name)} lvl ${b.level}">${b.level} ${escapeHtml(b.name)}♥</span>`;
+    return '';
+  }).join('');
+}
+
+function getRowVipClass(badges) {
+  if (!Array.isArray(badges) || !badges.length) return '';
+  if (badges.some(b => b.type === 'svip')) return 'chat-row-svip';
+  if (badges.some(b => b.type === 'vip'))  return 'chat-row-vip';
+  if (badges.some(b => b.type === 'top'))  return 'chat-row-top';
+  if (badges.some(b => b.type === 'family')) return 'chat-row-family';
+  return '';
+}
+
 // Bigo level tier (1-6) cho color coding. Bigo total levels 1-119.
 function levelTier(lv) {
   const n = parseInt(lv, 10);
@@ -2166,14 +2193,16 @@ function renderParsed(ev) {
   }
   if (ev.type === 'chat') {
     const div = document.createElement('div');
-    div.className = 'chat-row';
+    const vipClass = getRowVipClass(ev.badges);
+    div.className = `chat-row ${vipClass}`.trim();
     const avUrl = resolveAvatarForUser(ev.user, ev.user_avatar_url);
     const av = avUrl ? `<img class="avatar" src="${escapeHtml(avUrl)}" loading="lazy" style="width:20px;height:20px" />` : '';
     const tier = levelTier(ev.level);
     const lvlText = ev.level ? `Lv.${ev.level}` : 'Lv.?';
-    div.innerHTML = `${av}<span class="lvl tier-${tier}">${lvlText}</span><span class="who">${escapeHtml(ev.user)}</span><span class="what">${escapeHtml(ev.content)}</span>`;
+    const badgesHtml = renderUserBadges(ev.badges);
+    div.innerHTML = `${badgesHtml}${av}<span class="lvl tier-${tier}">${lvlText}</span><span class="who">${escapeHtml(ev.user)}</span><span class="what">${escapeHtml(ev.content)}</span>`;
     // Lưu vào recentChats để popup snapshot khi mở.
-    const chatItem = { user: ev.user, level: ev.level, content: ev.content, user_avatar_url: avUrl, ts: Date.now() };
+    const chatItem = { user: ev.user, level: ev.level, content: ev.content, user_avatar_url: avUrl, badges: ev.badges, ts: Date.now() };
     recentChats.push(chatItem);
     if (recentChats.length > RECENT_CHATS_MAX) recentChats.shift();
     // Forward to chats popup nếu đang mở (per-event live update).
