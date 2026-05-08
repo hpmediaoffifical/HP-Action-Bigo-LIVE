@@ -2162,12 +2162,17 @@ function normEv(s) {
 // Chat giữ 1s (re-rendered chat row legitimately).
 const recentEventHashes = new Map();
 function shouldDropDuplicate(ev) {
-  if (!ev || (ev.type !== 'chat' && ev.type !== 'gift' && ev.type !== 'gift_overlay')) return false;
-  const isGift = ev.type === 'gift' || ev.type === 'gift_overlay';
+  if (!ev) return false;
+  // KHÔNG dedup gift events ở renderer — scraper đã rely WeakMap content-tracking.
+  // Drop ở đây gây loss legit gifts (user tặng N → ghi nhận M < N).
+  if (ev.type === 'gift') return false;
+  if (ev.type !== 'chat' && ev.type !== 'gift_overlay') return false;
   const key = ev.type === 'chat'
     ? `c|${ev.level}|${normEv(ev.user)}|${normEv(ev.content)}`
-    : `g|${normEv(ev.user)}|${normEv(ev.gift_name)}|${ev.gift_count || 1}`;
-  const window = isGift ? 50 : 1000;  // Gift 50ms (IPC race only), Chat 1s.
+    : `o|${normEv(ev.user)}|${normEv(ev.gift_name)}|${ev.gift_count || 1}`;
+  // Chat lặp 1s thường là DOM re-scan. gift_overlay popup linger 2-3s nên 100ms
+  // dedup đủ tránh same-popup re-detect.
+  const window = ev.type === 'chat' ? 1000 : 100;
   const now = Date.now();
   const last = recentEventHashes.get(key);
   if (last && now - last < window) return true;

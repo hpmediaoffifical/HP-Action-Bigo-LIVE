@@ -97,9 +97,13 @@ function normalize(s) {
     .toLowerCase();
 }
 
-// WeakSet đánh dấu element đã scan để tránh scan lại trong cùng tick (cũng tránh
-// parent + child cùng match khi text concat của parent vẫn nằm trong giới hạn).
-const elementsScanned = new WeakSet();
+// WeakMap track LAST-PROCESSED-TEXT per element (thay vì WeakSet element identity).
+// Lý do: nếu Bigo virtualize chat list (recycle DOM elements with new content),
+// WeakSet skip → miss new content. WeakMap re-process khi text element thay đổi.
+//   - Same element + same text → skip (tránh duplicate per-tick).
+//   - Same element + different text → process (Bigo recycled, content mới).
+//   - New element → process.
+const elementContent = new WeakMap();
 
 // Counter diagnostic — track tổng gifts captured cumulative.
 let _totalGiftsCaptured = 0;
@@ -114,25 +118,28 @@ function processElement(rootEl) {
   if (!rootEl) return { chats, gifts };
   for (const el of walkAllElements(rootEl)) {
     if (el.nodeType !== 1) continue;
-    if (elementsScanned.has(el)) continue;
     const text = (el.textContent || '').trim();
     if (text.length < 5 || text.length > 300) continue;
+    // CONTENT-BASED dedup per element: skip CHỈ KHI element + text giống lần trước.
+    // Khác text → process lại (handle virtualized list reuse).
+    if (elementContent.get(el) === text) continue;
 
     // Filter "shared this LIVE" enter notification — không phải chat thật
     if (/shared\s+this\s+(live|LIVE)\s*$/i.test(text)) {
-      elementsScanned.add(el);
+      elementContent.set(el, text);
       continue;
     }
     // Filter joined messages
     if (/has\s+joined|joined\s+the\s+room/i.test(text)) {
-      elementsScanned.add(el);
+      elementContent.set(el, text);
       continue;
     }
 
     const m = tryMatchChat(text);
     if (!m) continue;
 
-    elementsScanned.add(el);
+    // Đánh dấu text đã process (cho mọi element-text pair).
+    elementContent.set(el, text);
 
     const avatarUrl = findAvatarUrl(el);
     const giftIconUrl = findGiftIconUrl(el);
@@ -141,11 +148,10 @@ function processElement(rootEl) {
     const isGift = !!giftM || /^sent\s+/i.test(m.content);
 
     if (isGift) {
-      // KHÔNG hash-dedup nữa cho gifts — tin tưởng WeakSet elementsScanned đã
-      // handle per-DOM-element dedup. 2 chat rows khác nhau dù cùng content
-      // (vd "X sent Rose" 2 lần liên tiếp) sẽ là 2 elements khác → cả 2 fire.
-      // Trước đây 500ms window drop 2nd → bug user "tặng 2 quà chỉ thấy 1".
-      // (Pre-effect race protection làm ở overlay.js block window, không ở đây.)
+      // KHÔNG hash-dedup cho gifts — tin tưởng WeakMap elementContent đã handle
+      // per-element dedup (skip nếu cùng element + cùng text). 2 chat rows khác
+      // (kể cả cùng content) là 2 elements khác → cả 2 fire. Virtualized list
+      // recycle element với text mới → cũng fire (text khác lần trước).
       if (giftM) {
         const ev = {
           type: 'gift', level: m.level, user: m.user,
