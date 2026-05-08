@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { BigoClient } = require('./bigo-client');
@@ -10,6 +10,7 @@ const CONFIG_PATH = path.join(ROOT, 'config', 'settings.json');
 const MAPPING_PATH = path.join(ROOT, 'config', 'gift-mapping.json');
 const GIFT_MASTER_PATH = path.join(ROOT, 'config', 'gift-master.json');
 const EFFECTS_DIR = path.join(ROOT, 'assets', 'effects');
+const GIFT_ICONS_DIR = path.join(ROOT, 'assets', 'gift-icons');
 const GIFT_MASTER_TTL = 24 * 3600 * 1000; // 24h
 
 let win;
@@ -131,13 +132,27 @@ async function ensureGiftMaster(force = false) {
   }
 }
 
+// vm_exchange_rate / 100 = số đậu (verified: Bunny DINO 100→1, Roses 100→1, Roadster 300000→3000)
+function rateToDiamonds(rate) {
+  if (rate == null) return null;
+  return Math.round(rate / 100);
+}
+
+function getLocalIconPath(typeid) {
+  if (!typeid) return null;
+  const p = path.join(GIFT_ICONS_DIR, `${typeid}.png`);
+  return fs.existsSync(p) ? p : null;
+}
+function localIconUrl(typeid) {
+  const p = getLocalIconPath(typeid);
+  return p ? 'file:///' + p.replace(/\\/g, '/') : null;
+}
+
 function enrichGiftEvent(ev) {
   if (!ev || (ev.type !== 'gift' && ev.type !== 'gift_overlay')) return ev;
   let meta = null;
-  // 1. Match by exact icon URL (chính xác nhất)
   const iconUrl = ev.gift_icon_url || ev.icon;
   if (iconUrl && giftMaster.byImgUrl) meta = giftMaster.byImgUrl.get(iconUrl);
-  // 2. Fallback by name (case-insensitive)
   if (!meta && ev.gift_name && giftMaster.byName) {
     const arr = giftMaster.byName.get(String(ev.gift_name).toLowerCase().trim());
     if (arr && arr.length) {
@@ -147,9 +162,13 @@ function enrichGiftEvent(ev) {
   }
   if (meta) {
     ev.gift_id = meta.typeid;
-    ev.gift_value = meta.vm_exchange_rate;
-    if (!ev.gift_icon) ev.gift_icon = meta.img_url;
+    ev.gift_value = rateToDiamonds(meta.vm_exchange_rate); // ĐÚNG: chia 100
+    if (!ev.gift_icon) ev.gift_icon = localIconUrl(meta.typeid) || meta.img_url;
   }
+  // Tổng = (count × combo) × giá 1 quà.  combo 1 nếu không có.
+  const totalCount = (ev.gift_count || 1) * (ev.combo || 1);
+  ev.total_count = totalCount;
+  if (ev.gift_value != null) ev.total_diamond = totalCount * ev.gift_value;
   return ev;
 }
 
@@ -253,27 +272,99 @@ ipcMain.handle('bigo:check-live', async (_e, bigoId) => {
 });
 
 // =================== Gift master IPC ===================
-ipcMain.handle('gifts:master-list', () => {
-  return giftMaster.gifts || [];
-});
+function decorateGift(g) {
+  return {
+    ...g,
+    diamonds: rateToDiamonds(g.vm_exchange_rate),
+    localIcon: localIconUrl(g.typeid),
+  };
+}
+
+ipcMain.handle('gifts:master-list', () => (giftMaster.gifts || []).map(decorateGift));
 ipcMain.handle('gifts:master-refresh', async () => ensureGiftMaster(true));
 ipcMain.handle('gifts:lookup', (_e, query) => {
   if (!query) return [];
   const q = String(query).toLowerCase().trim();
   if (!giftMaster.gifts) return [];
-  // Try exact typeid first
   const id = parseInt(q, 10);
   if (!isNaN(id) && giftMaster.byTypeId && giftMaster.byTypeId.has(id)) {
-    return [giftMaster.byTypeId.get(id)];
+    return [decorateGift(giftMaster.byTypeId.get(id))];
   }
-  // Substring match by name, max 50 results
   const out = [];
   for (const g of giftMaster.gifts) {
     if (out.length >= 50) break;
     const n = String(g.name || '').toLowerCase();
-    if (n.includes(q)) out.push(g);
+    if (n.includes(q)) out.push(decorateGift(g));
   }
   return out;
+});
+
+// =================== Gift Icons (download + drag) ===================
+ipcMain.handle('gifts:icons-status', () => {
+  let count = 0;
+  if (fs.existsSync(GIFT_ICONS_DIR)) {
+    count = fs.readdirSync(GIFT_ICONS_DIR).filter(f => /\.png$/i.test(f)).length;
+  }
+  return {
+    dir: GIFT_ICONS_DIR,
+    count,
+    total: giftMaster.gifts?.length || 0,
+  };
+});
+
+ipcMain.handle('gifts:download-icons', async (e, opts = {}) => {
+  if (!giftMaster.gifts || !giftMaster.gifts.length) await ensureGiftMaster();
+  fs.mkdirSync(GIFT_ICONS_DIR, { recursive: true });
+  const list = giftMaster.gifts || [];
+  const total = list.length;
+  let done = 0, ok = 0, skip = 0, fail = 0;
+  const concurrency = 6;
+  let idx = 0;
+
+  const sendProgress = () => {
+    try { e.sender.send('gifts:download-progress', { done, total, ok, skip, fail }); } catch {}
+  };
+
+  async function worker() {
+    while (idx < list.length) {
+      const g = list[idx++];
+      if (!g.typeid || !g.img_url) { done++; continue; }
+      const filePath = path.join(GIFT_ICONS_DIR, `${g.typeid}.png`);
+      try {
+        if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
+          skip++;
+        } else {
+          const res = await fetch(g.img_url);
+          if (!res.ok) throw new Error('http ' + res.status);
+          const buf = Buffer.from(await res.arrayBuffer());
+          fs.writeFileSync(filePath, buf);
+          ok++;
+        }
+      } catch (err) {
+        fail++;
+      }
+      done++;
+      if (done % 5 === 0 || done === total) sendProgress();
+    }
+  }
+
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  sendProgress();
+  return { total, ok, skip, fail };
+});
+
+// Native drag — phải dùng ipcRenderer.send để khớp event loop của renderer dragstart
+ipcMain.on('gifts:start-drag', (event, typeid) => {
+  if (!typeid) return;
+  const filePath = path.join(GIFT_ICONS_DIR, `${typeid}.png`);
+  if (!fs.existsSync(filePath)) return;
+  try {
+    const icon = nativeImage.createFromPath(filePath);
+    const sized = icon.isEmpty() ? nativeImage.createEmpty() : icon.resize({ width: 64, height: 64 });
+    event.sender.startDrag({ file: filePath, icon: sized });
+  } catch (err) {
+    if (win) win.webContents.send('bigo:log', `[drag err] ${err.message}`);
+  }
 });
 
 // =================== Web Embed Listener ===================

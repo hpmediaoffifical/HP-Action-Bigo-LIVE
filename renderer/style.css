@@ -77,11 +77,18 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .gift-row .matched { background: #1e8a4f; color: #fff; padding: 1px 6px; border-radius: 8px; font-size: 10px; }
 .gift-row .right { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
 
+/* Icon cache bar */
+.icon-cache-bar { display: flex; align-items: center; gap: 12px; padding: 8px 10px; margin-bottom: 12px; background: #0f1117; border: 1px dashed #2c303d; border-radius: 6px; font-size: 11px; color: #8a8f9a; }
+.icon-cache-bar #iconCacheStatus { flex: 1; }
+.icon-cache-bar progress { flex: 1; height: 12px; }
+
 /* Master gift search */
 .master-search { background: #0f1117; border-radius: 6px; padding: 8px; max-height: 240px; overflow-y: auto; margin-top: 6px; }
 .master-search-row { display: grid; grid-template-columns: 28px 1fr auto auto; gap: 8px; padding: 4px 6px; align-items: center; cursor: pointer; border-radius: 4px; }
 .master-search-row:hover { background: #20242f; }
-.master-search-row img { width: 28px; height: 28px; border-radius: 4px; }
+.master-search-row img { width: 28px; height: 28px; border-radius: 4px; cursor: grab; }
+.master-search-row img:active { cursor: grabbing; }
+.master-search-row img[draggable] { -webkit-user-drag: element; }
 .master-search-row .id { color: #8a8f9a; font-family: 'Consolas', monospace; font-size: 11px; }
 .master-search-row .price { color: #ffd166; font-size: 11px; }
 

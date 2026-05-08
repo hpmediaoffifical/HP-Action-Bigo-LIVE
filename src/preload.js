@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld('bigo', {
   giftsMasterList: () => ipcRenderer.invoke('gifts:master-list'),
   giftsMasterRefresh: () => ipcRenderer.invoke('gifts:master-refresh'),
   giftsLookup: (q) => ipcRenderer.invoke('gifts:lookup', q),
+  giftsIconsStatus: () => ipcRenderer.invoke('gifts:icons-status'),
+  giftsDownloadIcons: () => ipcRenderer.invoke('gifts:download-icons'),
+  giftsOnDownloadProgress: (cb) => ipcRenderer.on('gifts:download-progress', (_e, p) => cb(p)),
+  giftsStartDrag: (typeid) => ipcRenderer.send('gifts:start-drag', typeid),
 
   // Open API mode
   start: (opts) => ipcRenderer.invoke('bigo:start', opts),

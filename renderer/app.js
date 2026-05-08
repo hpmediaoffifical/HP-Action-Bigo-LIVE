@@ -20,6 +20,7 @@ const els = {
   events: $('events'),
   // Gifts tab
   giftTableBody: $('giftTableBody'), btnAddGift: $('btnAddGift'), btnTestGift: $('btnTestGift'),
+  iconCacheStatus: $('iconCacheStatus'), btnDownloadIcons: $('btnDownloadIcons'), iconProgress: $('iconProgress'),
   // Overlays tab
   overlayTableBody: $('overlayTableBody'), btnAddOverlay: $('btnAddOverlay'),
   // Gift modal
@@ -69,7 +70,28 @@ async function init() {
   await reloadEffects();
   renderGiftTable();
   renderOverlayTable();
+  refreshIconCacheStatus();
 }
+
+async function refreshIconCacheStatus() {
+  const s = await window.bigo.giftsIconsStatus();
+  els.iconCacheStatus.textContent = `Kho icon: ${s.count}/${s.total} đã tải · ${s.dir}`;
+}
+
+els.btnDownloadIcons.onclick = async () => {
+  els.btnDownloadIcons.disabled = true;
+  els.iconProgress.style.display = 'inline-block';
+  els.iconProgress.value = 0;
+  els.iconProgress.max = 100;
+  window.bigo.giftsOnDownloadProgress(p => {
+    if (p.total) els.iconProgress.value = (p.done / p.total) * 100;
+    els.iconCacheStatus.textContent = `Đang tải: ${p.done}/${p.total} (ok ${p.ok}, skip ${p.skip}, fail ${p.fail})`;
+  });
+  const r = await window.bigo.giftsDownloadIcons();
+  els.iconProgress.style.display = 'none';
+  els.btnDownloadIcons.disabled = false;
+  els.iconCacheStatus.textContent = `Hoàn tất: ${r.ok} mới · ${r.skip} bỏ qua · ${r.fail} lỗi · tổng ${r.total}`;
+};
 
 async function reloadEffects() {
   effects = await window.bigo.effectsList();
@@ -161,25 +183,36 @@ els.dlgMasterQuery.addEventListener('input', () => {
     if (!results.length) {
       els.dlgMasterResults.innerHTML = '<div style="padding:8px;color:#666">không tìm thấy</div>';
     } else {
-      els.dlgMasterResults.innerHTML = results.map(g => `
-        <div class="master-search-row" data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
-          <img src="${escapeHtml(g.img_url || '')}" loading="lazy" />
+      els.dlgMasterResults.innerHTML = results.map(g => {
+        const src = g.localIcon || g.img_url || '';
+        return `<div class="master-search-row" data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
+          <img src="${escapeHtml(src)}" loading="lazy" draggable="true" data-typeid="${g.typeid}" title="Kéo ra desktop để lưu ${g.typeid}.png" />
           <div><b>${escapeHtml(g.name)}</b></div>
           <div class="id">id ${g.typeid}</div>
-          <div class="price">💎 ${g.vm_exchange_rate}</div>
-        </div>
-      `).join('');
+          <div class="price">💎 ${g.diamonds ?? '?'}</div>
+        </div>`;
+      }).join('');
       els.dlgMasterResults.querySelectorAll('.master-search-row').forEach(row => {
-        row.onclick = () => {
+        row.onclick = (e) => {
+          if (e.target.tagName === 'IMG') return; // image drag, không trigger click
           const name = row.dataset.name;
-          // Add to matchKeys (avoid duplicates)
+          const typeid = row.dataset.typeid;
+          // Match key có thể là gift_id (số) hoặc name. Dùng cả 2 cho linh hoạt.
           const cur = els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean);
+          if (!cur.includes(typeid)) cur.push(typeid);
           if (!cur.includes(name)) cur.push(name);
           els.dlgMatchKeys.value = cur.join(', ');
           if (!els.dlgAlias.value) els.dlgAlias.value = name;
           els.dlgMasterResults.style.display = 'none';
           els.dlgMasterResults.innerHTML = '';
           els.dlgMasterQuery.value = '';
+        };
+      });
+      // Native drag — kéo icon ra desktop, file lưu thành <typeid>.png
+      els.dlgMasterResults.querySelectorAll('img[draggable]').forEach(img => {
+        img.ondragstart = (e) => {
+          e.preventDefault();
+          window.bigo.giftsStartDrag(parseInt(img.dataset.typeid, 10));
         };
       });
     }
@@ -428,19 +461,24 @@ function renderParsed(ev) {
       ? `<img class="avatar" src="${escapeHtml(ev.user_avatar_url)}" loading="lazy" />`
       : `<div class="avatar"></div>`;
     const giftIconUrl = ev.gift_icon || ev.gift_icon_url || '';
-    const giftIcon = giftIconUrl ? `<img class="gift-icon" src="${escapeHtml(giftIconUrl)}" loading="lazy" />` : '';
+    const dragAttrs = ev.gift_id != null ? `draggable="true" data-typeid="${ev.gift_id}" title="Kéo ra desktop để lưu ${ev.gift_id}.png"` : '';
+    const giftIcon = giftIconUrl ? `<img class="gift-icon" src="${escapeHtml(giftIconUrl)}" loading="lazy" ${dragAttrs} />` : '';
     const idText = ev.gift_id != null
       ? `id <b>${ev.gift_id}</b>${ev.gift_value != null ? ` · 💎 ${ev.gift_value}` : ''}`
       : (ev.gift_ambiguous ? `<span style="color:#ff9a4a">${ev.gift_ambiguous} match</span>` : '<span style="color:#666">chưa map id</span>');
-    const beansLine = ev.gift_value != null && ev.gift_count
-      ? `<span class="beans">💎 ${ev.gift_value * ev.gift_count}</span>`
+    const totalCount = ev.total_count != null ? ev.total_count : (ev.gift_count || 1) * (ev.combo || 1);
+    const totalDiamond = ev.total_diamond != null
+      ? ev.total_diamond
+      : (ev.gift_value != null ? totalCount * ev.gift_value : null);
+    const beansLine = totalDiamond != null
+      ? `<span class="beans">💎 ${totalDiamond}</span>`
       : '';
     const matchedBadge = matched ? `<span class="matched">▶ ${escapeHtml(matched.alias || matched.matchKeys.join(','))}</span>` : '';
     const userLine = ev.level != null
       ? `<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span>`
       : `<span class="who">${escapeHtml(ev.user)}</span>`;
-    const cntStr = ev.type === 'gift_overlay'
-      ? `×${ev.gift_count} · combo ${ev.combo}`
+    const cntStr = ev.type === 'gift_overlay' && ev.combo > 1
+      ? `×${ev.gift_count} · combo ${ev.combo} = <b>${totalCount}</b>`
       : `×${ev.gift_count}`;
     div.innerHTML = `
       ${avatar}
@@ -453,7 +491,15 @@ function renderParsed(ev) {
     els.liveGifts.prepend(div);
     while (els.liveGifts.children.length > 200) els.liveGifts.lastChild.remove();
 
-    // Trigger overlay play (chỉ cho 'gift', không cho 'gift_overlay' để tránh kép)
+    // Native drag handler cho icon trong panel quà nhận
+    const draggableImg = div.querySelector('img[draggable]');
+    if (draggableImg) {
+      draggableImg.ondragstart = (e) => {
+        e.preventDefault();
+        window.bigo.giftsStartDrag(parseInt(draggableImg.dataset.typeid, 10));
+      };
+    }
+
     if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
       window.bigo.overlayPlay({ overlayId: matched.overlayId, file: matched.mediaFile });
     }
