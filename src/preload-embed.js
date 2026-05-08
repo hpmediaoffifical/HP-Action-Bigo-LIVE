@@ -1,0 +1,139 @@
+// Preload chạy trong main frame VÀ sub-frames (do nodeIntegrationInSubFrames=true).
+// DOM scraper: Bigo player đã render chat/gift ra HTML — ta dùng MutationObserver-style
+// polling + pattern matching để tách event đã decode sẵn (không cần parse protobuf).
+
+const { ipcRenderer } = require('electron');
+
+const FRAME_URL = (() => { try { return location.href; } catch { return '<unknown>'; } })();
+const IS_MAIN = (() => { try { return window.top === window; } catch { return false; } })();
+
+function send(channel, payload) {
+  try { ipcRenderer.send(channel, { ...payload, _frame: FRAME_URL, _main: IS_MAIN }); } catch {}
+}
+
+const seenChats = new Map();
+const seenGifts = new Map();
+
+const CHAT_PATTERNS = [
+  /^\s*Lv\.?\s*(\d+)\s+([^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
+  /^\s*\[Lv\.?(\d+)\]\s*([^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
+];
+
+function tryMatchChat(text) {
+  for (const re of CHAT_PATTERNS) {
+    const m = text.match(re);
+    if (m) return { level: +m[1], user: m[2].trim(), content: m[3].trim() };
+  }
+  return null;
+}
+
+function pruneMap(map, max = 2000, recentMs = 60_000) {
+  if (map.size <= max) return;
+  const cutoff = Date.now() - recentMs;
+  for (const [k, ts] of map) if (ts < cutoff) map.delete(k);
+}
+
+// Walk all elements including shadow DOM
+function* walkAllElements(root) {
+  if (!root) return;
+  const stack = [root];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node) continue;
+    yield node;
+    if (node.children) for (const c of node.children) stack.push(c);
+    if (node.shadowRoot) stack.push(node.shadowRoot);
+  }
+}
+
+function scanChatsAndGifts() {
+  const chats = [];
+  const gifts = [];
+  if (!document.body) return { chats, gifts };
+
+  for (const el of walkAllElements(document.body)) {
+    if (el.nodeType !== 1) continue;
+    const text = (el.textContent || '').trim();
+    if (text.length < 5 || text.length > 500) continue;
+
+    const m = tryMatchChat(text);
+    if (!m) continue;
+
+    const hash = `${m.level}|${m.user}|${m.content}`;
+    if (seenChats.has(hash)) continue;
+    seenChats.set(hash, Date.now());
+
+    const giftM = m.content.match(/sent\s+(?:a\s+)?(.+?)\s*[×xX](\d+)\s*$/);
+    if (giftM) {
+      gifts.push({ type: 'gift', level: m.level, user: m.user, gift_name: giftM[1].trim(), gift_count: +giftM[2], raw: text });
+    } else if (/^sent\s+/i.test(m.content)) {
+      gifts.push({ type: 'gift', level: m.level, user: m.user, gift_name: m.content.replace(/^sent\s+/i, '').trim(), gift_count: 1, raw: text });
+    } else {
+      chats.push({ type: 'chat', level: m.level, user: m.user, content: m.content, raw: text });
+    }
+  }
+
+  pruneMap(seenChats);
+  return { chats, gifts };
+}
+
+function scanGiftOverlay() {
+  const out = [];
+  if (!document.body) return out;
+  for (const el of walkAllElements(document.body)) {
+    if (el.nodeType !== 1) continue;
+    const text = (el.textContent || '').trim();
+    if (text.length < 4 || text.length > 200) continue;
+    const m = text.match(/(.{1,40})\s*Send\s*[\s\S]{0,80}?[xX×](\d+)\s*combo\s*(\d+)/i);
+    if (!m) continue;
+    const sender = m[1].trim();
+    const count = +m[2], combo = +m[3];
+    const img = el.querySelector('img');
+    const icon = img ? img.src : '';
+    const hash = `${sender}|${count}|${combo}|${icon}`;
+    if (seenGifts.has(hash)) continue;
+    seenGifts.set(hash, Date.now());
+    out.push({ type: 'gift_overlay', user: sender, gift_count: count, combo, icon, raw: text.slice(0, 100) });
+  }
+  pruneMap(seenGifts);
+  return out;
+}
+
+function scanRoomMeta() {
+  const meta = {};
+  if (!document.body) return meta;
+  for (const el of walkAllElements(document.body)) {
+    if (el.nodeType !== 1) continue;
+    const t = (el.textContent || '').trim();
+    if (t.length > 200) continue;
+    const m = t.match(/^BIGO\s*ID\s*[:：]\s*(\S+)/i);
+    if (m && !meta.bigoId) meta.bigoId = m[1];
+  }
+  if (document.title) meta.title = document.title;
+  return meta;
+}
+
+function attach() {
+  if (!document.body) return setTimeout(attach, 200);
+  send('embed:dom-attached', { url: location.href, isMain: IS_MAIN, ts: Date.now() });
+
+  let lastMeta = '';
+  const tick = () => {
+    try {
+      const { chats, gifts } = scanChatsAndGifts();
+      for (const ev of chats) send('embed:parsed', { ...ev, ts: Date.now() });
+      for (const ev of gifts) send('embed:parsed', { ...ev, ts: Date.now() });
+      for (const ev of scanGiftOverlay()) send('embed:parsed', { ...ev, ts: Date.now() });
+      const meta = scanRoomMeta();
+      const j = JSON.stringify(meta);
+      if (j !== lastMeta) { lastMeta = j; send('embed:meta', { ...meta, ts: Date.now() }); }
+    } catch (e) {
+      send('embed:scrape-error', { msg: e.message });
+    }
+  };
+  setTimeout(tick, 4000);
+  setInterval(tick, 800);
+}
+
+attach();
+send('embed:ready', { url: FRAME_URL, isMain: IS_MAIN, ts: Date.now() });

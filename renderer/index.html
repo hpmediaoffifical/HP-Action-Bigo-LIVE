@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>BIGO Action</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>BIGO Action <span class="badge" id="status">disconnected</span></h1>
+    <div class="hint">Bigo gift listener · Web Embed (mọi BIGO ID đang live)</div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="embed">🌐 Web Listener</button>
+    <button class="tab" data-tab="oauth">🔐 Open API (OAuth)</button>
+    <button class="tab" data-tab="effects">🎬 Hiệu ứng &amp; Mapping</button>
+  </nav>
+
+  <main>
+    <!-- TAB 1: WEB EMBED LISTENER -->
+    <section class="tab-panel active" data-tab="embed">
+      <div class="panel">
+        <h2>Kết nối phòng live</h2>
+        <div class="row">
+          <label>BIGO ID
+            <input id="embedBigoId" placeholder="vd: 1066691535" />
+          </label>
+          <label>&nbsp;
+            <button id="btnCheckLive">🔍 Check live</button>
+          </label>
+        </div>
+        <div id="liveInfo" class="live-info">Chưa check.</div>
+
+        <div class="actions">
+          <button id="btnEmbedStart" class="primary">▶ Bắt đầu nghe</button>
+          <button id="btnEmbedStop" disabled>⏹ Dừng</button>
+          <button id="btnEmbedShow">👁 Hiện cửa sổ Bigo</button>
+        </div>
+      </div>
+
+      <div class="panel" id="metaPanel" style="display:none">
+        <h2>📺 Room hiện tại</h2>
+        <div id="metaInfo" class="meta-info"></div>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>💬 Bình luận live</h2>
+          <div id="liveChats" class="chats"></div>
+        </div>
+        <div class="panel">
+          <h2>🎁 Quà đã nhận</h2>
+          <div id="liveGifts" class="gifts"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: OAUTH -->
+    <section class="tab-panel" data-tab="oauth">
+      <div class="panel">
+        <h2>Bigo Open API (cần streamer authorize app của bạn)</h2>
+        <div class="row">
+          <label>Môi trường
+            <select id="env">
+              <option value="prod">prod (oauth.bigolive.tv)</option>
+              <option value="gray">gray</option>
+              <option value="test">test</option>
+            </select>
+          </label>
+          <label>BIGO ID (hiển thị)
+            <input id="bigoId" placeholder="vd: 20200995" />
+          </label>
+        </div>
+        <div class="row">
+          <label>openid streamer
+            <input id="openid" placeholder="openid từ OAuth callback" />
+          </label>
+          <label>game_id
+            <input id="gameId" placeholder="Bigo cấp" />
+          </label>
+        </div>
+        <div class="row">
+          <label>access_token
+            <input id="accessToken" placeholder="OAuth access_token" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="btnSave">💾 Lưu</button>
+          <button id="btnStart" class="primary">▶ Kết nối Open API</button>
+          <button id="btnStop" disabled>⏹ Dừng</button>
+        </div>
+        <h3>Sự kiện Open API</h3>
+        <div id="events" class="events"></div>
+      </div>
+    </section>
+
+    <!-- TAB 3: EFFECTS & MAPPING -->
+    <section class="tab-panel" data-tab="effects">
+      <div class="panel">
+        <h2>Stage hiệu ứng</h2>
+        <div class="stage">
+          <video id="fxVideo" muted playsinline></video>
+          <audio id="fxAudio"></audio>
+          <div class="stage-empty" id="stageEmpty">Chưa có hiệu ứng. Bấm Test gift để xem demo.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Mapping gift_name → file hiệu ứng</h2>
+        <div id="mappingList"></div>
+        <div class="row">
+          <input id="mapGiftId" placeholder="gift_name (vd: お面) hoặc gift_id" />
+          <select id="mapFile"></select>
+          <button id="btnAddMap">+ Thêm mapping</button>
+          <button id="btnReloadFx">↻ Quét lại assets/effects</button>
+        </div>
+        <div class="actions">
+          <button id="btnTestGift">🎁 Test gift</button>
+          <button id="btnTestHeart">❤ Test heart</button>
+          <button id="btnTestMsg">💬 Test msg</button>
+        </div>
+        <div class="hint small">
+          Đặt file <code>.mp4 / .webm / .mp3 / .wav</code> vào <code>assets/effects/</code>.
+        </div>
+      </div>
+    </section>
+
+    <section class="panel log-panel">
+      <h2>Log</h2>
+      <pre id="log" class="log"></pre>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
