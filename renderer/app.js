@@ -137,8 +137,15 @@ function pushPlayBatch(item, ev, playTimes) {
       playTimes: 1,
     });
   }
-  // Prepend whole batch — batch[0] sẽ ở top
-  queueItems.unshift(...batch);
+  // Priority: 0 = chèn lên top (mới nhất ở đầu, default).
+  // N > 0 = chèn vào index N (sau quà đang phát + N-1 quà chờ).
+  const priority = item?.priority || 0;
+  if (priority > 0 && queueItems.length > 0) {
+    const insertIdx = Math.min(priority, queueItems.length);
+    queueItems.splice(insertIdx, 0, ...batch);
+  } else {
+    queueItems.unshift(...batch);
+  }
   while (queueItems.length > QUEUE_MAX) queueItems.pop();
   renderQueue(); renderMiniQueue(); updateQueueStats();
   batch.forEach(forwardToQueuePopup);
@@ -623,21 +630,20 @@ function renderGroupCard(grp, overlayMap) {
   const enabled = grp.enabled !== false;
   const collapsed = !!grp.collapsed;
   const itemsHtml = (grp.items || []).map(item => {
-    const ov = overlayMap.get(item.overlayId);
     const iconUrl = getGiftIcon(item);
     const iconCell = iconUrl
       ? `<img src="${escapeHtml(iconUrl)}" class="grow-icon" loading="lazy" />`
       : '<div class="grow-icon-empty"></div>';
-    const matchKeys = (item.matchKeys || []).map(k => `<code>${escapeHtml(k)}</code>`).join(' ');
+    const displayName = item.alias || (item.matchKeys || [])[0] || '?';
+    const priorityBadge = item.priority > 0 ? `<span class="prio-badge" title="Ưu tiên hàng ${item.priority}">⚡${item.priority}</span>` : '';
     return `<div class="group-item" data-iid="${item.id}" data-gid="${grp.id}">
       ${iconCell}
       <div class="grow-meta">
-        <div class="grow-name"><b>${escapeHtml(item.alias || (item.matchKeys || [])[0] || '?')}</b> ${matchKeys}</div>
-        <div class="grow-sub">${item.mediaFile ? `<code>${escapeHtml(item.mediaFile)}</code>` : '<span style="color:#666">—</span>'} → ${ov ? escapeHtml(ov.name) : '<span style="color:#ff6b6b">overlay xoá</span>'}</div>
+        <div class="grow-name"><b>${escapeHtml(displayName)}</b>${priorityBadge}</div>
       </div>
       <div class="grow-actions">
         <input type="number" class="play-count" min="1" max="50" value="1" data-iid="${item.id}" title="Số lượng phát" onclick="event.stopPropagation()" />
-        <button class="tiny" data-act="play" data-iid="${item.id}" title="Phát N lần theo số lượng">▶</button>
+        <button class="tiny" data-act="play" data-iid="${item.id}" title="Phát N lần">▶</button>
         <button class="tiny" data-act="edit-item" data-iid="${item.id}">✏️</button>
         <button class="tiny danger" data-act="del-item" data-iid="${item.id}">🗑</button>
       </div>
@@ -861,7 +867,7 @@ async function openGiftDialog(gift = null, groupId = null) {
   els.giftDialogTitle.textContent = gift ? 'Sửa quà' : 'Thêm quà';
   els.dlgMatchKeys.value = gift ? gift.matchKeys.join(', ') : '';
   els.dlgAlias.value = gift?.alias || '';
-  // Group: nếu pass groupId thì dùng tên group đó, fallback gift._group hoặc empty
+  // Group: tên nhóm hiện tại của gift / groupId pass vào / fallback Mặc định
   let groupName = '';
   if (groupId) {
     const grp = findGroupById(groupId);
@@ -870,13 +876,18 @@ async function openGiftDialog(gift = null, groupId = null) {
     const found = findItemById(gift.id);
     if (found) groupName = found.group.name;
   }
-  els.dlgGroup.value = groupName;
-  // Refresh datalist với toàn bộ tên nhóm hiện có (case khi user mở dialog
-  // trước khi renderGroupsInto chạy — vẫn phải thấy đầy đủ groups)
-  if (els.groupList) {
-    const allNames = (mapping.groups || []).map(g => g.name).filter(Boolean);
-    els.groupList.innerHTML = allNames.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+  // Populate select Nhóm với tất cả groups
+  const allGroups = mapping.groups || [];
+  if (allGroups.length === 0) {
+    els.dlgGroup.innerHTML = '<option value="Mặc định">Mặc định</option>';
+  } else {
+    els.dlgGroup.innerHTML = allGroups.map(g =>
+      `<option value="${escapeHtml(g.name)}">${escapeHtml(g.name)}</option>`
+    ).join('');
   }
+  els.dlgGroup.value = groupName || allGroups[0]?.name || 'Mặc định';
+  // Priority field
+  if (els.dlgPriority) els.dlgPriority.value = gift?.priority || 0;
   els.giftDialog.dataset.editingGroupId = groupId || '';
   els.dlgMasterFilter.value = '';
   els.dlgMasterSort.value = 'kc-asc';
@@ -905,6 +916,7 @@ els.dlgGiftSave.onclick = async (e) => {
     mediaFile: els.dlgFile.value,
     overlayId: els.dlgOverlay.value,
     pauseBgm: els.dlgPauseBgm ? els.dlgPauseBgm.checked : false,
+    priority: els.dlgPriority ? Math.max(0, Math.min(100, parseInt(els.dlgPriority.value, 10) || 0)) : 0,
   };
   // Tìm/tạo group case-insensitive (NPC = npc = Npc)
   const targetGroup = findOrCreateGroupCI(targetGroupName, 'gift');

@@ -337,11 +337,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .group-item .grow-icon { width: 40px; height: 40px; border-radius: 6px; object-fit: contain; background: #0f1117; }
 .group-item .grow-icon-empty { width: 40px; height: 40px; border-radius: 6px; background: #1c1f28; }
 .group-item .grow-meta { min-width: 0; }
-.group-item .grow-name { color: #c9d6ff; font-size: 13px; word-break: break-word; }
+.group-item .grow-name { color: #c9d6ff; font-size: 13px; word-break: break-word; display: flex; align-items: center; gap: 6px; }
 .group-item .grow-name b { color: #ffe07a; }
-.group-item .grow-name code { background: #0f1117; padding: 1px 5px; border-radius: 3px; font-size: 10px; color: #ffd166; margin-left: 4px; }
-.group-item .grow-sub { color: #8a8f9a; font-size: 11px; margin-top: 2px; }
-.group-item .grow-actions { display: flex; gap: 4px; }
+.group-item .grow-actions { display: flex; gap: 4px; align-items: center; }
+.prio-badge { background: linear-gradient(135deg, #fe2c55, #ff8a3d); color: #fff; padding: 1px 7px; border-radius: 8px; font-size: 10px; font-weight: 700; }
 
 /* Switch toggle */
 .switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
@@ -419,7 +418,14 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .color-swatch { display: inline-block; width: 18px; height: 18px; border-radius: 4px; vertical-align: middle; border: 1px solid #2c303d; margin-right: 6px; }
 
 /* ============ Modal ============ */
-.modal { background: #1c1f28; color: #e6e8ee; border: 1px solid #262a35; border-radius: 12px; padding: 20px; max-width: 560px; width: 90%; }
+.modal { background: #1c1f28; color: #e6e8ee; border: 1px solid #262a35; border-radius: 12px; padding: 20px; max-width: 560px; width: 90%; position: relative; }
+.dialog-close {
+  position: absolute; top: 12px; right: 12px;
+  background: transparent; border: 1px solid #2c303d;
+  color: #8a8f9a; padding: 4px 10px; cursor: pointer;
+  border-radius: 6px; font-size: 14px;
+}
+.dialog-close:hover { background: #5a2030; border-color: #ff6b6b; color: #ff6b6b; }
 .modal::backdrop { background: rgba(0,0,0,0.7); }
 .modal h3 { margin: 0 0 16px; color: #ff8a3d; font-size: 15px; }
 .form-row { display: flex; gap: 12px; margin-bottom: 12px; }

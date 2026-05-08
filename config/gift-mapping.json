@@ -17,7 +17,7 @@
             "7750",
             "Bell-测试68372/60190"
           ],
-          "alias": "Flower",
+          "alias": "Tung hoa",
           "mediaFile": "Tơ nhện.webm",
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": true
@@ -142,7 +142,7 @@
       "name": "Peo",
       "type": "gift",
       "enabled": true,
-      "collapsed": false,
+      "collapsed": true,
       "bigoId": "",
       "items": [
         {
@@ -173,7 +173,7 @@
       "name": "Ada",
       "type": "gift",
       "enabled": true,
-      "collapsed": false,
+      "collapsed": true,
       "bigoId": "",
       "items": [
         {

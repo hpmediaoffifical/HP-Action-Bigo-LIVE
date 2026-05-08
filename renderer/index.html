@@ -264,6 +264,7 @@
   <!-- =================== MODAL: EDIT GIFT =================== -->
   <dialog id="giftDialog" class="modal">
     <form method="dialog">
+      <button type="button" class="dialog-close" onclick="this.closest('dialog').close()" title="Đóng (ESC)">✕</button>
       <h3 id="giftDialogTitle">Quà</h3>
       <div class="form-row">
         <label>Match keys (tên Bigo render hoặc mã ID — cách nhau bằng dấu phẩy)
@@ -271,7 +272,7 @@
         </label>
       </div>
       <div class="form-row" style="margin-bottom:6px">
-        <label style="flex:2">🔍 Lọc trong master (<span id="dlgMasterTotal">2410</span> quà)
+        <label style="flex:2">🔍 Lọc trong master · <b id="dlgMasterTotal">2410</b> quà tặng
           <input id="dlgMasterFilter" placeholder="gõ tên hoặc mã quà..." />
         </label>
         <label>Sắp xếp
@@ -307,8 +308,12 @@
           <input id="dlgAlias" placeholder="Mặt nạ" />
         </label>
         <label>Nhóm
-          <input id="dlgGroup" list="groupList" placeholder="Quà Hot" />
-          <datalist id="groupList"></datalist>
+          <select id="dlgGroup"></select>
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Ưu tiên trong queue (0 = bình thường, N = chèn vào hàng N)
+          <input type="number" id="dlgPriority" min="0" max="100" value="0" placeholder="0" />
         </label>
       </div>
       <div class="form-row">
@@ -338,6 +343,7 @@
   <!-- =================== MODAL: EDIT GROUP =================== -->
   <dialog id="groupEditDialog" class="modal">
     <form method="dialog">
+      <button type="button" class="dialog-close" onclick="this.closest('dialog').close()" title="Đóng (ESC)">✕</button>
       <h3 id="groupEditTitle">Sửa nhóm</h3>
       <div class="form-row">
         <label style="flex:1">Tên nhóm
@@ -372,6 +378,7 @@
   <!-- =================== MODAL: EDIT OVERLAY =================== -->
   <dialog id="overlayDialog" class="modal">
     <form method="dialog">
+      <button type="button" class="dialog-close" onclick="this.closest('dialog').close()" title="Đóng (ESC)">✕</button>
       <h3 id="overlayDialogTitle">Overlay</h3>
       <div class="form-row">
         <label style="flex:2">Tên
