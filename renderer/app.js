@@ -301,9 +301,8 @@ function levelTier(lv) {
   return 6;
 }
 
-// Special clear-queue trigger check: settings.clearGift.enabled + matching typeid/name.
-function checkClearGiftTrigger(ev) {
-  const cfg = appSettings?.clearGift;
+// Match 1 special effect cfg với 1 gift event (by typeid hoặc giftName).
+function matchSpecialGift(ev, cfg) {
   if (!cfg || !cfg.enabled) return false;
   if (!cfg.typeid && !cfg.giftName) return false;
   if (cfg.typeid && ev.gift_id && Number(ev.gift_id) === Number(cfg.typeid)) return true;
@@ -313,6 +312,38 @@ function checkClearGiftTrigger(ev) {
     if (a === b) return true;
   }
   return false;
+}
+
+// Check & trigger TẤT CẢ special effects khi 1 gift event đến từ live.
+// Trả về true nếu gift này match ít nhất 1 trigger (caller có thể dùng để skip
+// duplicate flow nếu cần).
+function checkSpecialEffectsTriggers(ev) {
+  const se = appSettings?.specialEffects;
+  if (!se) return false;
+  let triggered = false;
+  if (matchSpecialGift(ev, se.clearQueue)) {
+    appendLog(`[se:clearQueue] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → xoá DSHT`);
+    clearAllQueue();
+    triggered = true;
+  }
+  if (matchSpecialGift(ev, se.speedUp)) {
+    const f = parseFloat(se.speedUp.factor) || 1.25;
+    appendLog(`[se:speedUp] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → BGM ×${f}`);
+    applyBgmSpeed(f);
+    triggered = true;
+  }
+  if (matchSpecialGift(ev, se.speedDown)) {
+    const f = parseFloat(se.speedDown.factor) || 0.75;
+    appendLog(`[se:speedDown] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → BGM ×${f}`);
+    applyBgmSpeed(f);
+    triggered = true;
+  }
+  return triggered;
+}
+
+// Backward compat shim
+function checkClearGiftTrigger(ev) {
+  return matchSpecialGift(ev, appSettings?.specialEffects?.clearQueue);
 }
 
 function pushQueue(ev, matched, playTimes) {
@@ -390,10 +421,7 @@ const els = {
   // Pre-effect sound (Cài đặt chung)
   preFxFileLabel: $('preFxFileLabel'), preFxEnabled: $('preFxEnabled'),
   btnPickPreFx: $('btnPickPreFx'), btnTestPreFx: $('btnTestPreFx'), btnClearPreFx: $('btnClearPreFx'),
-  // Clear-queue trigger gift
-  clearGiftLabel: $('clearGiftLabel'), clearGiftId: $('clearGiftId'),
-  clearGiftEnabled: $('clearGiftEnabled'),
-  btnPickClearGift: $('btnPickClearGift'), btnClearClearGift: $('btnClearClearGift'),
+  // (Hiệu Ứng Đặc Biệt: dùng document.getElementById trực tiếp trong applySpecialEffectsUi)
   audioDevice: $('audioDevice'), btnRefreshDevices: $('btnRefreshDevices'),
   bgmVol: $('bgmVol'), bgmVolVal: $('bgmVolVal'),
   fxVol: $('fxVol'), fxVolVal: $('fxVolVal'),
@@ -1739,11 +1767,9 @@ function renderParsed(ev) {
     return;
   }
   if (ev.type === 'gift' || ev.type === 'gift_overlay') {
-    // Special clear-queue trigger: nếu user trong live tặng quà đã set ở Cài đặt chung → xoá toàn bộ queue
-    if (ev.type === 'gift' && checkClearGiftTrigger(ev)) {
-      appendLog(`[clear-trigger] ${ev.user} tặng "${ev.gift_name}" → tự xoá toàn bộ DANH SÁCH HIỆU ỨNG`);
-      clearAllQueue();
-      // Vẫn xử lý event tiếp (cập nhật stats, log) nhưng không push vào queue đã clear
+    // Hiệu Ứng Đặc Biệt: check tất cả triggers (clearQueue / speedUp / speedDown)
+    if (ev.type === 'gift') {
+      checkSpecialEffectsTriggers(ev);
     }
     const matched = findGiftByEvent(ev);
     // Update session stats (chỉ count gift, không count gift_overlay duplicate)
@@ -1817,7 +1843,12 @@ function renderEmbedEvent(ev) {
 let appSettings = {
   bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
-  clearGift: { enabled: false, typeid: null, giftName: '' },  // Quà tự xoá DSHT khi user tặng
+  // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
+  specialEffects: {
+    clearQueue:  { enabled: false, typeid: null, giftName: '', iconUrl: '' },
+    speedUp:     { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 1.25 },
+    speedDown:   { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 0.75 },
+  },
   fxVolume: 100,
   maxListItems: 200,
 };
@@ -1827,7 +1858,12 @@ async function saveAppSettings(patch) {
   if (patch) {
     if (patch.bgm) s.bgm = { ...(s.bgm || {}), ...patch.bgm };
     if (patch.preFx) s.preFx = { ...(s.preFx || {}), ...patch.preFx };
-    if (patch.clearGift) s.clearGift = { ...(s.clearGift || {}), ...patch.clearGift };
+    if (patch.specialEffects) {
+      s.specialEffects = s.specialEffects || {};
+      for (const [k, v] of Object.entries(patch.specialEffects)) {
+        s.specialEffects[k] = { ...(s.specialEffects[k] || {}), ...v };
+      }
+    }
     if ('fxVolume' in patch) s.fxVolume = patch.fxVolume;
     if ('maxListItems' in patch) s.maxListItems = patch.maxListItems;
   }
@@ -1894,13 +1930,26 @@ async function applyBgmSinkId() {
 async function initAppSettings(s) {
   appSettings.bgm = { ...appSettings.bgm, ...(s.bgm || {}) };
   appSettings.preFx = { ...appSettings.preFx, ...(s.preFx || {}) };
-  appSettings.clearGift = { ...appSettings.clearGift, ...(s.clearGift || {}) };
+  // Migrate old clearGift → specialEffects.clearQueue (backward compat)
+  if (s.clearGift && !s.specialEffects?.clearQueue) {
+    appSettings.specialEffects.clearQueue = {
+      enabled: !!s.clearGift.enabled,
+      typeid: s.clearGift.typeid || null,
+      giftName: s.clearGift.giftName || '',
+      iconUrl: '',
+    };
+  }
+  if (s.specialEffects) {
+    for (const k of ['clearQueue', 'speedUp', 'speedDown']) {
+      if (s.specialEffects[k]) {
+        appSettings.specialEffects[k] = { ...appSettings.specialEffects[k], ...s.specialEffects[k] };
+      }
+    }
+  }
   appSettings.fxVolume = s.fxVolume != null ? s.fxVolume : 100;
   appSettings.maxListItems = s.maxListItems || 200;
-  // Apply clear-gift UI
-  if (els.clearGiftLabel) els.clearGiftLabel.value = appSettings.clearGift.giftName || '';
-  if (els.clearGiftId) els.clearGiftId.value = appSettings.clearGift.typeid || '';
-  if (els.clearGiftEnabled) els.clearGiftEnabled.checked = !!appSettings.clearGift.enabled;
+  // Apply special effects UI
+  applySpecialEffectsUi();
   // Apply BGM
   if (els.bgmAudio) {
     els.bgmAudio.volume = (appSettings.bgm.volume || 80) / 100;
@@ -1960,48 +2009,186 @@ if (els.preFxEnabled) {
   });
 }
 
-// =================== Clear-queue trigger gift picker ===================
-// Reuse master gift picker dialog (đã có sẵn) — đơn giản hoá: prompt user nhập typeid hoặc tên.
-// Nâng cấp sau có thể dùng full master table như dlgMasterFilter.
-if (els.btnPickClearGift) {
-  els.btnPickClearGift.onclick = async () => {
-    const q = prompt('Nhập typeid (số) hoặc tên quà chính xác để dùng làm trigger xoá DSHT:\n(Quà này khi user tặng → app tự xoá toàn bộ hiệu ứng đang chờ)', appSettings.clearGift.giftName || '');
-    if (q == null || !q.trim()) return;
-    const trimmed = q.trim();
-    const asNum = parseInt(trimmed, 10);
-    let typeid = null, giftName = trimmed;
-    if (!isNaN(asNum) && String(asNum) === trimmed) {
-      // Numeric → coi là typeid, lookup tên qua master
-      typeid = asNum;
-      try {
-        const list = await window.bigo.giftsLookup(String(asNum));
-        if (list && list.length) giftName = list[0].name || trimmed;
-      } catch {}
-    } else {
-      // Text → giữ raw, không cần typeid
-      giftName = trimmed;
+// =================== Hiệu Ứng Đặc Biệt ===================
+// 3 trigger gift: clearQueue | speedUp | speedDown. Dùng dedicated picker dialog
+// có master table giống dlgMaster. User click row → save typeid+name+icon.
+
+const SE_LABELS = {
+  clearQueue: { id: 'seClearQueueLabel', enabled: 'seClearQueueEnabled', factor: null },
+  speedUp:    { id: 'seSpeedUpLabel',    enabled: 'seSpeedUpEnabled',    factor: 'seSpeedUpFactor' },
+  speedDown:  { id: 'seSpeedDownLabel',  enabled: 'seSpeedDownEnabled',  factor: 'seSpeedDownFactor' },
+};
+
+function applySpecialEffectsUi() {
+  for (const [key, ref] of Object.entries(SE_LABELS)) {
+    const cfg = appSettings.specialEffects[key] || {};
+    const labelEl = document.getElementById(ref.id);
+    const enabledEl = document.getElementById(ref.enabled);
+    if (labelEl) {
+      if (cfg.giftName) {
+        const idText = cfg.typeid ? ` (id ${cfg.typeid})` : '';
+        const iconHtml = cfg.iconUrl ? `<img src="${escapeHtml(cfg.iconUrl)}" style="width:18px;height:18px;vertical-align:middle;margin-right:6px;border-radius:3px" />` : '';
+        labelEl.innerHTML = `${iconHtml}<b>${escapeHtml(cfg.giftName)}</b>${idText}`;
+      } else {
+        labelEl.textContent = '— chưa chọn —';
+      }
     }
-    appSettings.clearGift.typeid = typeid;
-    appSettings.clearGift.giftName = giftName;
-    if (els.clearGiftLabel) els.clearGiftLabel.value = `${giftName}${typeid ? ' (id ' + typeid + ')' : ''}`;
-    if (els.clearGiftId) els.clearGiftId.value = typeid || '';
-    await saveAppSettings({ clearGift: { typeid, giftName } });
-  };
+    if (enabledEl) enabledEl.checked = !!cfg.enabled;
+    if (ref.factor) {
+      const facEl = document.getElementById(ref.factor);
+      if (facEl && cfg.factor != null) facEl.value = cfg.factor;
+    }
+  }
 }
-if (els.btnClearClearGift) {
-  els.btnClearClearGift.onclick = async () => {
-    appSettings.clearGift.typeid = null;
-    appSettings.clearGift.giftName = '';
-    if (els.clearGiftLabel) els.clearGiftLabel.value = '';
-    if (els.clearGiftId) els.clearGiftId.value = '';
-    await saveAppSettings({ clearGift: { typeid: null, giftName: '' } });
-  };
+
+// Dedicated master picker dialog
+function openSpecialPicker(targetKey) {
+  const dlg = document.getElementById('specialPickerDialog');
+  if (!dlg) return;
+  dlg.dataset.target = targetKey;
+  document.getElementById('specialPickerTitle').textContent = `Chọn quà tặng cho "${SE_TITLES[targetKey] || targetKey}"`;
+  const filter = document.getElementById('spMasterFilter');
+  const sort = document.getElementById('spMasterSort');
+  if (filter) filter.value = '';
+  if (sort) sort.value = 'kc-asc';
+  renderSpecialPickerTable();
+  dlg.showModal();
 }
-if (els.clearGiftEnabled) {
-  els.clearGiftEnabled.addEventListener('change', async () => {
-    appSettings.clearGift.enabled = !!els.clearGiftEnabled.checked;
-    await saveAppSettings({ clearGift: { enabled: appSettings.clearGift.enabled } });
+
+const SE_TITLES = {
+  clearQueue: 'Xoá danh sách hiệu ứng',
+  speedUp: 'Tăng tốc nhạc nền',
+  speedDown: 'Giảm tốc nhạc nền',
+};
+
+let _spRenderTimer = null;
+function scheduleSpecialPickerRender() {
+  clearTimeout(_spRenderTimer);
+  _spRenderTimer = setTimeout(renderSpecialPickerTable, 80);
+}
+
+function renderSpecialPickerTable() {
+  const body = document.getElementById('spMasterTableBody');
+  const total = document.getElementById('spMasterTotal');
+  const count = document.getElementById('spMasterCount');
+  const filter = (document.getElementById('spMasterFilter')?.value || '').toLowerCase().trim();
+  const sortVal = document.getElementById('spMasterSort')?.value || 'kc-asc';
+  const vnOnly = document.getElementById('spMasterVnOnly')?.checked;
+  const favOnly = document.getElementById('spMasterFavOnly')?.checked;
+  if (!masterFullList) {
+    if (body) body.innerHTML = '';
+    if (count) count.textContent = 'đang tải master...';
+    return;
+  }
+  if (total) total.textContent = masterFullList.length;
+  let arr = masterFullList.slice();
+  if (filter) {
+    const fnum = parseInt(filter, 10);
+    arr = arr.filter(g => {
+      if (!isNaN(fnum) && String(fnum) === filter) return g.typeid === fnum;
+      return String(g.name || '').toLowerCase().includes(filter) || String(g.typeid).includes(filter);
+    });
+  }
+  if (vnOnly) arr = arr.filter(g => isVnGift(g));
+  if (favOnly) arr = arr.filter(g => giftFavorites.has(g.typeid));
+  arr = sortMasterArr(arr, sortVal);
+  const renderLimit = 200;
+  if (count) count.textContent = `${arr.length} kết quả`;
+  if (body) {
+    body.innerHTML = arr.slice(0, renderLimit).map(g => {
+      const iconUrl = g.localIcon || g.img_url || '';
+      const isFav = giftFavorites.has(g.typeid);
+      return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}" data-icon="${escapeHtml(iconUrl)}">
+        <td>${iconUrl ? `<img src="${escapeHtml(iconUrl)}" style="width:32px;height:32px;object-fit:contain" />` : ''}</td>
+        <td><span class="id">${g.typeid}</span></td>
+        <td><span class="price">💎 ${g.diamonds ?? '?'}</span></td>
+        <td><span class="name">${escapeHtml(g.name)}</span></td>
+        <td><button type="button" class="fav-btn ${isFav ? 'on' : ''}" data-fav="${g.typeid}" title="Yêu thích">${isFav ? '⭐' : '☆'}</button></td>
+      </tr>`;
+    }).join('');
+    if (arr.length > renderLimit && count) count.textContent += ` · hiển thị ${renderLimit} đầu`;
+    body.querySelectorAll('tr').forEach(row => {
+      row.style.cursor = 'pointer';
+      row.onclick = (e) => {
+        if (e.target.classList && e.target.classList.contains('fav-btn')) return;
+        const dlg = document.getElementById('specialPickerDialog');
+        const targetKey = dlg.dataset.target;
+        if (!targetKey || !appSettings.specialEffects[targetKey]) return;
+        appSettings.specialEffects[targetKey].typeid = parseInt(row.dataset.typeid, 10);
+        appSettings.specialEffects[targetKey].giftName = row.dataset.name;
+        appSettings.specialEffects[targetKey].iconUrl = row.dataset.icon;
+        saveAppSettings({ specialEffects: { [targetKey]: {
+          typeid: appSettings.specialEffects[targetKey].typeid,
+          giftName: appSettings.specialEffects[targetKey].giftName,
+          iconUrl: appSettings.specialEffects[targetKey].iconUrl,
+        } } });
+        applySpecialEffectsUi();
+        dlg.close();
+      };
+    });
+    body.querySelectorAll('.fav-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const id = parseInt(btn.dataset.fav, 10);
+        if (giftFavorites.has(id)) giftFavorites.delete(id);
+        else giftFavorites.add(id);
+        saveFavorites(giftFavorites);
+        renderSpecialPickerTable();
+      };
+    });
+  }
+}
+
+// Wire pick / unpick / enable / factor inputs
+document.querySelectorAll('.se-pick').forEach(btn => {
+  btn.onclick = () => openSpecialPicker(btn.dataset.seKey);
+});
+document.querySelectorAll('.se-unpick').forEach(btn => {
+  btn.onclick = async () => {
+    const key = btn.dataset.seKey;
+    if (!appSettings.specialEffects[key]) return;
+    appSettings.specialEffects[key].typeid = null;
+    appSettings.specialEffects[key].giftName = '';
+    appSettings.specialEffects[key].iconUrl = '';
+    await saveAppSettings({ specialEffects: { [key]: { typeid: null, giftName: '', iconUrl: '' } } });
+    applySpecialEffectsUi();
+  };
+});
+['clearQueue','speedUp','speedDown'].forEach(key => {
+  const enabledEl = document.getElementById(SE_LABELS[key].enabled);
+  if (enabledEl) enabledEl.addEventListener('change', async () => {
+    appSettings.specialEffects[key].enabled = !!enabledEl.checked;
+    await saveAppSettings({ specialEffects: { [key]: { enabled: enabledEl.checked } } });
   });
+  const facKey = SE_LABELS[key].factor;
+  if (facKey) {
+    const facEl = document.getElementById(facKey);
+    if (facEl) facEl.addEventListener('change', async () => {
+      const v = parseFloat(facEl.value) || 1;
+      appSettings.specialEffects[key].factor = v;
+      await saveAppSettings({ specialEffects: { [key]: { factor: v } } });
+    });
+  }
+});
+// Picker filter/sort live update
+['spMasterFilter','spMasterSort','spMasterVnOnly','spMasterFavOnly'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.tagName === 'INPUT' && el.type !== 'checkbox') el.addEventListener('input', scheduleSpecialPickerRender);
+  else el.addEventListener('change', renderSpecialPickerTable);
+});
+// Reset BGM speed button
+const btnResetBgmSpeed = document.getElementById('btnResetBgmSpeed');
+if (btnResetBgmSpeed) {
+  btnResetBgmSpeed.onclick = () => applyBgmSpeed(1.0);
+}
+
+// BGM speed control via HTMLAudioElement.playbackRate (range 0.25-3.0)
+function applyBgmSpeed(rate) {
+  const r = Math.max(0.25, Math.min(3, parseFloat(rate) || 1));
+  if (els.bgmAudio) els.bgmAudio.playbackRate = r;
+  const disp = document.getElementById('bgmSpeedDisplay');
+  if (disp) disp.textContent = `Tốc độ hiện tại: ×${r.toFixed(2).replace(/\.?0+$/, '')}`;
 }
 
 if (els.btnPickBgm) {

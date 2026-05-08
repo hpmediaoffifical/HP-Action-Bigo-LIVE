@@ -229,22 +229,6 @@
           Mặc định <b>TẮT</b> cho tất cả quà. Vào dialog "Sửa quà" tick riêng từng quà cần phát pre-effect. Toggle Bật/Tắt ô này nhiều lần <b>KHÔNG tự bật lại</b> quà nào — mỗi quà giữ trạng thái user đã set.
         </div>
         <div class="row">
-          <label style="flex:2">🧹 Quà tặng "Xoá danh sách hiệu ứng"
-            <div style="display:flex; gap:6px; align-items:center">
-              <input id="clearGiftLabel" placeholder="Chưa chọn — bấm 🎁 để pick từ master" readonly style="flex:1" />
-              <input type="hidden" id="clearGiftId" />
-              <button type="button" id="btnPickClearGift" class="tiny" title="Chọn 1 quà từ master làm trigger xoá">🎁 Chọn</button>
-              <button type="button" id="btnClearClearGift" class="tiny danger" title="Bỏ trigger">🗑</button>
-            </div>
-          </label>
-          <label class="checkbox-row" style="flex:0 0 auto; align-self:flex-end; padding-bottom:8px">
-            <input type="checkbox" id="clearGiftEnabled" /> Bật
-          </label>
-        </div>
-        <div class="hint small" style="margin-top:-6px; margin-bottom:6px">
-          Khi bật: nếu user trong LIVE tặng quà này, app sẽ <b>tự xoá toàn bộ DANH SÁCH HIỆU ỨNG</b> (queue) — tiện cho streamer reset queue khi cần.
-        </div>
-        <div class="row">
           <label style="flex:2">🔊 Thiết bị phát (output)
             <select id="audioDevice"></select>
           </label>
@@ -268,6 +252,63 @@
         <div class="hint small">
           Nhạc nền sẽ phát loop, có thể chọn output device (loa ngoài hoặc cable virtual cho OBS).
           Khi gift bật <b>"Tạm dừng nhạc nền khi phát"</b>, nhạc nền tự pause trong lúc effect chạy rồi resume.
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>✨ Hiệu Ứng Đặc Biệt</h2>
+        <div class="hint small" style="margin-bottom:10px">
+          Gắn quà tặng làm trigger cho action đặc biệt. User trong LIVE tặng đúng quà này → app tự thực hiện.
+        </div>
+
+        <div class="se-row">
+          <div class="se-row-head">
+            <span class="se-icon">🧹</span>
+            <b class="se-title">Xoá danh sách hiệu ứng</b>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seClearQueueEnabled" /> Bật</label>
+          </div>
+          <div class="se-row-body">
+            <span id="seClearQueueLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny se-pick" data-se-key="clearQueue" title="Chọn quà từ master">🎁 Chọn</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="clearQueue" title="Bỏ trigger">🗑</button>
+          </div>
+        </div>
+
+        <div class="se-row">
+          <div class="se-row-head">
+            <span class="se-icon">⏩</span>
+            <b class="se-title">Tăng tốc nhạc nền</b>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedUpFactor" step="0.05" min="1" max="3" value="1.25" style="width:60px" /></label>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedUpEnabled" /> Bật</label>
+          </div>
+          <div class="se-row-body">
+            <span id="seSpeedUpLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny se-pick" data-se-key="speedUp">🎁 Chọn</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="speedUp">🗑</button>
+          </div>
+        </div>
+
+        <div class="se-row">
+          <div class="se-row-head">
+            <span class="se-icon">⏪</span>
+            <b class="se-title">Giảm tốc nhạc nền</b>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedDownFactor" step="0.05" min="0.25" max="1" value="0.75" style="width:60px" /></label>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedDownEnabled" /> Bật</label>
+          </div>
+          <div class="se-row-body">
+            <span id="seSpeedDownLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny se-pick" data-se-key="speedDown">🎁 Chọn</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="speedDown">🗑</button>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px; align-items:center">
+          <button type="button" id="btnResetBgmSpeed" class="tiny" title="Đưa BGM về tốc độ 1.0×">↻ Reset tốc độ BGM</button>
+          <span id="bgmSpeedDisplay" style="color:#8a8f9a; font-size:11px">Tốc độ hiện tại: ×1.0</span>
+        </div>
+
+        <div class="hint small" style="margin-top:8px">
+          📌 Sắp tới: <b>Táp màn hình theo yêu cầu</b> để phát hiệu ứng riêng + nhiều trigger khác.
         </div>
       </div>
 
@@ -308,6 +349,49 @@
   <audio id="bgmAudio" loop></audio>
 
   <!-- =================== MODAL: EDIT GIFT =================== -->
+  <!-- =================== MODAL: Special Effects Gift Picker =================== -->
+  <dialog id="specialPickerDialog" class="modal">
+    <form method="dialog">
+      <button type="button" class="dialog-close" onclick="this.closest('dialog').close()" title="Đóng (ESC)">✕</button>
+      <h3 id="specialPickerTitle">Chọn quà tặng làm trigger</h3>
+      <div class="form-row" style="margin-bottom:6px">
+        <label style="flex:2">🔍 Lọc trong master · <b id="spMasterTotal">0</b> quà tặng
+          <input id="spMasterFilter" placeholder="gõ tên hoặc mã quà..." />
+        </label>
+        <label>Sắp xếp
+          <select id="spMasterSort">
+            <option value="kc-asc" selected>KC thấp → cao</option>
+            <option value="kc-desc">KC cao → thấp</option>
+            <option value="id-asc">Mã ↑</option>
+            <option value="id-desc">Mã ↓</option>
+            <option value="name-asc">Tên A → Z</option>
+            <option value="name-desc">Tên Z → A</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-row" style="margin-bottom:6px; align-items:center">
+        <label class="checkbox-row" style="font-size:12px">
+          <input type="checkbox" id="spMasterVnOnly" /> 🇻🇳 Chỉ quà Việt Nam
+        </label>
+        <label class="checkbox-row" style="font-size:12px">
+          <input type="checkbox" id="spMasterFavOnly" /> ⭐ Chỉ yêu thích
+        </label>
+      </div>
+      <div class="master-table-wrap">
+        <table class="master-table">
+          <thead>
+            <tr><th style="width:40px">Icon</th><th style="width:80px">Mã</th><th style="width:80px">KC</th><th>Tên quà</th><th style="width:32px">⭐</th></tr>
+          </thead>
+          <tbody id="spMasterTableBody"></tbody>
+        </table>
+        <div id="spMasterCount" class="hint small" style="text-align:center; padding:6px">đang tải...</div>
+      </div>
+      <div class="modal-actions">
+        <button value="cancel">Huỷ</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="giftDialog" class="modal">
     <form method="dialog">
       <button type="button" class="dialog-close" onclick="this.closest('dialog').close()" title="Đóng (ESC)">✕</button>

@@ -382,6 +382,41 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .group-item .grow-sub { color: #8a8f9a; font-size: 11px; margin-top: 2px; word-break: break-all; }
 .group-item .grow-sub code { background: #0f1117; padding: 1px 6px; border-radius: 4px; color: #ffd166; }
 .group-item .grow-actions { display: flex; gap: 4px; align-items: center; }
+/* Hiệu Ứng Đặc Biệt rows */
+.se-row {
+  background: #0f1117;
+  border: 1px solid #1c1f28;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.se-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.se-row-head .se-icon { font-size: 16px; }
+.se-row-head .se-title { color: #ffd166; font-size: 13px; }
+.se-row-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 26px;
+}
+.se-gift-label {
+  flex: 1;
+  font-size: 12px;
+  color: #c9d6ff;
+  background: #1c1f28;
+  padding: 6px 10px;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.se-gift-label img { vertical-align: middle; margin-right: 6px; border-radius: 3px; }
+
 /* Bigo Live level tier colors (match màu badge trên web bigo.tv).
    Bigo level 1-119 chia theo grouping unlocks at 30/50/60/90.
    Tier-based color: 1-15 (newbie), 16-30 (regular), 31-45 (mid),
