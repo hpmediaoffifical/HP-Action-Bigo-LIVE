@@ -648,10 +648,14 @@ function renderGroupCard(grp, overlayMap) {
       : '<div class="grow-icon-empty"></div>';
     const displayName = item.alias || (item.matchKeys || [])[0] || '?';
     const priorityBadge = item.priority > 0 ? `<span class="prio-badge" title="Ưu tiên hàng ${item.priority}">⚡${item.priority}</span>` : '';
+    const fileLine = item.mediaFile
+      ? `<div class="grow-sub"><code>${escapeHtml(item.mediaFile)}</code></div>`
+      : '<div class="grow-sub" style="color:#ff6b6b">— chưa có file hiệu ứng —</div>';
     return `<div class="group-item" data-iid="${item.id}" data-gid="${grp.id}">
       ${iconCell}
       <div class="grow-meta">
         <div class="grow-name"><b>${escapeHtml(displayName)}</b>${priorityBadge}</div>
+        ${fileLine}
       </div>
       <div class="grow-actions">
         <input type="number" class="play-count" min="1" max="50" value="1" data-iid="${item.id}" title="Số lượng phát" onclick="event.stopPropagation()" />
