@@ -4,6 +4,28 @@ const $ = (id) => document.getElementById(id);
 let mapping = { version: 2, gifts: [], overlays: [], groups: [] };
 let effects = [];
 
+// Stats tổng tracking - reset khi connect/disconnect room mới
+const sessionStats = {
+  effects: 0,        // số hiệu ứng đã trigger play
+  diamond: 0,        // tổng đậu nhận
+  giftCount: 0,      // tổng quà count nhận
+  users: new Set(),  // unique user names
+};
+function resetSessionStats() {
+  sessionStats.effects = 0;
+  sessionStats.diamond = 0;
+  sessionStats.giftCount = 0;
+  sessionStats.users.clear();
+  updateConnectStats();
+}
+function updateConnectStats() {
+  if (!els.csEffects) return;
+  els.csEffects.textContent = sessionStats.effects;
+  els.csDiamond.textContent = sessionStats.diamond;
+  els.csUsers.textContent = sessionStats.users.size;
+  els.csGifts.textContent = sessionStats.giftCount;
+}
+
 // =================== Effect Queue State ===================
 const queueItems = []; // { id, ts, user, avatar, gift_id, gift_name, gift_icon, count, diamond, status }
 const QUEUE_MAX = 100;
@@ -120,6 +142,7 @@ const els = {
   liveInfo: $('liveInfo'),
   metaPanel: $('metaPanel'), metaInfo: $('metaInfo'),
   liveChats: $('liveChats'), liveGifts: $('liveGifts'),
+  csEffects: $('csEffects'), csDiamond: $('csDiamond'), csUsers: $('csUsers'), csGifts: $('csGifts'),
   effectQueue: $('effectQueue'), btnClearQueue: $('btnClearQueue'),
   qStatGifts: $('qStatGifts'), qStatDiamond: $('qStatDiamond'), qStatUsers: $('qStatUsers'),
   qSizeFont: $('qSizeFont'), qSizeFontVal: $('qSizeFontVal'),
@@ -547,6 +570,7 @@ function resetEmbedUi() {
   els.metaInfo.innerHTML = '';
   els.liveChats.innerHTML = '';
   els.liveGifts.innerHTML = '';
+  resetSessionStats();
 }
 
 // Toggle state: false=disconnected, true=connected
@@ -667,6 +691,16 @@ function renderParsed(ev) {
   }
   if (ev.type === 'gift' || ev.type === 'gift_overlay') {
     const matched = findGiftByEvent(ev);
+    // Update session stats (chỉ count gift, không count gift_overlay duplicate)
+    if (ev.type === 'gift') {
+      sessionStats.giftCount += (ev.gift_count || 1) * (ev.combo || 1);
+      sessionStats.diamond += ev.total_diamond || 0;
+      if (ev.user) sessionStats.users.add(ev.user);
+      if (matched && matched.mediaFile) {
+        sessionStats.effects += Math.max(1, Math.min(50, ev.total_count || ev.gift_count || 1));
+      }
+      updateConnectStats();
+    }
     const div = document.createElement('div');
     div.className = 'gift-row';
     const avatar = ev.user_avatar_url
