@@ -39,6 +39,19 @@ function findItemById(itemId) {
   }
   return null;
 }
+// Tìm group theo tên không phân biệt hoa/thường. Nếu không có thì tạo mới.
+function findOrCreateGroupCI(name, type = 'gift') {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+  if (!Array.isArray(mapping.groups)) mapping.groups = [];
+  let grp = mapping.groups.find(g => String(g.name || '').toLowerCase() === lower);
+  if (!grp) {
+    grp = { id: uid('g_'), name: trimmed, type, enabled: true, collapsed: false, bigoId: '', items: [] };
+    mapping.groups.push(grp);
+  }
+  return grp;
+}
 
 // Stats tổng tracking - reset khi connect/disconnect room mới
 const sessionStats = {
@@ -89,6 +102,63 @@ function applyQueueSize() {
   els.qSizeIconVal.textContent = icon;
 }
 
+function pushQueueManual(item, group, playTimes) {
+  // Push 1 entry như khi gift event arrived, nhưng nguồn là user click Phát
+  const queueEntry = {
+    id: 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+    ts: Date.now(),
+    user: 'You (test)',
+    avatar: '',
+    gift_id: null,
+    gift_name: item.alias || (item.matchKeys || [])[0] || '?',
+    gift_icon: getGiftIcon(item),
+    count: playTimes,
+    rawCount: playTimes,
+    combo: 1,
+    playTimes: playTimes,
+    diamond: null,
+    mediaFile: item.mediaFile,
+    overlayId: item.overlayId,
+    status: 'playing',
+  };
+  queueItems.unshift(queueEntry);
+  if (queueItems.length > QUEUE_MAX) queueItems.length = QUEUE_MAX;
+  renderQueue();
+  renderMiniQueue();
+  updateQueueStats();
+  forwardToQueuePopup(queueEntry);
+  setTimeout(() => {
+    const f = queueItems.find(q => q.id === queueEntry.id);
+    if (f) { f.status = 'done'; renderQueue(); renderMiniQueue(); forwardToQueuePopup({ ...f }); }
+  }, PLAY_DURATION_MS);
+}
+
+function renderMiniQueue() {
+  const el = document.getElementById('miniQueue');
+  if (!el) return;
+  if (queueItems.length === 0) {
+    el.innerHTML = '<div style="color:#555;text-align:center;padding:14px;font-size:11px">Chưa có hiệu ứng</div>';
+    return;
+  }
+  // Top 10 entries
+  el.innerHTML = queueItems.slice(0, 10).map(q => {
+    const iconHtml = q.gift_icon
+      ? `<img class="gift-icon" src="${escapeHtml(q.gift_icon)}" loading="lazy" />`
+      : '<div class="gift-icon"></div>';
+    const status = q.status === 'playing' ? '<span class="badge-status playing">▶</span>'
+      : q.status === 'done' ? '<span class="badge-status done">✓</span>'
+      : '<span class="badge-status queued">⏳</span>';
+    return `<div class="mini-queue-row ${q.status}">
+      ${iconHtml}
+      <div class="mini-meta">
+        <div class="who">${escapeHtml(q.user)}</div>
+        <div class="what"><b>${escapeHtml(q.gift_name)}</b> ×${q.count}</div>
+      </div>
+      ${status}
+    </div>`;
+  }).join('');
+}
+
 function pushQueue(ev, matched, playTimes) {
   // Chỉ push gift events có hiệu ứng được map
   if (!matched || !matched.mediaFile) return;
@@ -114,6 +184,7 @@ function pushQueue(ev, matched, playTimes) {
   queueItems.unshift(item);
   if (queueItems.length > QUEUE_MAX) queueItems.length = QUEUE_MAX;
   renderQueue();
+  renderMiniQueue();
   updateQueueStats();
   forwardToQueuePopup(item);
 
@@ -123,11 +194,11 @@ function pushQueue(ev, matched, playTimes) {
     if (found && found.status === 'queued') {
       found.status = 'playing';
       renderQueue();
+      renderMiniQueue();
       forwardToQueuePopup({ ...found });
-      // Sau 5s giả định effect xong (TODO: thay bằng IPC từ overlay khi ended)
       setTimeout(() => {
         const f2 = queueItems.find(q => q.id === item.id);
-        if (f2) { f2.status = 'done'; renderQueue(); forwardToQueuePopup({ ...f2 }); }
+        if (f2) { f2.status = 'done'; renderQueue(); renderMiniQueue(); forwardToQueuePopup({ ...f2 }); }
       }, PLAY_DURATION_MS);
     }
   }, 100);
@@ -248,14 +319,20 @@ els.btnClearQueue.onclick = () => {
 // =================== Tabs ===================
 document.querySelectorAll('.tab').forEach(t => {
   t.onclick = () => {
+    // Tab Hàng đợi (queue) → mở popup, không switch
+    if (t.dataset.tab === 'queue') {
+      window.bigo.popupOpenQueue();
+      return;
+    }
     document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
     t.classList.add('active');
     document.querySelector(`.tab-panel[data-tab="${t.dataset.tab}"]`).classList.add('active');
-    // Re-render groups khi switch sang Tương tác hoặc Bảng quà
-    // để đảm bảo embedGroupsContainer được populate (lỡ render lần init bị skip)
     if (t.dataset.tab === 'embed' || t.dataset.tab === 'gifts') {
       try { renderGiftTable(); } catch (e) { console.warn(e); }
+    }
+    if (t.dataset.tab === 'settings') {
+      try { renderSettingsGroupsList(); } catch (e) { console.warn(e); }
     }
   };
 });
@@ -273,6 +350,8 @@ async function init() {
   refreshIconCacheStatus();
   loadQueueSettings();
   renderQueue();
+  renderMiniQueue();
+  renderSettingsGroupsList();
   // Pre-load master để gift table có icon ngay (background)
   ensureMasterLoaded().catch(() => {});
 }
@@ -488,7 +567,8 @@ function renderGroupCard(grp, overlayMap) {
         <div class="grow-sub">${item.mediaFile ? `<code>${escapeHtml(item.mediaFile)}</code>` : '<span style="color:#666">—</span>'} → ${ov ? escapeHtml(ov.name) : '<span style="color:#ff6b6b">overlay xoá</span>'}</div>
       </div>
       <div class="grow-actions">
-        <button class="tiny" data-act="play" data-iid="${item.id}">▶</button>
+        <input type="number" class="play-count" min="1" max="50" value="1" data-iid="${item.id}" title="Số lượng phát" onclick="event.stopPropagation()" />
+        <button class="tiny" data-act="play" data-iid="${item.id}" title="Phát N lần theo số lượng">▶</button>
         <button class="tiny" data-act="edit-item" data-iid="${item.id}">✏️</button>
         <button class="tiny danger" data-act="del-item" data-iid="${item.id}">🗑</button>
       </div>
@@ -554,9 +634,15 @@ async function groupAction(act, gid, value, itemId) {
     if (!found) return;
     if (act === 'play') {
       if (!found.item.mediaFile || !found.item.overlayId) { alert('Quà chưa có file hoặc overlay'); return; }
+      // Lấy số lượng từ input cùng row
+      const countInput = document.querySelector(`.play-count[data-iid="${itemId}"]`);
+      const playTimes = Math.max(1, Math.min(50, parseInt(countInput?.value || '1', 10) || 1));
       if (found.item.pauseBgm) pauseBgmForEffect();
-      const r = await window.bigo.overlayPlay({ overlayId: found.item.overlayId, file: found.item.mediaFile });
-      if (!r.ok) alert('Không phát được: ' + (r.error || 'unknown'));
+      for (let i = 0; i < playTimes; i++) {
+        await window.bigo.overlayPlay({ overlayId: found.item.overlayId, file: found.item.mediaFile });
+      }
+      // Push vào queue để mini queue UI hiện
+      pushQueueManual(found.item, found.group, playTimes);
     } else if (act === 'edit-item') {
       openGiftDialog(found.item, found.group.id);
     } else if (act === 'del-item') {
@@ -736,13 +822,8 @@ els.dlgGiftSave.onclick = async (e) => {
     overlayId: els.dlgOverlay.value,
     pauseBgm: els.dlgPauseBgm ? els.dlgPauseBgm.checked : false,
   };
-  // Tìm/tạo group theo tên
-  if (!Array.isArray(mapping.groups)) mapping.groups = [];
-  let targetGroup = mapping.groups.find(g => g.name === targetGroupName && g.type === 'gift');
-  if (!targetGroup) {
-    targetGroup = { id: uid('g_'), name: targetGroupName, type: 'gift', enabled: true, collapsed: false, bigoId: '', items: [] };
-    mapping.groups.push(targetGroup);
-  }
+  // Tìm/tạo group case-insensitive (NPC = npc = Npc)
+  const targetGroup = findOrCreateGroupCI(targetGroupName, 'gift');
   if (itemId) {
     // Edit: tìm item trong group hiện tại; nếu group đổi, move
     const found = findItemById(itemId);
@@ -926,6 +1007,9 @@ function resetEmbedUi() {
   // Reset popup nếu đang mở
   if (window.bigo.popupResetGifts) window.bigo.popupResetGifts().catch(() => {});
   if (window.bigo.popupResetQueue) window.bigo.popupResetQueue().catch(() => {});
+  // Reset mini queue UI luôn
+  const miniQ = document.getElementById('miniQueue');
+  if (miniQ) miniQ.innerHTML = '<div style="color:#555;text-align:center;padding:14px;font-size:11px">Chưa có hiệu ứng</div>';
 }
 
 // Toggle state: false=disconnected, true=connected
@@ -1015,6 +1099,8 @@ els.btnConnect.onclick = async () => {
 
 els.btnPopupGifts.onclick = () => window.bigo.popupOpenGifts();
 if (els.btnPopupQueue) els.btnPopupQueue.onclick = () => window.bigo.popupOpenQueue();
+const btnPopupQueueRight = document.getElementById('btnPopupQueueRight');
+if (btnPopupQueueRight) btnPopupQueueRight.onclick = () => window.bigo.popupOpenQueue();
 
 els.btnEmbedShow.onclick = async () => {
   const r = await window.bigo.embedShow();
@@ -1318,6 +1404,73 @@ if (els.maxListItems) {
     appSettings.maxListItems = parseInt(els.maxListItems.value, 10) || 200;
     saveAppSettings({ maxListItems: appSettings.maxListItems });
   });
+}
+
+// =================== Quản lý nhóm trong tab Cài đặt ===================
+function renderSettingsGroupsList() {
+  const container = document.getElementById('groupsListSettings');
+  if (!container) return;
+  const groups = mapping.groups || [];
+  if (groups.length === 0) {
+    container.innerHTML = '<div class="gls-empty">Chưa có nhóm nào — gõ tên rồi bấm "+ Tạo nhóm"</div>';
+    return;
+  }
+  container.innerHTML = groups.map(g => `
+    <div class="gls-row" data-gid="${g.id}">
+      <span class="name">${escapeHtml(g.name)}</span>
+      <span class="count">${(g.items || []).length} mục</span>
+      <button class="tiny" data-act="settings-rename" data-gid="${g.id}" title="Đổi tên">✏️</button>
+      <button class="tiny danger" data-act="settings-del" data-gid="${g.id}" title="Xoá nhóm">🗑</button>
+    </div>
+  `).join('');
+  container.querySelectorAll('button[data-act]').forEach(b => {
+    b.onclick = async () => {
+      const gid = b.dataset.gid;
+      const g = findGroupById(gid);
+      if (!g) return;
+      if (b.dataset.act === 'settings-rename') {
+        const newName = prompt('Đổi tên nhóm:', g.name);
+        if (newName && newName.trim()) {
+          // Check trùng case-insensitive
+          const lower = newName.trim().toLowerCase();
+          const dup = mapping.groups.find(x => x.id !== gid && x.name.toLowerCase() === lower);
+          if (dup) { alert(`Đã có nhóm "${dup.name}" - tên trùng (không phân biệt hoa/thường)`); return; }
+          g.name = newName.trim();
+          await persistMapping();
+          renderSettingsGroupsList();
+          renderGiftTable();
+        }
+      } else if (b.dataset.act === 'settings-del') {
+        if (!confirm(`Xoá nhóm "${g.name}" và ${(g.items || []).length} quà bên trong?`)) return;
+        mapping.groups = mapping.groups.filter(x => x.id !== gid);
+        await persistMapping();
+        renderSettingsGroupsList();
+        renderGiftTable();
+      }
+    };
+  });
+}
+
+const btnCreateGroup = document.getElementById('btnCreateGroup');
+const newGroupNameInput = document.getElementById('newGroupName');
+if (btnCreateGroup && newGroupNameInput) {
+  const createGroup = async () => {
+    const name = newGroupNameInput.value.trim();
+    if (!name) { alert('Nhập tên nhóm'); return; }
+    const lower = name.toLowerCase();
+    const exists = (mapping.groups || []).find(g => g.name.toLowerCase() === lower);
+    if (exists) {
+      alert(`Đã có nhóm "${exists.name}" - không phân biệt hoa/thường`);
+      return;
+    }
+    findOrCreateGroupCI(name, 'gift');
+    await persistMapping();
+    newGroupNameInput.value = '';
+    renderSettingsGroupsList();
+    renderGiftTable();
+  };
+  btnCreateGroup.onclick = createGroup;
+  newGroupNameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') createGroup(); });
 }
 
 // Pause BGM khi effect play, resume khi overlay queue rỗng (effect xong).

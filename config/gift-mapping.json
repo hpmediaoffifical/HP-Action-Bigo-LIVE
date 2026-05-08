@@ -10,30 +10,6 @@
       "bigoId": "",
       "items": [
         {
-          "id": "g_mox220symqfo",
-          "matchKeys": [
-            "2463",
-            "Bell",
-            "7750",
-            "Bell-测试68372/60190"
-          ],
-          "alias": "Flower",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": true
-        },
-        {
-          "id": "g_mox4yljml3od",
-          "matchKeys": [
-            "2968",
-            "Blue Flower"
-          ],
-          "alias": "Blue Flower",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": true
-        },
-        {
           "id": "g_mox4yxkelnd9",
           "matchKeys": [
             "1",
@@ -55,16 +31,17 @@
           "pauseBgm": false
         },
         {
-          "id": "g_mox5xbantd65",
+          "id": "g_mox220symqfo",
           "matchKeys": [
-            "5773",
-            "Heart Lock",
-            "7511"
+            "2463",
+            "Bell",
+            "7750",
+            "Bell-测试68372/60190"
           ],
-          "alias": "Heart Lock",
+          "alias": "Flower",
           "mediaFile": "Tơ nhện.webm",
           "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false
+          "pauseBgm": true
         },
         {
           "id": "g_mox7uyyhhk53",
@@ -112,17 +89,6 @@
           "pauseBgm": false
         },
         {
-          "id": "g_mox7x2tvggnl",
-          "matchKeys": [
-            "501947",
-            "Star Food Box"
-          ],
-          "alias": "Star Food Box",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false
-        },
-        {
           "id": "i_mox8dkm1u58u",
           "matchKeys": [
             "504754",
@@ -147,6 +113,50 @@
           "pauseBgm": true
         }
       ]
+    },
+    {
+      "id": "g_mox8ulzfk04f",
+      "name": "NPC",
+      "type": "gift",
+      "enabled": true,
+      "collapsed": false,
+      "bigoId": "",
+      "items": [
+        {
+          "id": "g_mox5xbantd65",
+          "matchKeys": [
+            "5773",
+            "Heart Lock",
+            "7511"
+          ],
+          "alias": "Heart Lock",
+          "mediaFile": "Tơ nhện.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false
+        },
+        {
+          "id": "g_mox4yljml3od",
+          "matchKeys": [
+            "2968",
+            "Blue Flower"
+          ],
+          "alias": "Blue Flower",
+          "mediaFile": "Tơ nhện.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true
+        },
+        {
+          "id": "g_mox7x2tvggnl",
+          "matchKeys": [
+            "501947",
+            "Star Food Box"
+          ],
+          "alias": "Star Food Box",
+          "mediaFile": "Tơ nhện.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false
+        }
+      ]
     }
   ],
   "overlays": [
@@ -154,7 +164,7 @@
       "id": "ov_mowzeyw8m6as",
       "name": "Overlay 1",
       "bgColor": "#00ff00",
-      "opacity": 0.42,
+      "opacity": 0,
       "bounds": {
         "x": 2023,
         "y": 1197,
@@ -162,7 +172,7 @@
         "height": 814
       },
       "alwaysOnTop": true,
-      "clickThrough": false,
+      "clickThrough": true,
       "autoHide": false
     }
   ]

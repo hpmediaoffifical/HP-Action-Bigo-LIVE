@@ -67,8 +67,9 @@ main { padding: 16px 24px; }
 .tab-panel.active { display: block; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-/* Embed tab: layout center + right sticky */
-.embed-layout { display: grid; grid-template-columns: 1fr 360px; gap: 16px; align-items: start; }
+/* Embed tab: layout center + right sticky.
+   User yêu cầu thu gọn Bảng quà bên trái, dành chỗ cho Lịch sử bên phải. */
+.embed-layout { display: grid; grid-template-columns: 380px 1fr; gap: 16px; align-items: start; }
 .embed-center { min-width: 0; }
 .embed-right { position: sticky; top: 16px; }
 .embed-right .panel { margin-bottom: 0; }
@@ -168,6 +169,31 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .master-table .fav-btn { background: transparent; border: 0; color: #555; font-size: 16px; cursor: pointer; padding: 2px; }
 .master-table .fav-btn.on { color: #ffd166; }
 .master-table .fav-btn:hover { color: #ffd166; transform: scale(1.2); }
+
+/* ============ Groups list in Settings tab ============ */
+.groups-list-settings { background: #0f1117; border-radius: 6px; padding: 6px; min-height: 60px; }
+.gls-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-bottom: 1px solid #1c1f28; font-size: 13px; }
+.gls-row:last-child { border-bottom: 0; }
+.gls-row .name { color: #ffe07a; font-weight: 600; flex: 1; }
+.gls-row .count { color: #8a8f9a; font-size: 11px; }
+.gls-empty { color: #555; text-align: center; padding: 16px; font-size: 12px; }
+
+/* Mini queue trên panel phải */
+.mini-queue { background: #0f1117; border-radius: 6px; padding: 6px; max-height: 200px; overflow-y: auto; }
+.mini-queue-row { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center; padding: 4px 6px; border-bottom: 1px solid #1c1f28; font-size: 12px; }
+.mini-queue-row.playing { background: linear-gradient(90deg, rgba(254, 44, 85, 0.18), rgba(255, 138, 61, 0.05)); border-left: 3px solid #fe2c55; padding-left: 3px; }
+.mini-queue-row.done { opacity: 0.55; }
+.mini-queue-row .gift-icon { width: 28px; height: 28px; border-radius: 4px; object-fit: contain; background: #14161c; }
+.mini-queue-row .mini-meta { min-width: 0; }
+.mini-queue-row .who { color: #ffb84a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+.mini-queue-row .what { color: #c9d6ff; font-size: 11px; }
+.mini-queue-row .what b { color: #ffe07a; }
+.mini-queue-row .badge-status.playing { background: #fe2c55; color: #fff; padding: 1px 6px; border-radius: 6px; font-size: 10px; }
+.mini-queue-row .badge-status.queued { background: #2c303d; color: #8ad6ff; padding: 1px 6px; border-radius: 6px; font-size: 10px; }
+.mini-queue-row .badge-status.done { background: transparent; color: #555; }
+
+/* Item row: input số lượng để phát nhanh N lần */
+.group-item .grow-actions .play-count { width: 48px; padding: 2px 4px; font-size: 11px; text-align: center; }
 
 /* ============ Subtab nav (gift/comment) ============ */
 .subtab-row { display: flex; gap: 0; margin-bottom: 10px; border-bottom: 1px solid #262a35; }
