@@ -316,9 +316,20 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .group-item .grow-actions .play-count:focus { outline: 2px solid #ff8a3d; }
 
 /* ============ Received gifts row (right panel) ============ */
-.rcv-row { display: grid; grid-template-columns: 28px 36px 1fr auto auto; gap: 8px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #1c1f28; cursor: default; user-select: none; }
+.rcv-row { display: grid; grid-template-columns: 28px 36px 1fr auto auto auto; gap: 8px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #1c1f28; cursor: default; user-select: none; }
 /* Khi không có avatar → bỏ cột để row gọn hơn */
-.rcv-row.no-avatar { grid-template-columns: 36px 1fr auto auto; }
+.rcv-row.no-avatar { grid-template-columns: 36px 1fr auto auto auto; }
+.rcv-row .rcv-beans {
+  background: linear-gradient(135deg, #6968fa, #8ad6ff);
+  color: #fff; padding: 3px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+}
+.rcv-row .rcv-beans-unknown { background: #1c1f28; color: #555; }
+.rcv-summary {
+  display: flex; gap: 14px; padding: 8px 10px; background: #0f1117;
+  border-radius: 6px; margin-bottom: 6px; font-size: 12px; color: #8a8f9a;
+}
+.rcv-summary b { color: #ffd166; font-weight: 700; margin-left: 2px; }
 .rcv-row:hover { background: #20242f; }
 .rcv-row .rcv-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #0f1117; }
 .rcv-row .rcv-avatar-empty { width: 28px; height: 28px; border-radius: 50%; background: #1c1f28; }
@@ -479,12 +490,21 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   border-color: #d23046;
   opacity: 1;
 }
-/* Đảm bảo row là relative để absolute child neo đúng */
-.mini-queue-row, .queue-row { position: relative; }
-/* Meta chiếm flex 1 — đẩy về phía trái sau gift icon */
-.mini-queue-row .mini-meta, .queue-row .meta { flex: 1; min-width: 0; }
-/* Padding-right để tránh nội dung chạy đè lên X button */
-.mini-queue-row, .queue-row { padding-right: 30px; }
+/* Row layout — flex left-aligned, X delete tuyệt đối góc phải */
+.mini-queue-row, .queue-row {
+  position: relative;
+  padding-right: 36px; /* chừa chỗ cho X button */
+  text-align: left;
+}
+/* Meta CHIẾM TRÁI sát sau icons (flex 1 fill space). Force text-align left. */
+.mini-queue-row .mini-meta, .queue-row .meta {
+  flex: 1; min-width: 0;
+  text-align: left;
+  margin-right: auto; /* đẩy mọi sibling khác sang phải nếu có */
+}
+.mini-queue-row .mini-meta > *, .queue-row .meta > * { text-align: left; }
+/* .right block (count + diamond) co lại để không chiếm hết không gian giữa */
+.queue-row .right { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 
 .prio-badge {
   background: linear-gradient(135deg, #fe2c55, #ff8a3d);

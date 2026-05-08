@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('bigo', {
   overlayApplyConfig: (cfg) => ipcRenderer.invoke('overlay:apply-config', cfg),
   overlayDelete: (overlayId) => ipcRenderer.invoke('overlay:delete', overlayId),
   overlayPlay: (opts) => ipcRenderer.invoke('overlay:play', opts),
+  overlayStopEffect: (overlayId) => ipcRenderer.invoke('overlay:stop-effect', overlayId),
 
   // Event subscriptions
   onEvent: (cb) => ipcRenderer.on('bigo:event', (_e, ev) => cb(ev)),

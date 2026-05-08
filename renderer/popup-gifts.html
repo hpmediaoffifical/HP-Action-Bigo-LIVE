@@ -65,6 +65,17 @@
         : `<div class="rcv-icon-empty"></div>`;
       const lvlBadge = g.level
         ? `<span class="lvl tier-${levelTier(g.level)}" style="margin-right:4px">Lv.${g.level}</span>` : '';
+      // 💎 KC tổng (đơn giá × số lượng) — tooltip chi tiết
+      let beansHtml;
+      if (g.diamond != null) {
+        const unit = g.count > 0 ? Math.round(g.diamond / g.count) : g.diamond;
+        const tooltip = g.count > 1
+          ? `${unit.toLocaleString('en-US')} KC × ${g.count} = ${g.diamond.toLocaleString('en-US')} KC`
+          : `${g.diamond.toLocaleString('en-US')} KC`;
+        beansHtml = `<span class="rcv-beans" title="${escapeHtml(tooltip)}">💎 ${g.diamond.toLocaleString('en-US')}</span>`;
+      } else {
+        beansHtml = `<span class="rcv-beans rcv-beans-unknown" title="Chưa có dữ liệu KC">💎 ?</span>`;
+      }
       return `<div class="rcv-row ${g.avatar ? '' : 'no-avatar'}" data-gid="${escapeHtml(g.id)}">
         ${avatar}
         ${giftIcon}
@@ -73,6 +84,7 @@
           <div class="rcv-gift">${escapeHtml(g.gift_name || '?')}${g.gift_id != null ? ` <span style="color:#666">#${g.gift_id}</span>` : ''}</div>
         </div>
         <span class="rcv-count">×${g.count || 1}</span>
+        ${beansHtml}
         <button class="rcv-del" data-del="${escapeHtml(g.id)}" title="Xoá">🗑</button>
       </div>`;
     }

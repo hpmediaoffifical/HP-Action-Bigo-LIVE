@@ -949,6 +949,15 @@ ipcMain.on('overlay:queue-empty', (e) => {
   }
 });
 
+// Stop hiệu ứng đang playing trên overlay (user xoá item khỏi DSHT)
+ipcMain.handle('overlay:stop-effect', (_e, overlayId) => {
+  const ov = overlayManager?.overlays?.get(overlayId);
+  if (ov && ov.win && !ov.win.isDestroyed()) {
+    try { ov.win.webContents.send('overlay:stop'); } catch {}
+  }
+  return { ok: true };
+});
+
 ipcMain.handle('overlay:play', (_e, { overlayId, file, fileUrl: rawUrl }) => {
   const cfg = mapping.overlays.find(o => o.id === overlayId);
   if (!cfg) return { ok: false };

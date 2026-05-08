@@ -101,3 +101,12 @@ ipcRenderer.on('overlay:play', (_e, url) => {
   queue.push(url);
   if (!playing) playNext();
 });
+// User xoá item playing trong DSHT → main app gửi stop → overlay tắt ngay video/audio + clear queue.
+ipcRenderer.on('overlay:stop', () => {
+  queue.length = 0;
+  playing = false;
+  clearPlayer();
+  clearAudio();
+  // Báo main → renderer chính advance UI (giống 'ended') để tránh state mắc kẹt.
+  try { ipcRenderer.send('overlay:queue-empty'); } catch {}
+});

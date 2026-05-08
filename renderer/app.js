@@ -265,12 +265,18 @@ function removeQueueItemById(id) {
   if (idx === -1) return;
   const removed = queueItems[idx];
   queueItems.splice(idx, 1);
-  // Nếu xoá item đang playing → mark playing cho item tiếp theo
+  // QUAN TRỌNG: Nếu xoá item đang playing → STOP effect ở overlay window (tránh
+  // hiệu ứng chạy ẩn dù đã xoá khỏi DSHT). Overlay tự fire 'queue-empty' để
+  // resume BGM nếu cần.
+  if (removed.status === 'playing' && removed.overlayId && window.bigo.overlayStopEffect) {
+    window.bigo.overlayStopEffect(removed.overlayId).catch(() => {});
+  }
+  // Mark playing cho item tiếp theo (nếu có)
   if (removed.status === 'playing' && queueItems.length > 0) {
     const nextQ = queueItems.find(q => q.status === 'queued');
     if (nextQ) nextQ.status = 'playing';
   }
-  // Decrement counter 🎵 effects (bộ đếm phải giảm khi danh sách giảm)
+  // Decrement counter 🎵 effects
   sessionStats.effects = Math.max(0, sessionStats.effects - 1);
   updateConnectStats();
   renderQueue(); renderMiniQueue(); updateQueueStats();
@@ -278,7 +284,15 @@ function removeQueueItemById(id) {
 }
 
 function clearAllQueue() {
-  // Decrement counter 🎵 effects theo số item bị xoá
+  // Stop tất cả overlay đang playing TRƯỚC khi clear (tránh chạy ẩn)
+  const playingOverlays = new Set();
+  for (const q of queueItems) {
+    if (q.status === 'playing' && q.overlayId) playingOverlays.add(q.overlayId);
+  }
+  for (const ovId of playingOverlays) {
+    if (window.bigo.overlayStopEffect) window.bigo.overlayStopEffect(ovId).catch(() => {});
+  }
+  // Decrement counter
   sessionStats.effects = Math.max(0, sessionStats.effects - queueItems.length);
   updateConnectStats();
   queueItems.length = 0;
@@ -1607,7 +1621,17 @@ function renderReceivedGifts() {
     cont.innerHTML = '';
     return;
   }
-  cont.innerHTML = receivedGifts.map(g => {
+  // Tổng quan: tổng KC + số quà + số user (hiển thị header trên list)
+  const totalDiamond = receivedGifts.reduce((s, g) => s + (g.diamond || 0), 0);
+  const totalCount = receivedGifts.reduce((s, g) => s + (g.count || 0), 0);
+  const uniqueUsers = new Set(receivedGifts.map(g => g.user)).size;
+  cont.innerHTML = `
+    <div class="rcv-summary">
+      <span title="Tổng KC nhận được">💎 <b>${totalDiamond.toLocaleString('en-US')}</b></span>
+      <span title="Tổng số quà">🎁 <b>${totalCount}</b></span>
+      <span title="Số user khác nhau">👤 <b>${uniqueUsers}</b></span>
+    </div>
+  ` + receivedGifts.map(g => {
     const iconHtml = g.gift_icon
       ? `<img class="rcv-icon" src="${escapeHtml(g.gift_icon)}" loading="lazy" />`
       : '<div class="rcv-icon-empty"></div>';
@@ -1615,6 +1639,17 @@ function renderReceivedGifts() {
     const avUrl = resolveAvatarForUser(g.user, g.avatar);
     const avHtml = avUrl ? `<img class="rcv-avatar" src="${escapeHtml(avUrl)}" loading="lazy" />` : '';
     const lvlBadge = g.level ? `<span class="lvl tier-${levelTier(g.level)}" style="margin-right:4px">Lv.${g.level}</span>` : '';
+    // Tổng KC = (đơn giá × số lượng). Tooltip show breakdown nếu có data.
+    let beansHtml;
+    if (g.diamond != null) {
+      const unit = g.count > 0 ? Math.round(g.diamond / g.count) : g.diamond;
+      const tooltip = g.count > 1
+        ? `${unit.toLocaleString('en-US')} KC × ${g.count} = ${g.diamond.toLocaleString('en-US')} KC`
+        : `${g.diamond.toLocaleString('en-US')} KC`;
+      beansHtml = `<span class="rcv-beans" title="${escapeHtml(tooltip)}">💎 ${g.diamond.toLocaleString('en-US')}</span>`;
+    } else {
+      beansHtml = `<span class="rcv-beans rcv-beans-unknown" title="Chưa có dữ liệu KC trong master">💎 ?</span>`;
+    }
     return `<div class="rcv-row ${avUrl ? '' : 'no-avatar'}" data-gid="${g.id}">
       ${avHtml}
       ${iconHtml}
@@ -1623,6 +1658,7 @@ function renderReceivedGifts() {
         <div class="rcv-gift">${escapeHtml(g.gift_name)}${g.gift_id != null ? ` <span style="color:#666">#${g.gift_id}</span>` : ''}</div>
       </div>
       <span class="rcv-count">×${g.count}</span>
+      ${beansHtml}
       <button class="rcv-del" data-gid="${g.id}" title="Xoá">🗑</button>
     </div>`;
   }).join('');

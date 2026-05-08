@@ -48,6 +48,19 @@
           "pauseBgm": false,
           "preEffect": true,
           "priority": 0
+        },
+        {
+          "id": "i_moxf76ewyq6n",
+          "matchKeys": [
+            "504754",
+            "Galaxy Ring"
+          ],
+          "alias": "Galaxy Ring",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/06. Ném Gạch.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": false,
+          "priority": 0
         }
       ],
       "isCommon": true
@@ -124,12 +137,16 @@
             "Fragrant",
             "503665",
             "وردة العائلة",
-            "9"
+            "9",
+            "3355",
+            "7340"
           ],
           "alias": "Flower",
-          "mediaFile": "Tơ nhện.webm",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/Tơ nhện.webm",
           "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false
+          "pauseBgm": false,
+          "preEffect": false,
+          "priority": 0
         }
       ]
     },
