@@ -4,38 +4,22 @@ html, body {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  /* Default rgba(0,255,0,1) - sẽ được overlay.js override theo config */
   background-color: rgba(0, 255, 0, 1);
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
 html { background: transparent; }
 
-#dragHandle {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  height: 28px;
+/* Drag toàn body khi không khoá: user kéo bất cứ chỗ nào trên overlay đều di chuyển được window. */
+body {
   -webkit-app-region: drag;
-  background: rgba(0, 0, 0, 0.55);
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 11px;
-  text-align: center;
-  line-height: 28px;
-  z-index: 10;
   cursor: move;
-  user-select: none;
-  letter-spacing: 0.05em;
-  /* Luôn nhìn thấy được — không auto-hide để user dễ kéo */
-  opacity: 0.65;
-  transition: opacity 0.15s ease;
-}
-#dragHandle:hover {
-  opacity: 1;
-  background: rgba(0, 0, 0, 0.75);
 }
 
-/* Video không nhận event để không che drag handle */
-#player {
-  pointer-events: none;
+/* Khi click-through (locked): không drag, không có cursor di chuyển.
+   Window cũng được setIgnoreMouseEvents nên click xuyên qua. */
+body.locked {
+  -webkit-app-region: no-drag;
+  cursor: default;
 }
 
 #stage {
@@ -51,6 +35,8 @@ html { background: transparent; }
   height: 100%;
   object-fit: contain;
   background: transparent;
+  /* Video không nuốt mouse event - drag từ vùng video vẫn move window. */
+  pointer-events: none;
 }
 
 #audio { display: none; }
