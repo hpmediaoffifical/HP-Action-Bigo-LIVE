@@ -154,7 +154,13 @@ function scanRoomMeta() {
 
 function attach() {
   if (!document.body) return setTimeout(attach, 200);
-  send('embed:dom-attached', { url: location.href, isMain: IS_MAIN, ts: Date.now() });
+  // Quan trọng: nếu preload đang chạy trong sub-frame (iframe của Bigo),
+  // SKIP scraping để tránh duplicate. Main frame đã quét toàn bộ DOM (kể cả iframe same-origin).
+  if (!IS_MAIN) {
+    send('embed:dom-attached', { url: location.href, isMain: false, skipped: true, ts: Date.now() });
+    return;
+  }
+  send('embed:dom-attached', { url: location.href, isMain: true, ts: Date.now() });
 
   let lastMeta = '';
   const tick = () => {
