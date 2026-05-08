@@ -183,11 +183,38 @@ function enrichGiftEvent(ev) {
 }
 
 // =================== App ===================
+function loadSettings() { return loadJson(CONFIG_PATH, { env: 'prod', accessToken: '', gameId: '', openid: '', bigoId: '', windowBounds: {} }); }
+function saveSettings(s) { saveJson(CONFIG_PATH, s); }
+function saveWindowBounds(key, bounds) {
+  const s = loadSettings();
+  if (!s.windowBounds) s.windowBounds = {};
+  s.windowBounds[key] = bounds;
+  saveSettings(s);
+}
+function getSavedBounds(key, fallback) {
+  const s = loadSettings();
+  return (s.windowBounds && s.windowBounds[key]) || fallback;
+}
+function trackWindowBounds(window, key) {
+  if (!window) return;
+  const save = () => {
+    if (window.isDestroyed()) return;
+    try { saveWindowBounds(key, window.getBounds()); } catch {}
+  };
+  let timer = null;
+  const debouncedSave = () => { clearTimeout(timer); timer = setTimeout(save, 400); };
+  window.on('move', debouncedSave);
+  window.on('resize', debouncedSave);
+  window.on('close', save);
+}
+
 function createWindow() {
+  const saved = getSavedBounds('main', { width: 1280, height: 860 });
   win = new BrowserWindow({
-    width: 1280,
-    height: 860,
-    title: 'BIGO Action',
+    width: saved.width || 1280,
+    height: saved.height || 860,
+    x: saved.x, y: saved.y,
+    title: 'HP Action - BIGO Live',
     icon: APP_ICON || undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -197,8 +224,8 @@ function createWindow() {
   });
   win.setMenuBarVisibility(false);
   win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
-  // Null out ref khi window closed - tránh gọi method trên destroyed object
   win.on('closed', () => { win = null; });
+  trackWindowBounds(win, 'main');
   if (process.argv.includes('--dev')) win.webContents.openDevTools({ mode: 'detach' });
 }
 
@@ -456,8 +483,10 @@ ipcMain.on('gifts:start-drag', (event, typeid) => {
 let queuePopup = null;
 function ensureQueuePopup() {
   if (queuePopup && !queuePopup.isDestroyed()) return queuePopup;
+  const saved = getSavedBounds('popupQueue', { width: 420, height: 760 });
   queuePopup = new BrowserWindow({
-    width: 420, height: 760,
+    width: saved.width || 420, height: saved.height || 760,
+    x: saved.x, y: saved.y,
     title: '🎬 Hàng đợi hiệu ứng',
     icon: APP_ICON || undefined,
     parent: win,
@@ -466,6 +495,7 @@ function ensureQueuePopup() {
   queuePopup.setMenuBarVisibility(false);
   queuePopup.loadFile(path.join(ROOT, 'renderer', 'popup-queue.html'));
   queuePopup.on('closed', () => { queuePopup = null; });
+  trackWindowBounds(queuePopup, 'popupQueue');
   return queuePopup;
 }
 ipcMain.handle('popup:open-queue', () => {
@@ -491,9 +521,11 @@ let giftsPopup = null;
 
 function ensureGiftsPopup() {
   if (giftsPopup && !giftsPopup.isDestroyed()) return giftsPopup;
+  const saved = getSavedBounds('popupGifts', { width: 380, height: 720 });
   giftsPopup = new BrowserWindow({
-    width: 380,
-    height: 720,
+    width: saved.width || 380,
+    height: saved.height || 720,
+    x: saved.x, y: saved.y,
     title: '🎁 Lịch sử quà',
     icon: APP_ICON || undefined,
     parent: win,
@@ -505,6 +537,7 @@ function ensureGiftsPopup() {
   giftsPopup.setMenuBarVisibility(false);
   giftsPopup.loadFile(path.join(ROOT, 'renderer', 'popup-gifts.html'));
   giftsPopup.on('closed', () => { giftsPopup = null; });
+  trackWindowBounds(giftsPopup, 'popupGifts');
   return giftsPopup;
 }
 

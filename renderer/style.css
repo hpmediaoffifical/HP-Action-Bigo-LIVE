@@ -165,6 +165,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .master-table .id { color: #8a8f9a; font-family: 'Consolas', monospace; font-size: 11px; }
 .master-table .price { color: #ffd166; font-size: 11px; }
 .master-table .name { color: #c9d6ff; }
+.master-table .fav-btn { background: transparent; border: 0; color: #555; font-size: 16px; cursor: pointer; padding: 2px; }
+.master-table .fav-btn.on { color: #ffd166; }
+.master-table .fav-btn:hover { color: #ffd166; transform: scale(1.2); }
 
 /* ============ Effect Queue ============ */
 .queue-stats { display: flex; gap: 16px; font-size: 12px; color: #8a8f9a; }

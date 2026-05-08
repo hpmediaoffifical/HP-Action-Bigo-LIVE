@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <title>BIGO Action</title>
+  <title>HP Action - BIGO Live</title>
   <link rel="icon" type="image/png" href="../logo-hp.png" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -16,12 +16,11 @@
       <button class="tab sidebar-tab" data-tab="queue" title="Hàng đợi hiệu ứng">🎬</button>
       <button class="tab sidebar-tab" data-tab="gifts" title="Bảng quà">🎁</button>
       <button class="tab sidebar-tab" data-tab="overlays" title="Overlay">🪟</button>
-      <button class="tab sidebar-tab" data-tab="oauth" title="Open API (OAuth)">🔐</button>
     </aside>
 
     <div class="main-content">
   <header>
-    <h1>BIGO Action <span class="badge" id="status">disconnected</span></h1>
+    <h1>HP Action - BIGO Live <span class="badge" id="status">disconnected</span></h1>
     <div class="hint">Bigo gift listener · Web Embed (mọi BIGO ID đang live)</div>
   </header>
 
@@ -114,6 +113,7 @@
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width:54px">Icon</th>
                 <th style="min-width:130px">Match keys</th>
                 <th>Alias</th>
                 <th>Nhóm</th>
@@ -164,39 +164,6 @@
       </div>
     </section>
 
-    <!-- =================== TAB: OPEN API =================== -->
-    <section class="tab-panel" data-tab="oauth">
-      <div class="panel">
-        <h2>Bigo Open API (cần streamer authorize app)</h2>
-        <div class="row">
-          <label>Môi trường
-            <select id="env">
-              <option value="prod">prod</option>
-              <option value="gray">gray</option>
-              <option value="test">test</option>
-            </select>
-          </label>
-          <label>BIGO ID hiển thị<input id="bigoId" /></label>
-        </div>
-        <div class="row">
-          <label>openid streamer<input id="openid" /></label>
-          <label>game_id<input id="gameId" /></label>
-        </div>
-        <div class="row">
-          <label>access_token<input id="accessToken" /></label>
-        </div>
-        <div class="actions">
-          <button id="btnSave">💾 Lưu</button>
-          <button id="btnStart" class="primary">▶ Kết nối Open API</button>
-          <button id="btnStop" disabled>⏹ Dừng</button>
-          <button id="btnTestHeart">❤ Test heart</button>
-          <button id="btnTestMsg">💬 Test msg</button>
-        </div>
-        <h3>Sự kiện Open API</h3>
-        <div id="events" class="events"></div>
-      </div>
-    </section>
-
   </main>
     </div>
   </div>
@@ -211,7 +178,7 @@
         </label>
       </div>
       <div class="form-row" style="margin-bottom:6px">
-        <label style="flex:2">🔍 Lọc trong master (2410 quà)
+        <label style="flex:2">🔍 Lọc trong master (<span id="dlgMasterTotal">2410</span> quà)
           <input id="dlgMasterFilter" placeholder="gõ tên hoặc mã quà..." />
         </label>
         <label>Sắp xếp
@@ -225,10 +192,18 @@
           </select>
         </label>
       </div>
+      <div class="form-row" style="margin-bottom:6px; align-items:center">
+        <label class="checkbox-row" style="font-size:12px">
+          <input type="checkbox" id="dlgMasterVnOnly" /> 🇻🇳 Chỉ quà Việt Nam (heuristic)
+        </label>
+        <label class="checkbox-row" style="font-size:12px">
+          <input type="checkbox" id="dlgMasterFavOnly" /> ⭐ Chỉ yêu thích
+        </label>
+      </div>
       <div class="master-table-wrap">
         <table class="master-table">
           <thead>
-            <tr><th style="width:40px">Icon</th><th style="width:80px">Mã</th><th style="width:80px">KC</th><th>Tên quà</th></tr>
+            <tr><th style="width:40px">Icon</th><th style="width:80px">Mã</th><th style="width:80px">KC</th><th>Tên quà</th><th style="width:32px">⭐</th></tr>
           </thead>
           <tbody id="dlgMasterTableBody"></tbody>
         </table>

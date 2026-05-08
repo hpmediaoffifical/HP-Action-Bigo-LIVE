@@ -154,11 +154,7 @@ const els = {
   qStatGifts: $('qStatGifts'), qStatDiamond: $('qStatDiamond'), qStatUsers: $('qStatUsers'),
   qSizeFont: $('qSizeFont'), qSizeFontVal: $('qSizeFontVal'),
   qSizeIcon: $('qSizeIcon'), qSizeIconVal: $('qSizeIconVal'),
-  // Open API tab
-  env: $('env'), bigoId: $('bigoId'), openid: $('openid'), gameId: $('gameId'), accessToken: $('accessToken'),
-  btnSave: $('btnSave'), btnStart: $('btnStart'), btnStop: $('btnStop'),
-  btnTestHeart: $('btnTestHeart'), btnTestMsg: $('btnTestMsg'),
-  events: $('events'),
+  // (OAuth tab đã được xoá - các els bên dưới có thể null)
   // Gifts tab
   giftTableBody: $('giftTableBody'), btnAddGift: $('btnAddGift'), btnTestGift: $('btnTestGift'),
   iconCacheStatus: $('iconCacheStatus'), btnDownloadIcons: $('btnDownloadIcons'), iconProgress: $('iconProgress'),
@@ -172,6 +168,8 @@ const els = {
   dlgPickFile: $('dlgPickFile'), dlgOpenFolder: $('dlgOpenFolder'),
   dlgMasterFilter: $('dlgMasterFilter'), dlgMasterSort: $('dlgMasterSort'),
   dlgMasterTableBody: $('dlgMasterTableBody'), dlgMasterCount: $('dlgMasterCount'),
+  dlgMasterVnOnly: $('dlgMasterVnOnly'), dlgMasterFavOnly: $('dlgMasterFavOnly'),
+  dlgMasterTotal: $('dlgMasterTotal'),
   // Overlay modal
   overlayDialog: $('overlayDialog'), overlayDialogTitle: $('overlayDialogTitle'),
   ovName: $('ovName'), ovBgColor: $('ovBgColor'), ovOpacity: $('ovOpacity'), ovOpacityVal: $('ovOpacityVal'),
@@ -215,12 +213,7 @@ document.querySelectorAll('.tab').forEach(t => {
 // =================== Init ===================
 async function init() {
   const s = await window.bigo.settingsLoad();
-  els.env.value = s.env || 'prod';
-  els.bigoId.value = s.bigoId || '';
   els.embedBigoId.value = s.bigoId || '';
-  els.openid.value = s.openid || '';
-  els.gameId.value = s.gameId || '';
-  els.accessToken.value = s.accessToken || '';
 
   mapping = await window.bigo.mappingLoad();
   await reloadEffects();
@@ -229,6 +222,8 @@ async function init() {
   refreshIconCacheStatus();
   loadQueueSettings();
   renderQueue();
+  // Pre-load master để gift table có icon ngay (background)
+  ensureMasterLoaded().catch(() => {});
 }
 
 async function refreshIconCacheStatus() {
@@ -285,14 +280,37 @@ async function persistMapping() {
 }
 
 // =================== Gift Table ===================
+// Tìm icon URL master theo matchKeys (ưu tiên typeid là số)
+function getGiftIcon(g) {
+  if (!masterFullList) return '';
+  for (const k of (g.matchKeys || [])) {
+    const id = parseInt(k, 10);
+    if (!isNaN(id)) {
+      const m = masterFullList.find(x => x.typeid === id);
+      if (m && (m.localIcon || m.img_url)) return m.localIcon || m.img_url;
+    }
+  }
+  for (const k of (g.matchKeys || [])) {
+    const lower = String(k).toLowerCase();
+    const m = masterFullList.find(x => String(x.name || '').toLowerCase() === lower);
+    if (m && (m.localIcon || m.img_url)) return m.localIcon || m.img_url;
+  }
+  return '';
+}
+
 function renderGiftTable() {
   const overlayMap = new Map(mapping.overlays.map(o => [o.id, o]));
   if (mapping.gifts.length === 0) {
-    els.giftTableBody.innerHTML = '<tr><td colspan="6" style="color:#555;text-align:center;padding:20px">Chưa có quà nào — bấm "+ Thêm quà"</td></tr>';
+    els.giftTableBody.innerHTML = '<tr><td colspan="7" style="color:#555;text-align:center;padding:20px">Chưa có quà nào — bấm "+ Thêm quà"</td></tr>';
   } else {
     els.giftTableBody.innerHTML = mapping.gifts.map(g => {
       const ov = overlayMap.get(g.overlayId);
+      const iconUrl = getGiftIcon(g);
+      const iconCell = iconUrl
+        ? `<img src="${escapeHtml(iconUrl)}" style="width:40px;height:40px;border-radius:6px;object-fit:contain;background:#0f1117" loading="lazy" />`
+        : '<div style="width:40px;height:40px;border-radius:6px;background:#1c1f28"></div>';
       return `<tr data-id="${g.id}">
+        <td>${iconCell}</td>
         <td>${g.matchKeys.map(k => `<code>${escapeHtml(k)}</code>`).join(' ')}</td>
         <td>${escapeHtml(g.alias || '')}</td>
         <td>${escapeHtml(g.group || '')}</td>
@@ -336,6 +354,8 @@ let masterFullList = null;
 async function ensureMasterLoaded() {
   if (masterFullList) return;
   masterFullList = await window.bigo.giftsMasterList();
+  // Sau khi master load, re-render gift table để show icons
+  renderGiftTable();
 }
 
 function sortMasterArr(arr, key) {
@@ -351,14 +371,36 @@ function sortMasterArr(arr, key) {
   }
 }
 
+// Heuristic detect quà Việt Nam: tên chứa từ khoá VN hoặc dấu Việt
+const VN_KEYWORDS = /việt|vietnam|tết|sài\s?gòn|hà\s?nội|đà\s?nẵng|phở|áo\s?dài|hoa\s?sen|trống|nón\s?lá|VN|hp\s|HPMedia/i;
+const VN_ACCENTS = /[àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
+function isVnGift(g) {
+  const n = String(g.name || '');
+  return VN_KEYWORDS.test(n) || VN_ACCENTS.test(n);
+}
+
+// Favorites lưu local
+function loadFavorites() {
+  try { return new Set(JSON.parse(localStorage.getItem('giftFavorites') || '[]')); } catch { return new Set(); }
+}
+function saveFavorites(set) {
+  localStorage.setItem('giftFavorites', JSON.stringify([...set]));
+}
+let giftFavorites = loadFavorites();
+
 function renderMasterTable() {
   if (!masterFullList) {
     els.dlgMasterCount.textContent = 'đang tải...';
     return;
   }
+  if (els.dlgMasterTotal) els.dlgMasterTotal.textContent = masterFullList.length;
   const filter = els.dlgMasterFilter.value.toLowerCase().trim();
   const sortKey = els.dlgMasterSort.value;
+  const vnOnly = els.dlgMasterVnOnly && els.dlgMasterVnOnly.checked;
+  const favOnly = els.dlgMasterFavOnly && els.dlgMasterFavOnly.checked;
   let arr = masterFullList.slice();
+  if (favOnly) arr = arr.filter(g => giftFavorites.has(g.typeid));
+  if (vnOnly) arr = arr.filter(isVnGift);
   if (filter) {
     arr = arr.filter(g => {
       const n = String(g.name || '').toLowerCase();
@@ -368,25 +410,27 @@ function renderMasterTable() {
   }
   sortMasterArr(arr, sortKey);
   els.dlgMasterCount.textContent = `${arr.length}/${masterFullList.length} quà`;
-  // Limit render to 500 first to avoid lag, but show count
   const renderLimit = 500;
   const display = arr.slice(0, renderLimit);
   els.dlgMasterTableBody.innerHTML = display.map(g => {
     const src = g.localIcon || g.img_url || '';
+    const isFav = giftFavorites.has(g.typeid);
     return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
       <td><img src="${escapeHtml(src)}" loading="lazy" draggable="true" data-typeid="${g.typeid}" title="Kéo ra desktop = ${g.typeid}.png" /></td>
       <td><span class="id">${g.typeid}</span></td>
       <td><span class="price">💎 ${g.diamonds ?? '?'}</span></td>
       <td><span class="name">${escapeHtml(g.name)}</span></td>
+      <td><button class="fav-btn ${isFav ? 'on' : ''}" data-fav="${g.typeid}" title="Đánh dấu yêu thích">${isFav ? '⭐' : '☆'}</button></td>
     </tr>`;
   }).join('');
   if (arr.length > renderLimit) {
     els.dlgMasterCount.textContent += ` · hiển thị ${renderLimit} đầu — gõ filter để thu hẹp`;
   }
-  // Click row -> add to matchKeys
+  // Click row -> add to matchKeys (skip nếu click vào fav button hoặc img)
   els.dlgMasterTableBody.querySelectorAll('tr').forEach(row => {
     row.onclick = (e) => {
       if (e.target.tagName === 'IMG') return;
+      if (e.target.classList && e.target.classList.contains('fav-btn')) return;
       const name = row.dataset.name;
       const typeid = row.dataset.typeid;
       const cur = els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean);
@@ -396,7 +440,16 @@ function renderMasterTable() {
       if (!els.dlgAlias.value) els.dlgAlias.value = name;
     };
   });
-  // Drag icon ra desktop
+  els.dlgMasterTableBody.querySelectorAll('.fav-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.fav, 10);
+      if (giftFavorites.has(id)) giftFavorites.delete(id);
+      else giftFavorites.add(id);
+      saveFavorites(giftFavorites);
+      renderMasterTable();
+    };
+  });
   els.dlgMasterTableBody.querySelectorAll('img[draggable]').forEach(img => {
     img.ondragstart = (e) => {
       e.preventDefault();
@@ -412,6 +465,8 @@ function scheduleRenderMaster() {
 }
 els.dlgMasterFilter.addEventListener('input', scheduleRenderMaster);
 els.dlgMasterSort.addEventListener('change', renderMasterTable);
+if (els.dlgMasterVnOnly) els.dlgMasterVnOnly.addEventListener('change', renderMasterTable);
+if (els.dlgMasterFavOnly) els.dlgMasterFavOnly.addEventListener('change', renderMasterTable);
 
 async function openGiftDialog(gift = null) {
   els.giftDialogTitle.textContent = gift ? 'Sửa quà' : 'Thêm quà';
@@ -845,64 +900,7 @@ function renderEmbedEvent(ev) {
   if (ev.kind === 'scrape-error') appendLog(`scrape error: ${ev.msg}`);
 }
 
-// =================== Open API tab ===================
-els.btnSave.onclick = async () => {
-  await window.bigo.settingsSave({
-    env: els.env.value, bigoId: els.bigoId.value.trim(),
-    openid: els.openid.value.trim(), gameId: els.gameId.value.trim(),
-    accessToken: els.accessToken.value.trim(),
-  });
-  appendLog('settings saved');
-};
-els.btnStart.onclick = async () => {
-  await els.btnSave.onclick();
-  els.btnStart.disabled = true;
-  els.status.textContent = 'connecting...';
-  const res = await window.bigo.start({
-    env: els.env.value, accessToken: els.accessToken.value.trim(),
-    gameId: els.gameId.value.trim(), openid: els.openid.value.trim(),
-  });
-  if (res.ok) {
-    els.status.textContent = `OAuth · sess=${res.gameSess.slice(0, 8)}`;
-    els.status.classList.add('on');
-    els.btnStop.disabled = false;
-  } else {
-    els.status.textContent = 'error';
-    els.btnStart.disabled = false;
-    appendLog(`OAuth start failed: ${res.error}`);
-    alert(`Không kết nối được: ${res.error}`);
-  }
-};
-els.btnStop.onclick = async () => {
-  await window.bigo.stop();
-  els.status.textContent = 'disconnected';
-  els.status.classList.remove('on');
-  els.btnStop.disabled = true;
-  els.btnStart.disabled = false;
-};
-els.btnTestHeart.onclick = () => window.bigo.testEvent('heart');
-els.btnTestMsg.onclick = () => window.bigo.testEvent('msg');
-
-function handleOpenApiEvent(ev) {
-  const div = document.createElement('div');
-  div.className = `event ${ev.type || 'msg'}`;
-  let line;
-  if (ev.type === 'gift') {
-    line = `🎁 [${ev.nick_name || ev.user}] ${ev.gift_name || ev.gift_id} ×${ev.gift_count || 1}`;
-    const matched = findGiftByName(ev.gift_name);
-    if (matched && matched.mediaFile && matched.overlayId) {
-      window.bigo.overlayPlay({ overlayId: matched.overlayId, file: matched.mediaFile });
-    }
-  } else if (ev.type === 'heart') line = `❤ [${ev.nick_name || ev.user}] +${ev.count || 1}`;
-  else if (ev.type === 'msg') line = `💬 [${ev.nick_name || ev.user}] ${ev.content || ''}`;
-  else line = JSON.stringify(ev);
-  div.textContent = `${new Date().toLocaleTimeString()} ${line}`;
-  els.events.prepend(div);
-  while (els.events.children.length > 200) els.events.lastChild.remove();
-}
-
 // =================== Wire up ===================
-window.bigo.onEvent(handleOpenApiEvent);
 window.bigo.onLog(appendLog);
 window.bigo.onEmbedEvent(renderEmbedEvent);
 
