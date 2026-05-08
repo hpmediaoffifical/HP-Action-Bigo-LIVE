@@ -13,6 +13,14 @@
     .pop-controls { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; font-size: 11px; color: #8a8f9a; flex-wrap: wrap; }
     #popQueue { background: #0f1117; border-radius: 6px; padding: 6px; max-height: calc(100vh - 140px); overflow-y: auto;
                 --queue-font: 14px; --queue-icon: 40px; }
+    /* Apply CSS vars vào qrow-* classes — slider điều chỉnh font/icon size */
+    #popQueue .qrow-avatar { width: var(--queue-icon, 36px) !important; height: var(--queue-icon, 36px) !important; }
+    #popQueue .qrow-gift-icon, #popQueue .qrow-gift-icon-empty {
+      width: var(--queue-icon, 32px) !important; height: var(--queue-icon, 32px) !important;
+    }
+    #popQueue .qrow-user { font-size: var(--queue-font, 14px) !important; }
+    #popQueue .qrow-effect { font-size: calc(var(--queue-font, 14px) - 2px) !important; }
+    #popQueue .cnt-inline, #popQueue .beans-inline { font-size: calc(var(--queue-font, 14px) - 3px); }
     .pop-stt { color: #8a8f9a; font-weight: 700; min-width: 22px; display: inline-block; text-align: center;
                background: #1c1f28; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 6px; }
     .queue-row.playing .pop-stt { background: #fe2c55; color: #fff; }

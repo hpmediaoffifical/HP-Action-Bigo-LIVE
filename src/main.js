@@ -364,7 +364,7 @@ ipcMain.handle('app:get-version', () => {
 });
 
 // =================== License (Google Apps Script) ===================
-const LICENSE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyvwvktzjYgOkhvJE9CwJAkilrcz5WrvO__1QrbkkHdvSx8ucBooayEw9GJF-d_2tXBwg/exec';
+const LICENSE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwOuL0jR7HL9oMwNkebX1JRKI8lf5-RafKZsqsIQmuHpuME5fGlsXsuqDv_r3VhP_Anuw/exec';
 
 // Generate machine ID — hash hardware để bind 1 key vào 1 máy.
 ipcMain.handle('license:machine-id', () => {

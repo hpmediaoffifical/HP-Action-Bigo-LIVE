@@ -154,14 +154,21 @@ function pushPlayBatch(item, ev, playTimes) {
   }
 
   // Priority: 0 = append cuối queue (FIFO chuẩn).
-  // N > 0 = chèn vào index N (sau quà đang phát + N-1 quà chờ).
+  // N > 0 = chèn vào HÀNG N (1-indexed, đếm từ trên cùng cả playing item).
+  // User: "tôi chọn 2 nhưng không lên hàng 2" — fix off-by-one trước đó dùng
+  // priority như array index (idx N), giờ chuyển sang display row N.
   const priority = item?.priority || 0;
   if (priority > 0 && queueItems.length > 0) {
-    const insertIdx = Math.min(priority, queueItems.length);
+    const hasPlaying = queueItems[0]?.status === 'playing';
+    // Display row N (1-indexed) → array idx (N - 1).
+    // Nếu queueItems[0] = playing, idx tối thiểu = 1 (không thể displace playing).
+    const minIdx = hasPlaying ? 1 : 0;
+    const desiredIdx = priority - 1; // row N → idx N-1
+    const insertIdx = Math.max(minIdx, Math.min(desiredIdx, queueItems.length));
     queueItems.splice(insertIdx, 0, ...batch);
-    appendLog(`[queue] ${baseName}: priority=${priority} → chèn tại index ${insertIdx}/${queueItems.length} (${batch.length} hàng)`);
+    appendLog(`[queue] ${baseName}: priority=${priority} → hàng ${insertIdx + 1} (queue có ${queueItems.length} hàng${hasPlaying ? ', đang phát ở hàng 1' : ''})`);
   } else {
-    queueItems.push(...batch); // FIFO append cuối
+    queueItems.push(...batch);
     if (priority > 0) {
       appendLog(`[queue] ${baseName}: priority=${priority} nhưng queue rỗng → append cuối`);
     }
@@ -1667,6 +1674,7 @@ async function disconnect() {
   await window.bigo.embedStop();
   els.status.textContent = 'disconnected';
   els.status.classList.remove('on');
+  els.status.classList.remove('connected');
   setConnectedUi(false);
   setLiveInfo('Đã hủy kết nối. Nhập BIGO ID khác và bấm KẾT NỐI.', '');
   resetEmbedUi();
@@ -1684,6 +1692,7 @@ els.btnConnect.onclick = async () => {
   els.btnConnect.disabled = true;
   els.status.textContent = 'checking...';
   els.status.classList.remove('on');
+  els.status.classList.remove('connected');
 
   // 1. Stop session cũ + clear UI (đề phòng)
   await window.bigo.embedStop();
@@ -1720,8 +1729,9 @@ els.btnConnect.onclick = async () => {
     alert(`Lỗi: ${res.error}`);
     return;
   }
-  els.status.textContent = `listening · ${id}`;
+  els.status.textContent = `Đã kết nối · ${id}`;
   els.status.classList.add('on');
+  els.status.classList.add('connected');
   setConnectedUi(true);
   appendLog(`connected to ${id}`);
   // Auto-play BGM khi kết nối thành công (theo nhóm active hoặc Cài đặt chung)
