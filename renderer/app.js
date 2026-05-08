@@ -1483,6 +1483,8 @@ function resetEmbedUi() {
   receivedGifts.length = 0;
   renderReceivedGifts();
   forwardReceivedGiftsSnapshot();
+  recentChats.length = 0;
+  if (window.bigo.popupChatsReset) window.bigo.popupChatsReset().catch(() => {});
   resetSessionStats();
   // Reset popup nếu đang mở
   if (window.bigo.popupResetGifts) window.bigo.popupResetGifts().catch(() => {});
@@ -1581,6 +1583,19 @@ if (els.btnPopupQueue) els.btnPopupQueue.onclick = () => window.bigo.popupOpenQu
 // Chat popup button
 const btnPopupChats = document.getElementById('btnPopupChats');
 if (btnPopupChats) btnPopupChats.onclick = () => window.bigo.popupOpenChats();
+
+// Recent chats history — popup khi mở sẽ request snapshot để hiển thị history.
+const recentChats = [];
+const RECENT_CHATS_MAX = 300;
+// Khi popup vừa mở → request snapshot → app gửi full recentChats.
+if (window.bigo.onChatsRequestSnapshot) {
+  window.bigo.onChatsRequestSnapshot(() => {
+    if (window.bigo.popupChatsSnapshot) {
+      window.bigo.popupChatsSnapshot(recentChats).catch(() => {});
+    }
+  });
+}
+// Reset khi disconnect (gắn vào resetEmbedUi nếu có).
 const btnPopupQueueRight = document.getElementById('btnPopupQueueRight');
 if (btnPopupQueueRight) btnPopupQueueRight.onclick = () => window.bigo.popupOpenQueue();
 
@@ -1832,12 +1847,13 @@ function renderParsed(ev) {
     const tier = levelTier(ev.level);
     const lvlText = ev.level ? `Lv.${ev.level}` : 'Lv.?';
     div.innerHTML = `${av}<span class="lvl tier-${tier}">${lvlText}</span><span class="who">${escapeHtml(ev.user)}</span><span class="what">${escapeHtml(ev.content)}</span>`;
-    // Forward to chats popup nếu đang mở
+    // Lưu vào recentChats để popup snapshot khi mở.
+    const chatItem = { user: ev.user, level: ev.level, content: ev.content, user_avatar_url: avUrl, ts: Date.now() };
+    recentChats.push(chatItem);
+    if (recentChats.length > RECENT_CHATS_MAX) recentChats.shift();
+    // Forward to chats popup nếu đang mở (per-event live update).
     if (window.bigo.popupChatsEvent) {
-      window.bigo.popupChatsEvent({
-        user: ev.user, level: ev.level, content: ev.content,
-        user_avatar_url: avUrl,
-      }).catch(() => {});
+      window.bigo.popupChatsEvent(chatItem).catch(() => {});
     }
     // Mới nhất ở DƯỚI: append + auto scroll xuống cuối
     els.liveChats.appendChild(div);

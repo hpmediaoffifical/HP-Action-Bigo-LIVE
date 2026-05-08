@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <title>Tương tác — BIGO Action</title>
+  <title>TƯƠNG TÁC — HP Action - BIGO LIVE</title>
   <link rel="icon" type="image/png" href="../logo-hp.png" />
   <link rel="stylesheet" href="style.css" />
   <style>
@@ -85,11 +85,21 @@
       totalRows = 0;
       countEl.textContent = '0 dòng';
     });
+    // Snapshot từ app → render full history khi popup vừa mở.
+    ipcRenderer.on('popup-chats:snapshot', (_e, items) => {
+      cont.innerHTML = '';
+      totalRows = 0;
+      if (Array.isArray(items)) {
+        for (const ev of items) appendChat(ev);
+      }
+    });
     document.getElementById('popChatClear').onclick = () => {
       cont.innerHTML = '';
       totalRows = 0;
       countEl.textContent = '0 dòng';
     };
+    // Khi popup vừa load xong → request snapshot từ app (history các chat đã đến).
+    ipcRenderer.send('popup-chats:request-snapshot');
   </script>
 </body>
 </html>

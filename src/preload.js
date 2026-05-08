@@ -73,6 +73,8 @@ contextBridge.exposeInMainWorld('bigo', {
   popupOpenChats: () => ipcRenderer.invoke('popup:open-chats'),
   popupChatsEvent: (ev) => ipcRenderer.invoke('popup:chats-event', ev),
   popupChatsReset: () => ipcRenderer.invoke('popup:chats-reset'),
+  popupChatsSnapshot: (items) => ipcRenderer.invoke('popup:chats-snapshot', items),
+  onChatsRequestSnapshot: (cb) => ipcRenderer.on('chats:request-snapshot', () => cb()),
 
   // Event subscriptions
   onEvent: (cb) => ipcRenderer.on('bigo:event', (_e, ev) => cb(ev)),

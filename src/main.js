@@ -703,7 +703,7 @@ function ensureQueuePopup() {
   queuePopup = new BrowserWindow({
     width: saved.width || 420, height: saved.height || 760,
     x: saved.x, y: saved.y,
-    title: '🎬 Hàng đợi hiệu ứng',
+    title: '📋 DANH SÁCH HIỆU ỨNG — HP Action - BIGO LIVE',
     icon: APP_ICON || undefined,
     parent: win,
     webPreferences: { nodeIntegration: true, contextIsolation: false },
@@ -762,7 +762,7 @@ function ensureChatsPopup() {
   chatsPopup = new BrowserWindow({
     width: saved.width || 400, height: saved.height || 720,
     x: saved.x, y: saved.y,
-    title: '💬 Tương tác',
+    title: '💬 TƯƠNG TÁC — HP Action - BIGO LIVE',
     icon: APP_ICON || undefined,
     parent: win,
     webPreferences: { nodeIntegration: true, contextIsolation: false },
@@ -790,6 +790,19 @@ ipcMain.handle('popup:chats-reset', () => {
   }
   return { ok: true };
 });
+// Snapshot từ app gửi xuống popup khi popup vừa mở (lấy full history).
+ipcMain.handle('popup:chats-snapshot', (_e, items) => {
+  if (chatsPopup && !chatsPopup.isDestroyed()) {
+    try { chatsPopup.webContents.send('popup-chats:snapshot', items || []); } catch {}
+  }
+  return { ok: true };
+});
+// Popup request snapshot từ app (khi vừa load) → forward về renderer.
+ipcMain.on('popup-chats:request-snapshot', () => {
+  if (win && !win.isDestroyed()) {
+    try { win.webContents.send('chats:request-snapshot'); } catch {}
+  }
+});
 
 // =================== Popup window (Lịch sử quà) ===================
 let giftsPopup = null;
@@ -801,7 +814,7 @@ function ensureGiftsPopup() {
     width: saved.width || 380,
     height: saved.height || 720,
     x: saved.x, y: saved.y,
-    title: '🎁 Lịch sử quà',
+    title: '🎁 QUÀ ĐÃ NHẬN — HP Action - BIGO LIVE',
     icon: APP_ICON || undefined,
     parent: win,
     webPreferences: {
