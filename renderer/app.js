@@ -702,11 +702,30 @@ function renderLicenseStatus(data) {
   statusEl.style.color = color;
 
   if (detailEl) {
+    // Format hạn sử dụng đẹp: Date object → dd/mm/yyyy, string ISO/dd-mm → giữ nguyên
+    let expiryDisplay = '—';
+    if (expiry) {
+      const d = new Date(expiry);
+      if (!isNaN(d.getTime())) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yy = d.getFullYear();
+        expiryDisplay = `${dd}/${mm}/${yy}`;
+        // Bonus: tính số ngày còn lại
+        const daysLeft = Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        if (daysLeft >= 0) expiryDisplay += ` <span style="color:#8a8f9a; font-weight:400">(còn ${daysLeft} ngày)</span>`;
+      } else {
+        expiryDisplay = String(expiry);
+      }
+    }
+    const quotaDisplay = quotaMax === 0 || quotaMax === '0'
+      ? `<span style="color:#ffb627">${escapeHtml(String(quotaUsed))} / ∞ Unlimited</span>`
+      : `${escapeHtml(String(quotaUsed))}/${escapeHtml(String(quotaMax))}`;
     detailEl.innerHTML = `
       <div class="dev-row"><span class="dev-key">Khách hàng:</span><span class="dev-val"><b>${escapeHtml(tenKh || '—')}</b></span></div>
       <div class="dev-row"><span class="dev-key">Gói:</span><span class="dev-val"><b style="color:${tier === 'SVIP' ? '#ffb627' : tier === 'VIP' ? '#a447e8' : '#8ad6ff'}">${escapeHtml(tier)}</b></span></div>
-      <div class="dev-row"><span class="dev-key">Hạn sử dụng:</span><span class="dev-val"><b>${escapeHtml(String(expiry || '—'))}</b></span></div>
-      <div class="dev-row"><span class="dev-key">Quota quà:</span><span class="dev-val"><b>${escapeHtml(String(quotaUsed))}/${escapeHtml(String(quotaMax))}</b></span></div>
+      <div class="dev-row"><span class="dev-key">Hạn sử dụng:</span><span class="dev-val"><b>${expiryDisplay}</b></span></div>
+      <div class="dev-row"><span class="dev-key">Quota quà:</span><span class="dev-val"><b>${quotaDisplay}</b></span></div>
       <div class="dev-row"><span class="dev-key">Trạng thái:</span><span class="dev-val"><b style="color:${color}">${escapeHtml(trang || '?')}</b></span></div>
     `;
   }
