@@ -62,13 +62,28 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .chat-row .who { color: #ffb84a; font-weight: 600; flex-shrink: 0; }
 .chat-row .what { color: #c9d6ff; word-break: break-word; }
 
-.gift-row { padding: 6px 8px; border-bottom: 1px solid #1c1f28; display: flex; gap: 8px; align-items: center; }
-.gift-row .lvl { background: #2c303d; color: #ff6b9d; padding: 1px 6px; border-radius: 8px; font-size: 10px; }
+.gift-row { padding: 8px 10px; border-bottom: 1px solid #1c1f28; display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; align-items: center; }
+.gift-row .avatar { width: 32px; height: 32px; border-radius: 50%; background: #2c303d; object-fit: cover; }
+.gift-row .body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gift-row .row1 { display: flex; gap: 6px; align-items: baseline; }
+.gift-row .row2 { display: flex; gap: 8px; align-items: center; }
+.gift-row .lvl { background: #2c303d; color: #ff6b9d; padding: 1px 6px; border-radius: 8px; font-size: 10px; flex-shrink: 0; }
 .gift-row .who { color: #ffb84a; font-weight: 600; }
 .gift-row .what { color: #ffe07a; }
-.gift-row .cnt { background: #ff3b6f; color: #fff; padding: 1px 7px; border-radius: 10px; font-weight: 700; font-size: 11px; }
-.gift-row .icon { width: 24px; height: 24px; border-radius: 4px; }
+.gift-row .gift-id { color: #8a8f9a; font-size: 10px; font-family: 'Consolas', monospace; }
+.gift-row .gift-icon { width: 24px; height: 24px; border-radius: 4px; background: #0f1117; }
+.gift-row .cnt { background: #ff3b6f; color: #fff; padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px; }
+.gift-row .beans { color: #ffd166; font-size: 11px; font-weight: 600; }
 .gift-row .matched { background: #1e8a4f; color: #fff; padding: 1px 6px; border-radius: 8px; font-size: 10px; }
+.gift-row .right { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
+
+/* Master gift search */
+.master-search { background: #0f1117; border-radius: 6px; padding: 8px; max-height: 240px; overflow-y: auto; margin-top: 6px; }
+.master-search-row { display: grid; grid-template-columns: 28px 1fr auto auto; gap: 8px; padding: 4px 6px; align-items: center; cursor: pointer; border-radius: 4px; }
+.master-search-row:hover { background: #20242f; }
+.master-search-row img { width: 28px; height: 28px; border-radius: 4px; }
+.master-search-row .id { color: #8a8f9a; font-family: 'Consolas', monospace; font-size: 11px; }
+.master-search-row .price { color: #ffd166; font-size: 11px; }
 
 /* ============ Tables ============ */
 .table-wrap { overflow-x: auto; }

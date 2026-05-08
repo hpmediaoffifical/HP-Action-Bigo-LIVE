@@ -163,10 +163,16 @@
     <form method="dialog">
       <h3 id="giftDialogTitle">Quà</h3>
       <div class="form-row">
-        <label>Match keys (cách nhau bằng dấu phẩy)
-          <input id="dlgMatchKeys" required placeholder="お面, Rose" />
+        <label>Match keys (tên Bigo render — cách nhau bằng dấu phẩy)
+          <input id="dlgMatchKeys" required placeholder="Roses, Love" />
         </label>
       </div>
+      <div class="form-row">
+        <label>🔍 Tìm trong master (2410 quà Bigo)
+          <input id="dlgMasterQuery" placeholder="gõ tên hoặc gift_id..." />
+        </label>
+      </div>
+      <div id="dlgMasterResults" class="master-search" style="display:none"></div>
       <div class="form-row">
         <label>Alias hiển thị
           <input id="dlgAlias" placeholder="Mặt nạ" />

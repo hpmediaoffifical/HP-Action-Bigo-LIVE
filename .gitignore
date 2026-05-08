@@ -1,5 +1,6 @@
 node_modules/
 config/settings.json
+config/gift-master.json
 dist/
 *.log
 .DS_Store

@@ -46,6 +46,28 @@ function* walkAllElements(root) {
   }
 }
 
+// Extract icon URL của quà từ DOM element (img có src chứa giftpic / pgc-live-manage)
+function findGiftIconUrl(el) {
+  if (!el) return '';
+  const imgs = el.querySelectorAll('img');
+  for (const img of imgs) {
+    const src = img.src || img.getAttribute('data-src') || '';
+    if (/giftpic|pgc-live-manage|gift\//i.test(src)) return src;
+  }
+  return '';
+}
+
+function findAvatarUrl(el) {
+  if (!el) return '';
+  const imgs = el.querySelectorAll('img');
+  for (const img of imgs) {
+    const src = img.src || img.getAttribute('data-src') || '';
+    // avatar Bigo thường ở host esx.bigo.sg/avatar hoặc tương tự
+    if (/avatar|user_pic|live_pic|bigocdn/i.test(src)) return src;
+  }
+  return '';
+}
+
 function scanChatsAndGifts() {
   const chats = [];
   const gifts = [];
@@ -63,13 +85,24 @@ function scanChatsAndGifts() {
     if (seenChats.has(hash)) continue;
     seenChats.set(hash, Date.now());
 
+    const avatarUrl = findAvatarUrl(el);
+    const giftIconUrl = findGiftIconUrl(el);
+
     const giftM = m.content.match(/sent\s+(?:a\s+)?(.+?)\s*[×xX](\d+)\s*$/);
     if (giftM) {
-      gifts.push({ type: 'gift', level: m.level, user: m.user, gift_name: giftM[1].trim(), gift_count: +giftM[2], raw: text });
+      gifts.push({
+        type: 'gift', level: m.level, user: m.user,
+        gift_name: giftM[1].trim(), gift_count: +giftM[2],
+        gift_icon_url: giftIconUrl, user_avatar_url: avatarUrl, raw: text,
+      });
     } else if (/^sent\s+/i.test(m.content)) {
-      gifts.push({ type: 'gift', level: m.level, user: m.user, gift_name: m.content.replace(/^sent\s+/i, '').trim(), gift_count: 1, raw: text });
+      gifts.push({
+        type: 'gift', level: m.level, user: m.user,
+        gift_name: m.content.replace(/^sent\s+/i, '').trim(), gift_count: 1,
+        gift_icon_url: giftIconUrl, user_avatar_url: avatarUrl, raw: text,
+      });
     } else {
-      chats.push({ type: 'chat', level: m.level, user: m.user, content: m.content, raw: text });
+      chats.push({ type: 'chat', level: m.level, user: m.user, content: m.content, user_avatar_url: avatarUrl, raw: text });
     }
   }
 
@@ -88,12 +121,15 @@ function scanGiftOverlay() {
     if (!m) continue;
     const sender = m[1].trim();
     const count = +m[2], combo = +m[3];
-    const img = el.querySelector('img');
-    const icon = img ? img.src : '';
-    const hash = `${sender}|${count}|${combo}|${icon}`;
+    const giftIconUrl = findGiftIconUrl(el);
+    const avatarUrl = findAvatarUrl(el);
+    const hash = `${sender}|${count}|${combo}|${giftIconUrl}`;
     if (seenGifts.has(hash)) continue;
     seenGifts.set(hash, Date.now());
-    out.push({ type: 'gift_overlay', user: sender, gift_count: count, combo, icon, raw: text.slice(0, 100) });
+    out.push({
+      type: 'gift_overlay', user: sender, gift_count: count, combo,
+      gift_icon_url: giftIconUrl, user_avatar_url: avatarUrl, raw: text.slice(0, 100),
+    });
   }
   pruneMap(seenGifts);
   return out;

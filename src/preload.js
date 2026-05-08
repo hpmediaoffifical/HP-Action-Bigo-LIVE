@@ -12,6 +12,11 @@ contextBridge.exposeInMainWorld('bigo', {
   // Effects directory
   effectsList: () => ipcRenderer.invoke('effects:list'),
 
+  // Gift master catalog
+  giftsMasterList: () => ipcRenderer.invoke('gifts:master-list'),
+  giftsMasterRefresh: () => ipcRenderer.invoke('gifts:master-refresh'),
+  giftsLookup: (q) => ipcRenderer.invoke('gifts:lookup', q),
+
   // Open API mode
   start: (opts) => ipcRenderer.invoke('bigo:start', opts),
   stop: () => ipcRenderer.invoke('bigo:stop'),

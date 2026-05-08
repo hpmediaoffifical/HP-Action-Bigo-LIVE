@@ -27,6 +27,7 @@ const els = {
   dlgMatchKeys: $('dlgMatchKeys'), dlgAlias: $('dlgAlias'),
   dlgGroup: $('dlgGroup'), dlgFile: $('dlgFile'), dlgOverlay: $('dlgOverlay'),
   dlgGiftSave: $('dlgGiftSave'), groupList: $('groupList'),
+  dlgMasterQuery: $('dlgMasterQuery'), dlgMasterResults: $('dlgMasterResults'),
   // Overlay modal
   overlayDialog: $('overlayDialog'), overlayDialogTitle: $('overlayDialogTitle'),
   ovName: $('ovName'), ovBgColor: $('ovBgColor'), ovOpacity: $('ovOpacity'), ovOpacityVal: $('ovOpacityVal'),
@@ -132,6 +133,9 @@ function openGiftDialog(gift = null) {
   els.dlgMatchKeys.value = gift ? gift.matchKeys.join(', ') : '';
   els.dlgAlias.value = gift?.alias || '';
   els.dlgGroup.value = gift?.group || '';
+  els.dlgMasterQuery.value = '';
+  els.dlgMasterResults.style.display = 'none';
+  els.dlgMasterResults.innerHTML = '';
   // refresh overlay options
   els.dlgOverlay.innerHTML = mapping.overlays.length
     ? mapping.overlays.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('')
@@ -141,6 +145,47 @@ function openGiftDialog(gift = null) {
   els.giftDialog.dataset.editingId = gift?.id || '';
   els.giftDialog.showModal();
 }
+
+// Master search inside gift dialog
+let masterSearchTimer = null;
+els.dlgMasterQuery.addEventListener('input', () => {
+  clearTimeout(masterSearchTimer);
+  const q = els.dlgMasterQuery.value.trim();
+  if (!q) {
+    els.dlgMasterResults.style.display = 'none';
+    els.dlgMasterResults.innerHTML = '';
+    return;
+  }
+  masterSearchTimer = setTimeout(async () => {
+    const results = await window.bigo.giftsLookup(q);
+    if (!results.length) {
+      els.dlgMasterResults.innerHTML = '<div style="padding:8px;color:#666">không tìm thấy</div>';
+    } else {
+      els.dlgMasterResults.innerHTML = results.map(g => `
+        <div class="master-search-row" data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
+          <img src="${escapeHtml(g.img_url || '')}" loading="lazy" />
+          <div><b>${escapeHtml(g.name)}</b></div>
+          <div class="id">id ${g.typeid}</div>
+          <div class="price">💎 ${g.vm_exchange_rate}</div>
+        </div>
+      `).join('');
+      els.dlgMasterResults.querySelectorAll('.master-search-row').forEach(row => {
+        row.onclick = () => {
+          const name = row.dataset.name;
+          // Add to matchKeys (avoid duplicates)
+          const cur = els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean);
+          if (!cur.includes(name)) cur.push(name);
+          els.dlgMatchKeys.value = cur.join(', ');
+          if (!els.dlgAlias.value) els.dlgAlias.value = name;
+          els.dlgMasterResults.style.display = 'none';
+          els.dlgMasterResults.innerHTML = '';
+          els.dlgMasterQuery.value = '';
+        };
+      });
+    }
+    els.dlgMasterResults.style.display = 'block';
+  }, 200);
+});
 
 els.dlgGiftSave.onclick = async (e) => {
   // dialog default behavior closes form; we hijack save
@@ -356,36 +401,62 @@ function findGiftByName(name) {
   return mapping.gifts.find(g => g.matchKeys.some(k => k.toLowerCase() === lower));
 }
 
+function findGiftByEvent(ev) {
+  // Ưu tiên match theo gift_id (chính xác nhất nếu master đã enrich)
+  if (ev.gift_id != null) {
+    const byId = mapping.gifts.find(g => g.matchKeys.some(k => String(k) === String(ev.gift_id)));
+    if (byId) return byId;
+  }
+  return findGiftByName(ev.gift_name);
+}
+
 function renderParsed(ev) {
   if (ev.type === 'chat') {
     const div = document.createElement('div');
     div.className = 'chat-row';
-    div.innerHTML = `<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span><span class="what">${escapeHtml(ev.content)}</span>`;
+    const av = ev.user_avatar_url ? `<img class="avatar" src="${escapeHtml(ev.user_avatar_url)}" loading="lazy" style="width:20px;height:20px" />` : '';
+    div.innerHTML = `${av}<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span><span class="what">${escapeHtml(ev.content)}</span>`;
     els.liveChats.prepend(div);
     while (els.liveChats.children.length > 200) els.liveChats.lastChild.remove();
     return;
   }
-  if (ev.type === 'gift') {
-    const matched = findGiftByName(ev.gift_name);
+  if (ev.type === 'gift' || ev.type === 'gift_overlay') {
+    const matched = findGiftByEvent(ev);
     const div = document.createElement('div');
     div.className = 'gift-row';
-    const matchedBadge = matched ? `<span class="matched">▶ ${escapeHtml(matched.alias || '')}</span>` : '';
-    div.innerHTML = `<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span><span>tặng</span><span class="what">${escapeHtml(ev.gift_name)}</span><span class="cnt">×${ev.gift_count}</span>${matchedBadge}`;
+    const avatar = ev.user_avatar_url
+      ? `<img class="avatar" src="${escapeHtml(ev.user_avatar_url)}" loading="lazy" />`
+      : `<div class="avatar"></div>`;
+    const giftIconUrl = ev.gift_icon || ev.gift_icon_url || '';
+    const giftIcon = giftIconUrl ? `<img class="gift-icon" src="${escapeHtml(giftIconUrl)}" loading="lazy" />` : '';
+    const idText = ev.gift_id != null
+      ? `id <b>${ev.gift_id}</b>${ev.gift_value != null ? ` · 💎 ${ev.gift_value}` : ''}`
+      : (ev.gift_ambiguous ? `<span style="color:#ff9a4a">${ev.gift_ambiguous} match</span>` : '<span style="color:#666">chưa map id</span>');
+    const beansLine = ev.gift_value != null && ev.gift_count
+      ? `<span class="beans">💎 ${ev.gift_value * ev.gift_count}</span>`
+      : '';
+    const matchedBadge = matched ? `<span class="matched">▶ ${escapeHtml(matched.alias || matched.matchKeys.join(','))}</span>` : '';
+    const userLine = ev.level != null
+      ? `<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span>`
+      : `<span class="who">${escapeHtml(ev.user)}</span>`;
+    const cntStr = ev.type === 'gift_overlay'
+      ? `×${ev.gift_count} · combo ${ev.combo}`
+      : `×${ev.gift_count}`;
+    div.innerHTML = `
+      ${avatar}
+      <div class="body">
+        <div class="row1">${userLine}${matchedBadge}</div>
+        <div class="row2">${giftIcon}<span class="what">${escapeHtml(ev.gift_name || '?')}</span><span class="gift-id">${idText}</span></div>
+      </div>
+      <div class="right"><span class="cnt">${cntStr}</span>${beansLine}</div>
+    `;
     els.liveGifts.prepend(div);
     while (els.liveGifts.children.length > 200) els.liveGifts.lastChild.remove();
-    if (matched && matched.mediaFile && matched.overlayId) {
+
+    // Trigger overlay play (chỉ cho 'gift', không cho 'gift_overlay' để tránh kép)
+    if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
       window.bigo.overlayPlay({ overlayId: matched.overlayId, file: matched.mediaFile });
     }
-    return;
-  }
-  if (ev.type === 'gift_overlay') {
-    // Bigo's animated gift overlay — chỉ log, không trigger (đã trigger từ gift event)
-    const div = document.createElement('div');
-    div.className = 'gift-row';
-    const iconHtml = ev.icon ? `<img class="icon" src="${ev.icon}" />` : '';
-    div.innerHTML = `${iconHtml}<span class="who">${escapeHtml(ev.user)}</span><span>combo</span><span class="cnt">×${ev.gift_count} · ${ev.combo}</span>`;
-    els.liveGifts.prepend(div);
-    while (els.liveGifts.children.length > 200) els.liveGifts.lastChild.remove();
   }
 }
 
