@@ -316,8 +316,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .group-item .grow-actions .play-count:focus { outline: 2px solid #ff8a3d; }
 
 /* ============ Received gifts row (right panel) ============ */
-.rcv-row { display: grid; grid-template-columns: 36px 1fr auto auto; gap: 10px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #1c1f28; cursor: default; user-select: none; }
+.rcv-row { display: grid; grid-template-columns: 28px 36px 1fr auto auto; gap: 8px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #1c1f28; cursor: default; user-select: none; }
 .rcv-row:hover { background: #20242f; }
+.rcv-row .rcv-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #0f1117; }
+.rcv-row .rcv-avatar-empty { width: 28px; height: 28px; border-radius: 50%; background: #1c1f28; }
 .rcv-row .rcv-icon { width: 36px; height: 36px; border-radius: 6px; object-fit: contain; background: #0f1117; }
 .rcv-row .rcv-icon-empty { width: 36px; height: 36px; border-radius: 6px; background: #1c1f28; }
 .rcv-row .rcv-meta { min-width: 0; }
@@ -380,6 +382,18 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .group-item .grow-sub { color: #8a8f9a; font-size: 11px; margin-top: 2px; word-break: break-all; }
 .group-item .grow-sub code { background: #0f1117; padding: 1px 6px; border-radius: 4px; color: #ffd166; }
 .group-item .grow-actions { display: flex; gap: 4px; align-items: center; }
+/* Bigo Live level tier colors (match màu badge trên web bigo.tv).
+   Bigo level 1-119 chia theo grouping unlocks at 30/50/60/90.
+   Tier-based color: 1-15 (newbie), 16-30 (regular), 31-45 (mid),
+   46-60 (high), 61-90 (vip), 91+ (top). */
+.lvl, .tier-1 { background: #3a8b85; color: #fff; }                  /* default */
+.lvl.tier-1 { background: linear-gradient(135deg, #4a6072, #607d8b); } /* 1-15 newbie gray-blue */
+.lvl.tier-2 { background: linear-gradient(135deg, #16a89a, #1ec1d4); } /* 16-30 teal-cyan (Lv.20-29 trên screenshot) */
+.lvl.tier-3 { background: linear-gradient(135deg, #4a6cf7, #5b8def); } /* 31-45 blue-purple */
+.lvl.tier-4 { background: linear-gradient(135deg, #e74b8e, #ff5fa2); } /* 46-60 pink-magenta (Lv.46 trên screenshot) */
+.lvl.tier-5 { background: linear-gradient(135deg, #a447e8, #c060ff); } /* 61-90 purple */
+.lvl.tier-6 { background: linear-gradient(135deg, #ffb627, #ff8a3d); color: #1a1d24; } /* 91+ top tier gold */
+
 .mini-stt, .queue-stt {
   display: inline-flex;
   align-items: center;
@@ -399,23 +413,41 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   background: linear-gradient(135deg, #fe2c55, #ff8a3d);
   color: #fff;
 }
-.mini-del, .queue-del {
+/* Delete button góc trên-phải, gọn nhỏ */
+.mini-del, .queue-del, .pop-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
   background: transparent;
   border: 1px solid #3a3f4b;
   color: #8a8f9a;
   cursor: pointer;
-  padding: 2px 7px;
-  border-radius: 4px;
-  font-size: 13px;
-  margin-left: 6px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   transition: all 0.15s;
+  z-index: 2;
+  opacity: 0.6;
 }
-.mini-del:hover, .queue-del:hover {
+.mini-del:hover, .queue-del:hover, .pop-del:hover {
   background: #d23046;
   color: #fff;
   border-color: #d23046;
+  opacity: 1;
 }
+/* Đảm bảo row là relative để absolute child neo đúng */
+.mini-queue-row, .queue-row { position: relative; }
+/* Meta chiếm flex 1 — đẩy về phía trái sau gift icon */
+.mini-queue-row .mini-meta, .queue-row .meta { flex: 1; min-width: 0; }
+/* Padding-right để tránh nội dung chạy đè lên X button */
+.mini-queue-row, .queue-row { padding-right: 30px; }
 
 .prio-badge {
   background: linear-gradient(135deg, #fe2c55, #ff8a3d);

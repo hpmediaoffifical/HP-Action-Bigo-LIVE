@@ -289,6 +289,18 @@ function resolveAvatarForUser(user, rawAvatar) {
   return rawAvatar || '';
 }
 
+// Bigo level tier (1-6) cho color coding. Bigo total levels 1-119.
+function levelTier(lv) {
+  const n = parseInt(lv, 10);
+  if (!n || n < 1) return 1;
+  if (n <= 15) return 1;
+  if (n <= 30) return 2;
+  if (n <= 45) return 3;
+  if (n <= 60) return 4;
+  if (n <= 90) return 5;
+  return 6;
+}
+
 // Special clear-queue trigger check: settings.clearGift.enabled + matching typeid/name.
 function checkClearGiftTrigger(ev) {
   const cfg = appSettings?.clearGift;
@@ -707,7 +719,8 @@ els.dlgPickFile.onclick = async () => {
   els.dlgFile.value = picked.fileUrl;
   appendLog(`đã chọn ${r.files.length} file (giữ ở vị trí gốc, không copy vào assets/effects)`);
 };
-els.dlgOpenFolder.onclick = () => window.bigo.effectsOpenFolder();
+// dlgOpenFolder button đã bỏ — không cần mở thư mục assets/effects nữa.
+if (els.dlgOpenFolder) els.dlgOpenFolder.onclick = () => window.bigo.effectsOpenFolder();
 
 async function persistMapping() {
   await window.bigo.mappingSave(mapping);
@@ -1554,10 +1567,14 @@ function renderReceivedGifts() {
     const iconHtml = g.gift_icon
       ? `<img class="rcv-icon" src="${escapeHtml(g.gift_icon)}" loading="lazy" />`
       : '<div class="rcv-icon-empty"></div>';
+    const avUrl = resolveAvatarForUser(g.user, g.avatar);
+    const avHtml = avUrl ? `<img class="rcv-avatar" src="${escapeHtml(avUrl)}" loading="lazy" />` : '<div class="rcv-avatar-empty"></div>';
+    const lvlBadge = g.level ? `<span class="lvl tier-${levelTier(g.level)}" style="margin-right:4px">Lv.${g.level}</span>` : '';
     return `<div class="rcv-row" data-gid="${g.id}">
+      ${avHtml}
       ${iconHtml}
       <div class="rcv-meta">
-        <div class="rcv-who">${escapeHtml(g.user)}</div>
+        <div class="rcv-who">${lvlBadge}${escapeHtml(g.user)}</div>
         <div class="rcv-gift">${escapeHtml(g.gift_name)}${g.gift_id != null ? ` <span style="color:#666">#${g.gift_id}</span>` : ''}</div>
       </div>
       <span class="rcv-count">×${g.count}</span>
@@ -1680,7 +1697,9 @@ function renderParsed(ev) {
     div.className = 'chat-row';
     const avUrl = resolveAvatarForUser(ev.user, ev.user_avatar_url);
     const av = avUrl ? `<img class="avatar" src="${escapeHtml(avUrl)}" loading="lazy" style="width:20px;height:20px" />` : '';
-    div.innerHTML = `${av}<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span><span class="what">${escapeHtml(ev.content)}</span>`;
+    const tier = levelTier(ev.level);
+    const lvlText = ev.level ? `Lv.${ev.level}` : 'Lv.?';
+    div.innerHTML = `${av}<span class="lvl tier-${tier}">${lvlText}</span><span class="who">${escapeHtml(ev.user)}</span><span class="what">${escapeHtml(ev.content)}</span>`;
     // Mới nhất ở DƯỚI: append + auto scroll xuống cuối
     els.liveChats.appendChild(div);
     while (els.liveChats.children.length > 200) els.liveChats.firstChild.remove();

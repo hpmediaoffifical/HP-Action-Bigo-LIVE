@@ -162,10 +162,10 @@
       "bgColor": "#b1f1b1",
       "opacity": 0.25,
       "bounds": {
-        "x": 1688,
-        "y": 1142,
-        "width": 465,
-        "height": 837
+        "x": 2012,
+        "y": 1207,
+        "width": 468,
+        "height": 842
       },
       "alwaysOnTop": true,
       "clickThrough": false,

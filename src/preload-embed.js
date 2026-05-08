@@ -67,17 +67,20 @@ function findGiftIconUrl(el) {
 function findAvatarUrl(el) {
   if (!el) return '';
   const imgs = el.querySelectorAll('img');
+  // Pass 1: URL pattern explicitly chỉ avatar
   for (const img of imgs) {
     const src = img.src || img.getAttribute('data-src') || '';
-    // Bigo avatar thường: esx.bigo.sg, avatar, user_pic, live_pic, bigocdn,
-    // hoặc bất kỳ URL có /head/ , /avatar/, hoặc giàu pattern.
-    if (/avatar|user_pic|live_pic|bigocdn|head\/|profile/i.test(src)) return src;
+    // Bigo CDN domains + path patterns commonly used for avatars
+    if (/avatar|user_pic|live_pic|bigocdn|head[\/_]|profile|portrait|userhead|user_head|esx\.bigo|pic-th|pic-tw|pic-sg|userprofile|cover\/|user\//i.test(src)) {
+      return src;
+    }
   }
-  // Fallback: lấy img đầu tiên không phải gift icon
+  // Pass 2: skip known non-avatar (level/badge/gift/emoji) → take first remaining
   for (const img of imgs) {
     const src = img.src || img.getAttribute('data-src') || '';
     if (!src) continue;
-    if (/giftpic|pgc-live-manage|gift\//i.test(src)) continue;
+    // Skip gift icon, level badge, emoji, fan badge, medal, decoration, family icon...
+    if (/giftpic|pgc-live-manage|gift\/|noble_emoji|emoji_|level_icon|level\/|badge\/|medal\/|family\/|svip|frame\/|deco\//i.test(src)) continue;
     if (/^data:|\.svg/.test(src)) continue;
     return src;
   }
