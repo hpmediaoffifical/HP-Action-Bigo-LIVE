@@ -12,25 +12,61 @@ const APP_ICON = fs.existsSync(path.join(ROOT, 'logo-hp.ico'))
   ? path.join(ROOT, 'logo-hp.ico')
   : (fs.existsSync(path.join(ROOT, 'logo-hp.png')) ? path.join(ROOT, 'logo-hp.png') : null);
 
+// Multi-monitor aware clamp.
+// - Nếu bounds có x,y hợp lệ → tìm display gần nhất với CENTER point của window
+//   để hỗ trợ kéo overlay sang màn hình phụ mà không bị reset.
+// - Nếu bounds completely off-screen mới fallback về primary display.
 function clampToScreen(b) {
-  const { workArea } = screen.getPrimaryDisplay();
-  const w = Math.min(b.width || 540, workArea.width);
-  const h = Math.min(b.height || 960, workArea.height);
+  let display = null;
+  if (b && b.x != null && b.y != null && b.width && b.height) {
+    const cx = Math.round(b.x + b.width / 2);
+    const cy = Math.round(b.y + b.height / 2);
+    try { display = screen.getDisplayNearestPoint({ x: cx, y: cy }); } catch {}
+  }
+  if (!display) display = screen.getPrimaryDisplay();
+  const wa = display.workArea;
+
+  const w = Math.min(b.width || 540, wa.width);
+  const h = Math.min(b.height || 960, wa.height);
   let x = b.x;
   let y = b.y;
-  if (x == null || x < workArea.x || x + w > workArea.x + workArea.width) {
-    x = workArea.x + workArea.width - w - 40;
+  // Chỉ reset nếu COMPLETELY ngoài display (không còn 1 phần nào trong vùng nhìn thấy).
+  // Cho phép overlay hơi tràn mép — user có thể đặt vị trí flex.
+  if (x == null || x + w <= wa.x || x >= wa.x + wa.width) {
+    x = wa.x + wa.width - w - 40;
   }
-  if (y == null || y < workArea.y || y + h > workArea.y + workArea.height) {
-    y = workArea.y + 40;
+  if (y == null || y + h <= wa.y || y >= wa.y + wa.height) {
+    y = wa.y + 40;
   }
   return { x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) };
 }
 
 class OverlayWindow {
-  constructor(cfg) {
+  constructor(cfg, onBoundsSave) {
     this.cfg = cfg;
+    this.onBoundsSave = onBoundsSave || (() => {});
     this.win = null;
+    this._saveTimer = null;
+  }
+
+  // Debounced save — gọi từ move/resize event continuous. Reset timer mỗi 400ms.
+  _scheduleSave() {
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this._flushSave(), 400);
+  }
+
+  // Synchronous save NOW — gọi từ moved/resized (one-shot end-of-drag) và quan trọng nhất
+  // là từ 'close' event để bắt vị trí cuối cùng TRƯỚC khi window destroy.
+  _flushSave() {
+    clearTimeout(this._saveTimer);
+    this._saveTimer = null;
+    if (!this.win || this.win.isDestroyed()) return;
+    try {
+      const b = this.win.getBounds();
+      if (b && b.width > 0 && b.height > 0) {
+        this.onBoundsSave({ x: b.x, y: b.y, width: b.width, height: b.height });
+      }
+    } catch {}
   }
 
   create() {
@@ -58,7 +94,24 @@ class OverlayWindow {
     this.win.setMenuBarVisibility(false);
     this.win.loadFile(RENDERER_PATH);
     this.win.webContents.once('did-finish-load', () => this.applyConfig());
-    this.win.on('closed', () => { this.win = null; });
+
+    // ========== Bounds tracking listeners ==========
+    // 'move' / 'resize' fire continuously khi user đang drag → debounce 400ms để giảm I/O.
+    this.win.on('move', () => this._scheduleSave());
+    this.win.on('resize', () => this._scheduleSave());
+    // 'moved' (macOS) / 'resized' (Win/Linux) fire MỘT LẦN khi user thả chuột → flush ngay.
+    this.win.on('moved', () => this._flushSave());
+    this.win.on('resized', () => this._flushSave());
+    // 'close' fire TRƯỚC khi window bị destroy. Đây là cơ hội cuối cùng để getBounds().
+    // Nếu user kéo rồi đóng nhanh trong <400ms, debounce timer chưa fire → 'close' bắt nốt.
+    this.win.on('close', () => this._flushSave());
+    // 'closed' fire SAU khi destroy → chỉ dọn reference, KHÔNG getBounds() vì sẽ throw/null.
+    this.win.on('closed', () => {
+      clearTimeout(this._saveTimer);
+      this._saveTimer = null;
+      this.win = null;
+    });
+
     if (this.cfg.alwaysOnTop) this.win.setAlwaysOnTop(true, 'screen-saver');
   }
 
@@ -115,11 +168,18 @@ class OverlayWindow {
   }
 
   hide() {
-    if (this.win && !this.win.isDestroyed()) this.win.hide();
+    if (this.win && !this.win.isDestroyed()) {
+      // Trước khi hide cũng flush bounds — phòng user move rồi click hide nhanh.
+      this._flushSave();
+      this.win.hide();
+    }
   }
 
   destroy() {
-    if (this.win && !this.win.isDestroyed()) this.win.destroy();
+    if (this.win && !this.win.isDestroyed()) {
+      this._flushSave();
+      this.win.destroy();
+    }
     this.win = null;
   }
 
@@ -135,28 +195,14 @@ class OverlayManager {
     this.overlays = new Map(); // id -> OverlayWindow
   }
 
-  _debounce(fn, ms) {
-    let t = null;
-    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-  }
-
   _ensure(cfg) {
     let ov = this.overlays.get(cfg.id);
     if (!ov) {
-      ov = new OverlayWindow(cfg);
-      const save = this._debounce(() => {
-        const b = ov.getBounds();
-        if (b) this.onBoundsChanged(cfg.id, b);
-      }, 400);
-      // attach listeners after create
-      const origCreate = ov.create.bind(ov);
-      ov.create = function () {
-        origCreate();
-        if (ov.win) {
-          ov.win.on('move', save);
-          ov.win.on('resize', save);
-        }
-      };
+      // Pass save callback at construct time → listeners attach trực tiếp trong create().
+      // Không còn monkey-patch fragile.
+      ov = new OverlayWindow(cfg, (b) => {
+        try { this.onBoundsChanged(cfg.id, b); } catch (e) { console.warn('[overlay bounds save]', e); }
+      });
       this.overlays.set(cfg.id, ov);
     } else {
       ov.cfg = cfg;

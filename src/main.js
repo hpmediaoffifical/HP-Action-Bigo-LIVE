@@ -310,6 +310,11 @@ app.whenReady().then(async () => {
       if (!ov) return;
       ov.bounds = { x: b.x, y: b.y, width: b.width, height: b.height };
       saveJson(MAPPING_PATH, mapping);
+      // Debug log để verify bounds được lưu khi user move/resize/close overlay.
+      // Thấy log này trong DevTools (Ctrl+Shift+I tab Console) = đã hoạt động.
+      if (win && !win.isDestroyed()) {
+        try { win.webContents.send('bigo:log', `[overlay-bounds] ${ov.name || overlayId}: x=${b.x} y=${b.y} w=${b.width} h=${b.height}`); } catch {}
+      }
     },
   });
   createWindow();
@@ -376,6 +381,14 @@ ipcMain.handle('mapping:save', (_e, data) => {
   ensureCommonGroup(data);
   mapping = data;
   saveJson(MAPPING_PATH, mapping);
+  // Sync OverlayWindow.cfg references về object MỚI trong mapping.overlays.
+  // Tránh OverlayWindow giữ reference cũ → applyConfig đọc sai cfg sau khi user save dialog.
+  if (overlayManager && Array.isArray(mapping.overlays)) {
+    for (const ov of mapping.overlays) {
+      const w = overlayManager.overlays.get(ov.id);
+      if (w) w.cfg = ov;
+    }
+  }
   return true;
 });
 
@@ -727,20 +740,25 @@ ipcMain.handle('overlay:hide', (_e, overlayId) => {
   return { ok: true };
 });
 ipcMain.handle('overlay:apply-config', (_e, cfg) => {
-  // cfg từ renderer khi user edit overlay. Chú ý: nếu cfg.bounds không có,
-  // GIỮ NGUYÊN bounds hiện tại (được track qua onBoundsChanged khi user move).
-  // Nếu cfg.bounds có (user nhập W/H trong dialog), update theo cfg.
+  // cfg từ renderer khi user edit overlay (color, opacity, W/H, alwaysOnTop, ...).
+  // QUAN TRỌNG: Renderer's `mapping` có thể STALE — onBoundsChanged tracking chỉ
+  // update mapping ở main process, không broadcast về renderer. Vì user dialog chỉ
+  // edit W/H (không có ô X/Y), x/y trong cfg.bounds (nếu có) là stale từ lúc renderer
+  // load mapping lần đầu — KHÔNG được tin tưởng.
+  // Quy tắc: x/y → ưu tiên existing.bounds (main process tracked, mới nhất).
+  //          width/height → ưu tiên cfg.bounds (user vừa nhập trong dialog).
   const idx = mapping.overlays.findIndex(o => o.id === cfg.id);
   if (idx === -1) return { ok: false };
   const existing = mapping.overlays[idx];
   const merged = { ...existing, ...cfg };
-  // Nếu cfg.bounds chỉ có w/h (không có x/y), giữ x/y hiện tại
-  if (cfg.bounds) {
+  if (cfg.bounds || existing.bounds) {
+    const ex = existing.bounds || {};
+    const incoming = cfg.bounds || {};
     merged.bounds = {
-      x: cfg.bounds.x != null ? cfg.bounds.x : existing.bounds?.x,
-      y: cfg.bounds.y != null ? cfg.bounds.y : existing.bounds?.y,
-      width: cfg.bounds.width != null ? cfg.bounds.width : existing.bounds?.width,
-      height: cfg.bounds.height != null ? cfg.bounds.height : existing.bounds?.height,
+      x: ex.x != null ? ex.x : (incoming.x != null ? incoming.x : null),
+      y: ex.y != null ? ex.y : (incoming.y != null ? incoming.y : null),
+      width: incoming.width != null ? incoming.width : ex.width,
+      height: incoming.height != null ? incoming.height : ex.height,
     };
   }
   mapping.overlays[idx] = merged;
