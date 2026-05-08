@@ -53,9 +53,6 @@
           <div class="panel">
             <div class="panel-head">
               <h2>🎁 DANH SÁCH TRÒ CHƠI</h2>
-              <div>
-                <button id="btnAddGiftEmbed" class="primary" title="Thêm quà mới + chọn hiệu ứng — chung dialog với Bảng quà">+ Thêm quà</button>
-              </div>
             </div>
             <div class="row" style="margin-bottom:8px">
               <input id="embedGroupSearch" placeholder="🔍 Tìm kiếm nhóm..." style="flex:1" />
@@ -78,7 +75,7 @@
             <div class="panel-head">
               <h2>🎁 QUÀ ĐÃ NHẬN</h2>
               <div style="display:flex; gap:4px">
-                <button id="btnPopupGifts" class="tiny" title="Mở popup riêng để xem song song">📤 Popup</button>
+                <button id="btnPopupGifts" class="tiny" title="Mở popup riêng để xem song song">📤</button>
                 <button class="tiny rps-collapse" data-rps-target="gifts" title="Thu gọn / mở">▼</button>
               </div>
             </div>
@@ -91,6 +88,7 @@
                 <span>A-</span>
                 <input type="range" id="chatFontSize" min="11" max="18" value="12" style="width:80px" />
                 <span style="font-size:14px">A+</span>
+                <button id="btnPopupChats" class="tiny" title="Mở popup riêng">📤</button>
                 <button class="tiny rps-collapse" data-rps-target="chats" title="Thu gọn / mở">▼</button>
               </div>
             </div>
@@ -110,7 +108,7 @@
             <span>🎁 quà: <b id="qStatGifts">0</b></span>
             <span>💎 đậu: <b id="qStatDiamond">0</b></span>
             <span>👤 user: <b id="qStatUsers">0</b></span>
-            <button id="btnPopupQueue" class="tiny" title="Mở popup riêng để giám sát">📤 Popup</button>
+            <button id="btnPopupQueue" class="tiny" title="Mở popup riêng để giám sát">📤</button>
           </div>
         </div>
         <div class="row" style="margin-bottom:8px; align-items:center">
@@ -222,7 +220,7 @@
         <div class="se-row">
           <div class="se-row-head">
             <span class="se-icon">⏩</span>
-            <b class="se-title">Tăng tốc nhạc nền</b>
+            <b class="se-title">Tăng tốc hiệu ứng (mp3/mp4/webm)</b>
             <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedUpFactor" step="0.05" min="1" max="3" value="1.25" style="width:60px" /></label>
             <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">⏱ <input type="number" id="seSpeedUpDuration" min="1" max="600" value="10" style="width:60px" />s</label>
             <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedUpEnabled" /> Bật</label>
@@ -238,7 +236,7 @@
         <div class="se-row">
           <div class="se-row-head">
             <span class="se-icon">⏪</span>
-            <b class="se-title">Giảm tốc nhạc nền</b>
+            <b class="se-title">Giảm tốc hiệu ứng (mp3/mp4/webm)</b>
             <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedDownFactor" step="0.05" min="0.25" max="1" value="0.75" style="width:60px" /></label>
             <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">⏱ <input type="number" id="seSpeedDownDuration" min="1" max="600" value="10" style="width:60px" />s</label>
             <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedDownEnabled" /> Bật</label>
@@ -252,8 +250,8 @@
         </div>
 
         <div class="row" style="margin-top:8px; align-items:center">
-          <button type="button" id="btnResetBgmSpeed" class="tiny" title="Đưa BGM về tốc độ 1.0×">↻ Reset tốc độ BGM</button>
-          <span id="bgmSpeedDisplay" style="color:#8a8f9a; font-size:11px">Tốc độ hiện tại: ×1.0</span>
+          <button type="button" id="btnResetBgmSpeed" class="tiny" title="Đưa hiệu ứng về tốc độ 1.0×">↻ Reset tốc độ hiệu ứng</button>
+          <span id="bgmSpeedDisplay" style="color:#8a8f9a; font-size:11px">Tốc độ hiệu ứng: ×1.0</span>
         </div>
 
         <div class="hint small" style="margin-top:8px">

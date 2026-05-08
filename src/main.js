@@ -754,6 +754,43 @@ ipcMain.on('popup-queue:clear-all', () => {
   }
 });
 
+// =================== Popup window (Tương tác - chats) ===================
+let chatsPopup = null;
+function ensureChatsPopup() {
+  if (chatsPopup && !chatsPopup.isDestroyed()) return chatsPopup;
+  const saved = getSavedBounds('popupChats', { width: 400, height: 720 });
+  chatsPopup = new BrowserWindow({
+    width: saved.width || 400, height: saved.height || 720,
+    x: saved.x, y: saved.y,
+    title: '💬 Tương tác',
+    icon: APP_ICON || undefined,
+    parent: win,
+    webPreferences: { nodeIntegration: true, contextIsolation: false },
+  });
+  chatsPopup.setMenuBarVisibility(false);
+  chatsPopup.loadFile(path.join(ROOT, 'renderer', 'popup-chats.html'));
+  chatsPopup.on('closed', () => { chatsPopup = null; });
+  trackWindowBounds(chatsPopup, 'popupChats');
+  return chatsPopup;
+}
+ipcMain.handle('popup:open-chats', () => {
+  const w = ensureChatsPopup();
+  w.show(); w.focus();
+  return { ok: true };
+});
+ipcMain.handle('popup:chats-event', (_e, ev) => {
+  if (chatsPopup && !chatsPopup.isDestroyed()) {
+    try { chatsPopup.webContents.send('popup-chats:event', ev); } catch {}
+  }
+  return { ok: true };
+});
+ipcMain.handle('popup:chats-reset', () => {
+  if (chatsPopup && !chatsPopup.isDestroyed()) {
+    try { chatsPopup.webContents.send('popup-chats:reset'); } catch {}
+  }
+  return { ok: true };
+});
+
 // =================== Popup window (Lịch sử quà) ===================
 let giftsPopup = null;
 
@@ -947,6 +984,21 @@ ipcMain.on('overlay:queue-empty', (e) => {
       break;
     }
   }
+});
+
+// Set tốc độ phát hiệu ứng (mp3/mp4/webm) trên TẤT CẢ overlays.
+// User: speed up/down trong Hieu Ung Dac Biet phai tac dong vao hieu ung qua,
+// KHONG phai BGM.
+ipcMain.handle('overlay:set-speed', (_e, rate) => {
+  const r = Math.max(0.25, Math.min(3, parseFloat(rate) || 1));
+  if (overlayManager) {
+    for (const ov of overlayManager.overlays.values()) {
+      if (ov.win && !ov.win.isDestroyed()) {
+        try { ov.win.webContents.send('overlay:set-speed', r); } catch {}
+      }
+    }
+  }
+  return { ok: true, rate: r };
 });
 
 // Stop hiệu ứng đang playing trên overlay (user xoá item khỏi DSHT)

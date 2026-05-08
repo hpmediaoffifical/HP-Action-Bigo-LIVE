@@ -1282,9 +1282,9 @@ function ensureDefaultOverlay() {
   }
 }
 
-// Cả 2 button cùng wire vào openNewGiftDialog → đảm bảo bấm ở đâu cũng cùng flow.
+// Button "+ Thêm quà" của tab Bảng quà. (btnAddGiftEmbed đã xoá khỏi UI vì user
+// gặp lỗi sau nhiều lần fix → chỉ còn 1 entry point.)
 els.btnAddGift.onclick = openNewGiftDialog;
-if (els.btnAddGiftEmbed) els.btnAddGiftEmbed.onclick = openNewGiftDialog;
 if (els.embedGroupSearch) {
   let searchTimer = null;
   els.embedGroupSearch.addEventListener('input', () => {
@@ -1522,6 +1522,9 @@ els.btnConnect.onclick = async () => {
 
 els.btnPopupGifts.onclick = () => window.bigo.popupOpenGifts();
 if (els.btnPopupQueue) els.btnPopupQueue.onclick = () => window.bigo.popupOpenQueue();
+// Chat popup button
+const btnPopupChats = document.getElementById('btnPopupChats');
+if (btnPopupChats) btnPopupChats.onclick = () => window.bigo.popupOpenChats();
 const btnPopupQueueRight = document.getElementById('btnPopupQueueRight');
 if (btnPopupQueueRight) btnPopupQueueRight.onclick = () => window.bigo.popupOpenQueue();
 
@@ -1789,6 +1792,13 @@ function renderParsed(ev) {
     const tier = levelTier(ev.level);
     const lvlText = ev.level ? `Lv.${ev.level}` : 'Lv.?';
     div.innerHTML = `${av}<span class="lvl tier-${tier}">${lvlText}</span><span class="who">${escapeHtml(ev.user)}</span><span class="what">${escapeHtml(ev.content)}</span>`;
+    // Forward to chats popup nếu đang mở
+    if (window.bigo.popupChatsEvent) {
+      window.bigo.popupChatsEvent({
+        user: ev.user, level: ev.level, content: ev.content,
+        user_avatar_url: avUrl,
+      }).catch(() => {});
+    }
     // Mới nhất ở DƯỚI: append + auto scroll xuống cuối
     els.liveChats.appendChild(div);
     while (els.liveChats.children.length > 200) els.liveChats.firstChild.remove();
@@ -2235,18 +2245,24 @@ document.querySelectorAll('.se-test').forEach(btn => {
   if (el.tagName === 'INPUT' && el.type !== 'checkbox') el.addEventListener('input', scheduleSpecialPickerRender);
   else el.addEventListener('change', renderSpecialPickerTable);
 });
-// Reset BGM speed button
+// Reset Effect speed button
 const btnResetBgmSpeed = document.getElementById('btnResetBgmSpeed');
 if (btnResetBgmSpeed) {
-  btnResetBgmSpeed.onclick = () => applyBgmSpeed(1.0);
+  btnResetBgmSpeed.onclick = () => {
+    if (_speedRevertTimer) { clearTimeout(_speedRevertTimer); _speedRevertTimer = null; }
+    applyEffectSpeed(1.0);
+  };
 }
 
-// BGM speed control via HTMLAudioElement.playbackRate (range 0.25-3.0)
-function applyBgmSpeed(rate) {
+// Effect speed control — tác động vào HIỆU ỨNG (mp3/mp4/webm) trên overlay,
+// KHÔNG phải BGM. User feedback: tăng/giảm tốc phải áp vào hiệu ứng quà tặng.
+function applyEffectSpeed(rate) {
   const r = Math.max(0.25, Math.min(3, parseFloat(rate) || 1));
-  if (els.bgmAudio) els.bgmAudio.playbackRate = r;
+  if (window.bigo.overlaySetSpeed) {
+    window.bigo.overlaySetSpeed(r).catch(() => {});
+  }
   const disp = document.getElementById('bgmSpeedDisplay');
-  if (disp) disp.textContent = `Tốc độ hiện tại: ×${r.toFixed(2).replace(/\.?0+$/, '')}`;
+  if (disp) disp.textContent = `Tốc độ hiệu ứng: ×${r.toFixed(2).replace(/\.?0+$/, '')}`;
 }
 
 // Trigger speed effect: apply factor + auto-revert về 1.0 sau duration giây.
@@ -2257,16 +2273,19 @@ function triggerSpeedEffect(key) {
   if (!cfg) return;
   const factor = parseFloat(cfg.factor) || 1;
   const duration = Math.max(1, parseInt(cfg.duration, 10) || 10);
-  applyBgmSpeed(factor);
+  applyEffectSpeed(factor);
   if (_speedRevertTimer) clearTimeout(_speedRevertTimer);
   _speedRevertTimer = setTimeout(() => {
-    applyBgmSpeed(1.0);
-    appendLog(`[se] BGM speed auto-revert ×1.0 sau ${duration}s`);
+    applyEffectSpeed(1.0);
+    appendLog(`[se] Tốc độ hiệu ứng auto-revert ×1.0 sau ${duration}s`);
     _speedRevertTimer = null;
   }, duration * 1000);
   const disp = document.getElementById('bgmSpeedDisplay');
-  if (disp) disp.textContent = `Tốc độ hiện tại: ×${factor} (revert sau ${duration}s)`;
+  if (disp) disp.textContent = `Tốc độ hiệu ứng: ×${factor} (revert sau ${duration}s)`;
 }
+
+// Backward compat: old code có thể gọi applyBgmSpeed → forward sang applyEffectSpeed.
+function applyBgmSpeed(rate) { applyEffectSpeed(rate); }
 
 if (els.btnPickBgm) {
   els.btnPickBgm.onclick = async () => {

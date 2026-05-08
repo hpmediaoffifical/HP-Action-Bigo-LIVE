@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Tương tác — BIGO Action</title>
+  <link rel="icon" type="image/png" href="../logo-hp.png" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { padding: 12px; min-width: 360px; }
+    h1 { font-size: 14px; color: #ff8a3d; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .pop-stats { font-size: 11px; color: #8a8f9a; }
+    .pop-controls { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; font-size: 11px; color: #8a8f9a; }
+    #popChats {
+      background: #0f1117; border-radius: 6px; padding: 6px;
+      max-height: calc(100vh - 100px); overflow-y: auto;
+      font-size: var(--chat-font, 13px);
+    }
+    .chat-row { padding: 5px 8px; border-bottom: 1px solid #1c1f28; display: flex; gap: 6px; align-items: baseline; }
+  </style>
+</head>
+<body>
+  <h1>
+    💬 TƯƠNG TÁC
+    <span class="pop-stats" id="popChatCount">0 dòng</span>
+  </h1>
+  <div class="pop-controls">
+    Cỡ chữ
+    <span style="font-size:10px">A-</span>
+    <input type="range" id="popChatFont" min="11" max="22" value="13" style="width:120px" />
+    <span style="font-size:14px">A+</span>
+    <span id="popChatFontVal" style="color:#ffd166">13</span>
+    <button id="popChatClear" class="tiny danger" title="Xoá hiển thị">🗑 Xoá</button>
+  </div>
+  <div id="popChats"></div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function levelTier(lv) {
+      const n = parseInt(lv, 10);
+      if (!n || n < 1) return 1;
+      if (n <= 15) return 1;
+      if (n <= 30) return 2;
+      if (n <= 45) return 3;
+      if (n <= 60) return 4;
+      if (n <= 90) return 5;
+      return 6;
+    }
+
+    const cont = document.getElementById('popChats');
+    const fontInput = document.getElementById('popChatFont');
+    const fontVal = document.getElementById('popChatFontVal');
+    const countEl = document.getElementById('popChatCount');
+
+    function applyFont() {
+      const f = fontInput.value;
+      cont.style.setProperty('--chat-font', f + 'px');
+      fontVal.textContent = f;
+    }
+    fontInput.addEventListener('input', applyFont);
+    applyFont();
+
+    let totalRows = 0;
+
+    function appendChat(ev) {
+      // ev = { user, level, content, user_avatar_url }
+      const div = document.createElement('div');
+      div.className = 'chat-row';
+      const avUrl = ev.user_avatar_url || '';
+      const av = avUrl ? `<img class="avatar" src="${escapeHtml(avUrl)}" loading="lazy" style="width:20px;height:20px" />` : '';
+      const tier = levelTier(ev.level);
+      const lvlText = ev.level ? `Lv.${ev.level}` : 'Lv.?';
+      div.innerHTML = `${av}<span class="lvl tier-${tier}">${lvlText}</span><span class="who">${escapeHtml(ev.user)}</span><span class="what">${escapeHtml(ev.content)}</span>`;
+      cont.appendChild(div);
+      while (cont.children.length > 500) cont.firstChild.remove();
+      cont.scrollTop = cont.scrollHeight;
+      totalRows++;
+      countEl.textContent = `${totalRows} dòng`;
+    }
+
+    ipcRenderer.on('popup-chats:event', (_e, ev) => appendChat(ev));
+    ipcRenderer.on('popup-chats:reset', () => {
+      cont.innerHTML = '';
+      totalRows = 0;
+      countEl.textContent = '0 dòng';
+    });
+    document.getElementById('popChatClear').onclick = () => {
+      cont.innerHTML = '';
+      totalRows = 0;
+      countEl.textContent = '0 dòng';
+    };
+  </script>
+</body>
+</html>

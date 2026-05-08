@@ -61,6 +61,19 @@
           "pauseBgm": false,
           "preEffect": false,
           "priority": 0
+        },
+        {
+          "id": "i_moxfttwodyvs",
+          "matchKeys": [
+            "504532",
+            "Red Cap"
+          ],
+          "alias": "Red Cap",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/dance (2).mp3",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": false,
+          "priority": 0
         }
       ],
       "isCommon": true

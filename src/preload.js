@@ -67,6 +67,12 @@ contextBridge.exposeInMainWorld('bigo', {
   overlayDelete: (overlayId) => ipcRenderer.invoke('overlay:delete', overlayId),
   overlayPlay: (opts) => ipcRenderer.invoke('overlay:play', opts),
   overlayStopEffect: (overlayId) => ipcRenderer.invoke('overlay:stop-effect', overlayId),
+  overlaySetSpeed: (rate) => ipcRenderer.invoke('overlay:set-speed', rate),
+
+  // Popup chats (Tương tác)
+  popupOpenChats: () => ipcRenderer.invoke('popup:open-chats'),
+  popupChatsEvent: (ev) => ipcRenderer.invoke('popup:chats-event', ev),
+  popupChatsReset: () => ipcRenderer.invoke('popup:chats-reset'),
 
   // Event subscriptions
   onEvent: (cb) => ipcRenderer.on('bigo:event', (_e, ev) => cb(ev)),

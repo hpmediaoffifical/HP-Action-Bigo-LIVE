@@ -31,6 +31,10 @@ let playing = false;
 let stopNonce = 0;
 let blockPlaysUntil = 0;
 
+// Tốc độ phát hiệu ứng — apply cho cả player + audio. Giữ giá trị qua các lần
+// playNext (khi load file mới sẽ áp dụng lại).
+let currentSpeed = 1.0;
+
 function isVideo(url) { return /\.(mp4|webm)(\?|$)/i.test(url); }
 function isAudio(url) { return /\.(mp3|wav|ogg)(\?|$)/i.test(url); }
 
@@ -71,21 +75,22 @@ function playNext() {
     clearAudio();
     player.src = url;
     player.muted = false;
-    // Reset visibility/opacity vì clearPlayer đã set 0/hidden
     player.style.display = 'block';
     player.style.opacity = '1';
     player.style.visibility = 'visible';
+    player.playbackRate = currentSpeed;  // Apply speed cho video
     player.play().catch(() => setTimeout(playNext, 100));
   } else if (isAudio(url)) {
     clearPlayer();
     audio.src = url;
+    audio.playbackRate = currentSpeed;   // Apply speed cho audio
     audio.play().catch(() => setTimeout(playNext, 100));
   } else {
-    // Unknown - thử video trước
     player.src = url;
     player.style.display = 'block';
     player.style.opacity = '1';
     player.style.visibility = 'visible';
+    player.playbackRate = currentSpeed;
     player.play().catch(() => setTimeout(playNext, 100));
   }
 }
@@ -113,6 +118,14 @@ audio.addEventListener('error', () => {
 });
 
 ipcRenderer.on('overlay:config', (_e, cfg) => applyConfig(cfg));
+
+// Set tốc độ phát hiệu ứng (mp3/mp4/webm). Apply ngay nếu đang play + lưu để
+// dùng cho file kế tiếp trong queue.
+ipcRenderer.on('overlay:set-speed', (_e, rate) => {
+  currentSpeed = Math.max(0.25, Math.min(3, parseFloat(rate) || 1));
+  try { player.playbackRate = currentSpeed; } catch {}
+  try { audio.playbackRate = currentSpeed; } catch {}
+});
 
 // QUAN TRỌNG: ignore plays during block window (sau stop) hoặc stale nonce.
 ipcRenderer.on('overlay:play', (_e, url) => {
