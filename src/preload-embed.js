@@ -128,34 +128,47 @@ function scanChatsAndGifts() {
 
     elementsScanned.add(el);
 
-    // Hash với normalize whitespace để bắt duplicate có khoảng trắng khác
-    const hash = `${m.level}|${normalize(m.user)}|${normalize(m.content)}`;
-    if (seenChats.has(hash)) continue;
-    seenChats.set(hash, Date.now());
-
     const avatarUrl = findAvatarUrl(el);
     const giftIconUrl = findGiftIconUrl(el);
 
     const giftM = m.content.match(/sent\s+(?:a\s+)?(.+?)\s*[×xX](\d+)\s*$/);
-    if (giftM) {
-      gifts.push({
-        type: 'gift', level: m.level, user: m.user,
-        gift_name: giftM[1].trim(), gift_count: +giftM[2],
-        gift_icon_url: giftIconUrl, user_avatar_url: avatarUrl, raw: text,
-      });
-    } else if (/^sent\s+/i.test(m.content)) {
-      // Strip "sent " AND optional "a "/"an " article (e.g. "sent a Enigma Crate" → "Enigma Crate")
-      gifts.push({
-        type: 'gift', level: m.level, user: m.user,
-        gift_name: m.content.replace(/^sent\s+(?:an?\s+)?/i, '').trim(), gift_count: 1,
-        gift_icon_url: giftIconUrl, user_avatar_url: avatarUrl, raw: text,
-      });
+    const isGift = !!giftM || /^sent\s+/i.test(m.content);
+
+    if (isGift) {
+      // GIFT DEDUP NGẮN — chỉ tránh DOM render race (cùng 1 chat row được scan
+      // 2 lần do MutationObserver bắt re-render). User: tặng cùng quà 2 lần liên
+      // tiếp PHẢI ra 2 events. Window 500ms đủ cover race nhưng không drop
+      // legitimate consecutive gifts (manual tap > 500ms).
+      const giftHash = `g|${m.level}|${normalize(m.user)}|${normalize(m.content)}`;
+      const last = seenGifts.get(giftHash);
+      if (last && Date.now() - last < 500) continue;
+      seenGifts.set(giftHash, Date.now());
+
+      if (giftM) {
+        gifts.push({
+          type: 'gift', level: m.level, user: m.user,
+          gift_name: giftM[1].trim(), gift_count: +giftM[2],
+          gift_icon_url: giftIconUrl, user_avatar_url: avatarUrl, raw: text,
+        });
+      } else {
+        gifts.push({
+          type: 'gift', level: m.level, user: m.user,
+          gift_name: m.content.replace(/^sent\s+(?:an?\s+)?/i, '').trim(), gift_count: 1,
+          gift_icon_url: giftIconUrl, user_avatar_url: avatarUrl, raw: text,
+        });
+      }
     } else {
+      // CHAT DEDUP DÀI — chats lặp lại trong 60s thường là DOM re-scan, không
+      // phải user spam thật (Bigo cap ~3s/msg). Hash dài để giảm noise.
+      const chatHash = `c|${m.level}|${normalize(m.user)}|${normalize(m.content)}`;
+      if (seenChats.has(chatHash)) continue;
+      seenChats.set(chatHash, Date.now());
       chats.push({ type: 'chat', level: m.level, user: m.user, content: m.content, user_avatar_url: avatarUrl, raw: text });
     }
   }
 
-  pruneMap(seenChats);
+  pruneMap(seenChats, 2000, 60_000);
+  pruneMap(seenGifts, 500, 1500); // gift hash chỉ giữ 1.5s
   return { chats, gifts };
 }
 

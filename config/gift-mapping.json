@@ -45,7 +45,7 @@
           "alias": "Duck Box",
           "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/dance (5).mp3",
           "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false,
+          "pauseBgm": true,
           "preEffect": true,
           "priority": 0
         },
@@ -71,7 +71,20 @@
           "alias": "Red Cap",
           "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/dance (2).mp3",
           "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false,
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 0
+        },
+        {
+          "id": "i_moxg99g7o4l1",
+          "matchKeys": [
+            "500858",
+            "Gold"
+          ],
+          "alias": "Gold",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/dance (4).mp3",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
           "preEffect": false,
           "priority": 0
         }

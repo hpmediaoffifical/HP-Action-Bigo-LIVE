@@ -1786,17 +1786,20 @@ function normEv(s) {
     .toLowerCase();
 }
 
-// Defensive dedup ở renderer (lớp 2). Window 1s, hash type-agnostic cho gift.
+// Defensive dedup ở renderer (lớp 2 — primary là preload-embed seenGifts/seenChats).
+// User report: tặng quà 2 lần liên tiếp → chỉ count 1. Vì 1s window quá rộng cho gift.
+// Fix: chia type-window — gift chỉ 250ms (chỉ tránh DOM race), chat giữ 1s.
 const recentEventHashes = new Map();
 function shouldDropDuplicate(ev) {
   if (!ev || (ev.type !== 'chat' && ev.type !== 'gift' && ev.type !== 'gift_overlay')) return false;
-  // Hash gift KHÔNG include combo/type — gift vs gift_overlay cùng quà coi là 1
+  const isGift = ev.type === 'gift' || ev.type === 'gift_overlay';
   const key = ev.type === 'chat'
     ? `c|${ev.level}|${normEv(ev.user)}|${normEv(ev.content)}`
     : `g|${normEv(ev.user)}|${normEv(ev.gift_name)}|${ev.gift_count || 1}`;
+  const window = isGift ? 250 : 1000;  // Gift: 250ms, Chat: 1s.
   const now = Date.now();
   const last = recentEventHashes.get(key);
-  if (last && now - last < 1000) return true; // 1s window
+  if (last && now - last < window) return true;
   recentEventHashes.set(key, now);
   if (recentEventHashes.size > 800) {
     const cutoff = now - 30000;
