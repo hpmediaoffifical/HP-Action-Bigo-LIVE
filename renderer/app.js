@@ -102,36 +102,75 @@ function applyQueueSize() {
   els.qSizeIconVal.textContent = icon;
 }
 
-function pushQueueManual(item, group, playTimes) {
-  // Push 1 entry như khi gift event arrived, nhưng nguồn là user click Phát
-  const queueEntry = {
-    id: 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
-    ts: Date.now(),
-    user: 'You (test)',
-    avatar: '',
-    gift_id: null,
-    gift_name: item.alias || (item.matchKeys || [])[0] || '?',
-    gift_icon: getGiftIcon(item),
-    count: playTimes,
-    rawCount: playTimes,
-    combo: 1,
-    playTimes: playTimes,
-    diamond: null,
-    mediaFile: item.mediaFile,
-    overlayId: item.overlayId,
-    status: 'playing',
-  };
-  queueItems.unshift(queueEntry);
-  if (queueItems.length > QUEUE_MAX) queueItems.length = QUEUE_MAX;
-  renderQueue();
-  renderMiniQueue();
-  updateQueueStats();
-  forwardToQueuePopup(queueEntry);
-  setTimeout(() => {
-    const f = queueItems.find(q => q.id === queueEntry.id);
-    if (f) { f.status = 'done'; renderQueue(); renderMiniQueue(); forwardToQueuePopup({ ...f }); }
-  }, PLAY_DURATION_MS);
+// Push batch N entries (chia tách thành N hàng, đếm lùi giảm dần)
+// Dùng chung cho cả manual play và live gift event.
+function pushPlayBatch(item, ev, playTimes) {
+  const batchId = 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 4);
+  const baseUser = ev?.user || 'You (test)';
+  const baseAvatar = ev?.user_avatar_url || '';
+  const baseName = ev?.gift_name || item?.alias || (item?.matchKeys || [])[0] || '?';
+  const baseId = ev?.gift_id ?? null;
+  const baseIcon = ev?.gift_icon || ev?.gift_icon_url || (item ? getGiftIcon(item) : '');
+  const baseDiamond = ev?.total_diamond ?? null;
+  const baseLevel = ev?.level ?? null;
+  const mediaFile = item?.mediaFile || null;
+  const overlayId = item?.overlayId || null;
+
+  const batch = [];
+  for (let i = 0; i < playTimes; i++) {
+    batch.push({
+      id: 'q_' + batchId + '_' + i,
+      batchId,
+      ts: Date.now() + i, // tăng dần để stable sort
+      user: baseUser,
+      avatar: baseAvatar,
+      gift_name: baseName,
+      gift_id: baseId,
+      gift_icon: baseIcon,
+      level: baseLevel,
+      count: 1,
+      step: i + 1,
+      total: playTimes,
+      diamond: baseDiamond,
+      mediaFile, overlayId,
+      status: i === 0 ? 'playing' : 'queued',
+      playTimes: 1,
+    });
+  }
+  // Prepend whole batch — batch[0] sẽ ở top
+  queueItems.unshift(...batch);
+  while (queueItems.length > QUEUE_MAX) queueItems.pop();
+  renderQueue(); renderMiniQueue(); updateQueueStats();
+  batch.forEach(forwardToQueuePopup);
+
+  // Schedule progression: mỗi PLAY_DURATION_MS, entry kế tiếp → playing, entry hiện → done → remove
+  for (let i = 0; i < playTimes; i++) {
+    setTimeout(() => {
+      const entry = queueItems.find(q => q.id === `q_${batchId}_${i}`);
+      if (entry) {
+        entry.status = 'done';
+        forwardToQueuePopup({ ...entry });
+      }
+      const next = queueItems.find(q => q.id === `q_${batchId}_${i + 1}`);
+      if (next) {
+        next.status = 'playing';
+        forwardToQueuePopup({ ...next });
+      }
+      renderQueue(); renderMiniQueue();
+      // Remove entry done sau 600ms để có hiệu ứng giảm dần
+      setTimeout(() => {
+        const idx = queueItems.findIndex(q => q.id === `q_${batchId}_${i}`);
+        if (idx !== -1) {
+          queueItems.splice(idx, 1);
+          renderQueue(); renderMiniQueue();
+        }
+      }, 600);
+    }, (i + 1) * PLAY_DURATION_MS);
+  }
 }
+
+// Backward-compat wrapper (giữ tên cũ trong case còn ai gọi)
+function pushQueueManual(item, group, playTimes) { pushPlayBatch(item, null, playTimes); }
 
 function renderMiniQueue() {
   const el = document.getElementById('miniQueue');
@@ -140,7 +179,7 @@ function renderMiniQueue() {
     el.innerHTML = '<div style="color:#555;text-align:center;padding:14px;font-size:11px">Chưa có hiệu ứng</div>';
     return;
   }
-  // Top 10 entries
+  // Top 10 entries — mỗi entry là 1 lần phát riêng (pushPlayBatch tách thành N hàng)
   el.innerHTML = queueItems.slice(0, 10).map(q => {
     const iconHtml = q.gift_icon
       ? `<img class="gift-icon" src="${escapeHtml(q.gift_icon)}" loading="lazy" />`
@@ -148,11 +187,13 @@ function renderMiniQueue() {
     const status = q.status === 'playing' ? '<span class="badge-status playing">▶</span>'
       : q.status === 'done' ? '<span class="badge-status done">✓</span>'
       : '<span class="badge-status queued">⏳</span>';
+    // Hiện step/total nếu là batch (vd 3/10), ngược lại hiện ×count
+    const cntLabel = q.total > 1 ? `<span class="step">${q.step}/${q.total}</span>` : `×${q.count}`;
     return `<div class="mini-queue-row ${q.status}">
       ${iconHtml}
       <div class="mini-meta">
         <div class="who">${escapeHtml(q.user)}</div>
-        <div class="what"><b>${escapeHtml(q.gift_name)}</b> ×${q.count}</div>
+        <div class="what"><b>${escapeHtml(q.gift_name)}</b> ${cntLabel}</div>
       </div>
       ${status}
     </div>`;
@@ -160,48 +201,9 @@ function renderMiniQueue() {
 }
 
 function pushQueue(ev, matched, playTimes) {
-  // Chỉ push gift events có hiệu ứng được map
   if (!matched || !matched.mediaFile) return;
-  // Tổng count = gift_count × combo (Bigo render combo trong overlay panel)
-  const totalCount = ev.total_count || (ev.gift_count || 1) * (ev.combo || 1);
-  const item = {
-    id: 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
-    ts: Date.now(),
-    user: ev.user || '?',
-    avatar: ev.user_avatar_url || '',
-    gift_id: ev.gift_id,
-    gift_name: ev.gift_name || matched.alias || '?',
-    gift_icon: ev.gift_icon || ev.gift_icon_url || '',
-    count: totalCount,            // ← dùng total_count (đã nhân combo)
-    rawCount: ev.gift_count || 1,
-    combo: ev.combo || 1,
-    playTimes: playTimes || 1,
-    diamond: ev.total_diamond,
-    mediaFile: matched.mediaFile,
-    overlayId: matched.overlayId,
-    status: 'queued',
-  };
-  queueItems.unshift(item);
-  if (queueItems.length > QUEUE_MAX) queueItems.length = QUEUE_MAX;
-  renderQueue();
-  renderMiniQueue();
-  updateQueueStats();
-  forwardToQueuePopup(item);
-
-  // Mark as playing sau 1 chút (giả định push vào overlay queue → sẽ play)
-  setTimeout(() => {
-    const found = queueItems.find(q => q.id === item.id);
-    if (found && found.status === 'queued') {
-      found.status = 'playing';
-      renderQueue();
-      renderMiniQueue();
-      forwardToQueuePopup({ ...found });
-      setTimeout(() => {
-        const f2 = queueItems.find(q => q.id === item.id);
-        if (f2) { f2.status = 'done'; renderQueue(); renderMiniQueue(); forwardToQueuePopup({ ...f2 }); }
-      }, PLAY_DURATION_MS);
-    }
-  }, 100);
+  // Dùng pushPlayBatch để chia tách thành playTimes entries
+  pushPlayBatch(matched, ev, playTimes);
 }
 
 function renderQueue() {
@@ -651,8 +653,8 @@ async function groupAction(act, gid, value, itemId) {
       for (let i = 0; i < playTimes; i++) {
         await window.bigo.overlayPlay({ overlayId: found.item.overlayId, file: found.item.mediaFile });
       }
-      // Push vào queue để mini queue UI hiện
-      pushQueueManual(found.item, found.group, playTimes);
+      // Chia tách thành playTimes entries (đếm lùi giảm dần)
+      pushPlayBatch(found.item, null, playTimes);
     } else if (act === 'edit-item') {
       openGiftDialog(found.item, found.group.id);
     } else if (act === 'del-item') {

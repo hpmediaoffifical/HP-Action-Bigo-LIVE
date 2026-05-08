@@ -208,6 +208,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .mini-queue-row .badge-status.playing { background: #fe2c55; color: #fff; padding: 1px 6px; border-radius: 6px; font-size: 10px; }
 .mini-queue-row .badge-status.queued { background: #2c303d; color: #8ad6ff; padding: 1px 6px; border-radius: 6px; font-size: 10px; }
 .mini-queue-row .badge-status.done { background: transparent; color: #555; }
+.mini-queue-row .step { background: #2c303d; color: #ffd166; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+.mini-queue-row { transition: opacity 0.4s, transform 0.3s; }
+.mini-queue-row.done { opacity: 0.3; }
 
 /* Item row: input số lượng để phát nhanh N lần */
 .group-item .grow-actions .play-count { width: 48px; padding: 2px 4px; font-size: 11px; text-align: center; }
