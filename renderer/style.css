@@ -265,7 +265,58 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .meta-info b { color: #ff8a3d; }
 
 .chats, .gifts { max-height: 320px; overflow-y: auto; background: #0f1117; border-radius: 6px; padding: 8px; font-size: 12px; }
-.chat-row { padding: 5px 8px; border-bottom: 1px solid #1c1f28; display: flex; gap: 6px; align-items: baseline; }
+.chat-row { padding: 5px 8px; border-bottom: 1px solid #1c1f28; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+/* VIP-tier highlights — border-left + bg gradient để NPC notice ngay */
+.chat-row.chat-row-svip {
+  background: linear-gradient(90deg, rgba(255, 182, 39, 0.15), rgba(255, 138, 61, 0.05) 60%, transparent);
+  border-left: 3px solid #ffb627;
+  padding-left: 5px;
+  box-shadow: inset 0 0 12px rgba(255, 182, 39, 0.08);
+}
+.chat-row.chat-row-vip {
+  background: linear-gradient(90deg, rgba(164, 71, 232, 0.12), transparent 70%);
+  border-left: 3px solid #a447e8;
+  padding-left: 5px;
+}
+.chat-row.chat-row-top {
+  background: linear-gradient(90deg, rgba(255, 138, 61, 0.10), transparent 70%);
+  border-left: 3px solid #ff8a3d;
+  padding-left: 5px;
+}
+.chat-row.chat-row-family {
+  background: linear-gradient(90deg, rgba(74, 142, 247, 0.08), transparent 70%);
+  border-left: 2px solid #4a8ef7;
+  padding-left: 6px;
+}
+/* User badges (SVIP/VIP/Top/Family chips) */
+.user-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+  margin-right: 3px;
+  flex-shrink: 0;
+}
+.badge-svip {
+  background: linear-gradient(135deg, #ffb627, #ff5f5f);
+  color: #1a1d24;
+  box-shadow: 0 1px 4px rgba(255, 182, 39, 0.5);
+}
+.badge-vip {
+  background: linear-gradient(135deg, #a447e8, #c060ff);
+  color: #fff;
+}
+.badge-top {
+  background: linear-gradient(135deg, #ff8a3d, #ffb627);
+  color: #1a1d24;
+}
+.badge-family {
+  background: linear-gradient(135deg, #4a8ef7, #6968fa);
+  color: #fff;
+}
 .chat-row .lvl { background: #2c303d; color: #8ad6ff; padding: 1px 6px; border-radius: 8px; font-size: 10px; flex-shrink: 0; }
 .chat-row .who { color: #ffb84a; font-weight: 600; flex-shrink: 0; }
 .chat-row .what { color: #c9d6ff; word-break: break-word; }

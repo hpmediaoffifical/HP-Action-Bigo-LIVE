@@ -185,7 +185,14 @@ function processElement(rootEl) {
       const chatHash = `c|${m.level}|${normalize(m.user)}|${normalize(m.content)}`;
       if (seenChats.has(chatHash)) continue;
       seenChats.set(chatHash, Date.now());
-      chats.push({ type: 'chat', level: m.level, user: m.user, content: m.content, user_avatar_url: avatarUrl, raw: text });
+      // Detect VIP/SVIP/Top/Family badges từ FULL TEXT của chat row (không chỉ content).
+      // Vì badges thường nằm BEFORE colon — ngoài m.content. Dùng raw text để bắt.
+      const badges = detectBadges(text);
+      chats.push({
+        type: 'chat', level: m.level, user: m.user, content: m.content,
+        user_avatar_url: avatarUrl, raw: text,
+        badges, // [{type, tier?, rank?, period?, level?, name?}, ...]
+      });
     }
   }
 
@@ -266,6 +273,36 @@ function scanGiftOverlay() {
 //   "<USER> 给 Idol 发送 <N> 个赞"             (Chinese)
 //
 // Match patterns trong content của chat row (sau khi tryMatchChat đã extract user/content).
+// VIP/SVIP/Family/Top badges detection — extract từ chat content nếu Bigo
+// render text-style. (Nếu chỉ có image-style, sẽ không detect được — không
+// false positive.)
+const BADGE_PATTERNS = {
+  svip:   /SVIP\s*(\d+)/i,                          // SVIP1-8
+  vip:    /(?:^|\s)VIP\s*(\d+)/i,                   // VIP1-60 (avoid match SVIP)
+  top:    /(WEEK|DAY|MONTH)\s+Top\s*(\d+)/i,        // WEEK Top1
+  family: /(\d+)\s+([A-Za-z][A-Za-z0-9_]{2,15})\s*♥/u, // "28 SASHA♥"
+};
+
+function detectBadges(text) {
+  const badges = [];
+  if (!text) return badges;
+  // SVIP (kiểm tra trước VIP để không bị VIP regex match SVIP)
+  let m = BADGE_PATTERNS.svip.exec(text);
+  if (m) badges.push({ type: 'svip', tier: parseInt(m[1], 10) || 0 });
+  // VIP (chỉ match khi không phải SVIP)
+  m = BADGE_PATTERNS.vip.exec(text);
+  if (m && !/SVIP/i.test(text.slice(Math.max(0, m.index - 1), m.index + 4))) {
+    badges.push({ type: 'vip', tier: parseInt(m[1], 10) || 0 });
+  }
+  // Top contributor
+  m = BADGE_PATTERNS.top.exec(text);
+  if (m) badges.push({ type: 'top', period: m[1].toUpperCase(), rank: parseInt(m[2], 10) || 0 });
+  // Family/Fan group
+  m = BADGE_PATTERNS.family.exec(text);
+  if (m) badges.push({ type: 'family', level: parseInt(m[1], 10) || 0, name: m[2] });
+  return badges;
+}
+
 const HEART_CHAT_PATTERNS = [
   /g[uưử]+i\s+(\d+)\s+l[uượ]+t?\s+th[ií]ch/iu,           // VN: "gửi N lượt thích"
   /sent\s+(\d+)\s+(?:hearts?|likes?|loves?)/i,             // EN: "sent N hearts/likes"
