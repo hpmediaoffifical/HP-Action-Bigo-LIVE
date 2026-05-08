@@ -12,7 +12,8 @@
       "alias": "Flower",
       "group": "TUNG HOA",
       "mediaFile": "Tơ nhện.webm",
-      "overlayId": "ov_mowzeyw8m6as"
+      "overlayId": "ov_mowzeyw8m6as",
+      "pauseBgm": true
     },
     {
       "id": "g_mox4yljml3od",
@@ -23,7 +24,8 @@
       "alias": "Blue Flower",
       "group": "TUNG HOA",
       "mediaFile": "Tơ nhện.webm",
-      "overlayId": "ov_mowzeyw8m6as"
+      "overlayId": "ov_mowzeyw8m6as",
+      "pauseBgm": true
     },
     {
       "id": "g_mox4yxkelnd9",
@@ -72,7 +74,7 @@
         "height": 814
       },
       "alwaysOnTop": true,
-      "clickThrough": true,
+      "clickThrough": false,
       "autoHide": false
     }
   ],

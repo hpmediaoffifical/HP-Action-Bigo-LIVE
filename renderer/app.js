@@ -353,6 +353,8 @@ async function giftAction(act, id) {
     renderGiftTable();
   } else if (act === 'play') {
     if (!g.mediaFile || !g.overlayId) { alert('Quà chưa có file hoặc overlay'); return; }
+    // Tạm dừng nhạc nền nếu gift cấu hình
+    if (g.pauseBgm) pauseBgmForEffect();
     const r = await window.bigo.overlayPlay({ overlayId: g.overlayId, file: g.mediaFile });
     if (!r.ok) alert('Không phát được: ' + (r.error || 'unknown'));
   }
@@ -1040,15 +1042,35 @@ if (els.maxListItems) {
   });
 }
 
-// Pause/resume BGM khi gift play. Auto resume sau 5s (giả định effect ngắn).
+// Pause BGM khi effect play, resume khi overlay queue rỗng (effect xong).
+// KHÔNG reset currentTime — pause/play giữ vị trí gốc (nhạc tiếp tục từ chỗ ngắt).
+let bgmPausedForEffect = false;
 let bgmResumeTimer = null;
 function pauseBgmForEffect() {
-  if (!els.bgmAudio || els.bgmAudio.paused) return;
-  els.bgmAudio.pause();
+  if (!els.bgmAudio || !els.bgmAudio.src) return;
+  // Chỉ pause nếu đang phát (nếu đã pause thủ công thì không can thiệp)
+  if (!els.bgmAudio.paused) {
+    els.bgmAudio.pause();
+    bgmPausedForEffect = true;
+  }
+  // Fallback timer 30s: nếu IPC overlay:queue-empty không tới, vẫn resume
   if (bgmResumeTimer) clearTimeout(bgmResumeTimer);
-  bgmResumeTimer = setTimeout(() => {
-    if (els.bgmAudio && els.bgmAudio.src) els.bgmAudio.play().catch(() => {});
-  }, 6000);
+  bgmResumeTimer = setTimeout(resumeBgmAfterEffect, 30000);
+}
+function resumeBgmAfterEffect() {
+  if (bgmResumeTimer) { clearTimeout(bgmResumeTimer); bgmResumeTimer = null; }
+  if (!bgmPausedForEffect) return;
+  bgmPausedForEffect = false;
+  if (els.bgmAudio && els.bgmAudio.src) {
+    // play() resume từ currentTime hiện tại — không reset về 0
+    els.bgmAudio.play().catch(() => {});
+  }
+}
+// Hook IPC overlay:queue-empty từ main process
+if (window.bigo.onOverlayQueueEmpty) {
+  window.bigo.onOverlayQueueEmpty(() => {
+    resumeBgmAfterEffect();
+  });
 }
 
 // =================== Wire up ===================

@@ -642,7 +642,12 @@ ipcMain.handle('overlay:delete', (_e, overlayId) => {
   return { ok: true };
 });
 // overlay queue-empty: từ overlay window khi đã play hết → hide nếu autoHide bật
+// + forward sang main window để renderer resume BGM
 ipcMain.on('overlay:queue-empty', (e) => {
+  // Forward to main window (renderer chính resume BGM)
+  if (win && !win.isDestroyed()) {
+    try { win.webContents.send('overlay:queue-empty'); } catch {}
+  }
   for (const [id, ov] of overlayManager.overlays.entries()) {
     if (ov.win && !ov.win.isDestroyed() && ov.win.webContents === e.sender) {
       if (ov.cfg && ov.cfg.autoHide) {

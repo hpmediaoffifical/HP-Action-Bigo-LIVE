@@ -55,4 +55,5 @@ contextBridge.exposeInMainWorld('bigo', {
   onEvent: (cb) => ipcRenderer.on('bigo:event', (_e, ev) => cb(ev)),
   onLog: (cb) => ipcRenderer.on('bigo:log', (_e, msg) => cb(msg)),
   onEmbedEvent: (cb) => ipcRenderer.on('embed:event', (_e, ev) => cb(ev)),
+  onOverlayQueueEmpty: (cb) => ipcRenderer.on('overlay:queue-empty', () => cb()),
 });
