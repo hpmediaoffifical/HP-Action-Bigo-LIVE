@@ -384,6 +384,45 @@ async function init() {
   // Pre-load master để gift table có icon ngay (background)
   ensureMasterLoaded().catch(() => {});
   updateBgmSidebarIcon();
+
+  // Right panel: collapse buttons + persist heights
+  initRightPanelControls();
+}
+
+function initRightPanelControls() {
+  // Collapse buttons
+  document.querySelectorAll('.rps-collapse').forEach(btn => {
+    const target = btn.dataset.rpsTarget;
+    const sec = btn.closest('.right-panel-section');
+    if (!sec) return;
+    // Restore state
+    const saved = localStorage.getItem('rps_collapsed_' + target) === '1';
+    if (saved) sec.classList.add('collapsed');
+    btn.onclick = () => {
+      sec.classList.toggle('collapsed');
+      const isCollapsed = sec.classList.contains('collapsed');
+      localStorage.setItem('rps_collapsed_' + target, isCollapsed ? '1' : '0');
+    };
+  });
+  // Restore + save heights via ResizeObserver
+  const resizables = [
+    { el: document.getElementById('miniQueue'), key: 'rps_h_queue' },
+    { el: document.getElementById('liveGifts'), key: 'rps_h_gifts' },
+    { el: document.getElementById('liveChats'), key: 'rps_h_chats' },
+  ];
+  for (const { el, key } of resizables) {
+    if (!el) continue;
+    const saved = parseInt(localStorage.getItem(key) || '', 10);
+    if (saved > 60 && saved < window.innerHeight) el.style.height = saved + 'px';
+    let savingTimer = null;
+    const ro = new ResizeObserver(() => {
+      clearTimeout(savingTimer);
+      savingTimer = setTimeout(() => {
+        localStorage.setItem(key, String(el.offsetHeight));
+      }, 300);
+    });
+    ro.observe(el);
+  }
 }
 
 async function refreshIconCacheStatus() {
@@ -1545,31 +1584,35 @@ function renderSettingsGroupsList() {
       <button class="tiny danger" data-act="settings-del" data-gid="${g.id}" title="Xoá nhóm">🗑</button>
     </div>
   `).join('');
-  container.querySelectorAll('button[data-act]').forEach(b => {
-    b.onclick = async () => {
-      const gid = b.dataset.gid;
-      const g = findGroupById(gid);
-      if (!g) return;
-      if (b.dataset.act === 'settings-rename') {
-        const newName = prompt('Đổi tên nhóm:', g.name);
-        if (newName && newName.trim()) {
-          // Check trùng case-insensitive
-          const lower = newName.trim().toLowerCase();
-          const dup = mapping.groups.find(x => x.id !== gid && x.name.toLowerCase() === lower);
-          if (dup) { alert(`Đã có nhóm "${dup.name}" - tên trùng (không phân biệt hoa/thường)`); return; }
-          g.name = newName.trim();
-          await persistMapping();
-          renderSettingsGroupsList();
-          renderGiftTable();
-        }
-      } else if (b.dataset.act === 'settings-del') {
-        if (!confirm(`Xoá nhóm "${g.name}" và ${(g.items || []).length} quà bên trong?`)) return;
-        mapping.groups = mapping.groups.filter(x => x.id !== gid);
-        await persistMapping();
-        renderSettingsGroupsList();
-        renderGiftTable();
-      }
-    };
+}
+
+// Event delegation cho settings groups list — gắn 1 lần (không bị mất khi re-render innerHTML)
+const settingsGroupsContainer = document.getElementById('groupsListSettings');
+if (settingsGroupsContainer && !settingsGroupsContainer._wired) {
+  settingsGroupsContainer._wired = true;
+  settingsGroupsContainer.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const gid = btn.dataset.gid;
+    const g = findGroupById(gid);
+    if (!g) return;
+    if (btn.dataset.act === 'settings-rename') {
+      const newName = prompt('Đổi tên nhóm:', g.name);
+      if (!newName || !newName.trim()) return;
+      const lower = newName.trim().toLowerCase();
+      const dup = mapping.groups.find(x => x.id !== gid && x.name.toLowerCase() === lower);
+      if (dup) { alert(`Đã có nhóm "${dup.name}" - tên trùng (không phân biệt hoa/thường)`); return; }
+      g.name = newName.trim();
+      await persistMapping();
+      renderSettingsGroupsList();
+      renderGiftTable();
+    } else if (btn.dataset.act === 'settings-del') {
+      if (!confirm(`Xoá nhóm "${g.name}" và ${(g.items || []).length} quà bên trong?`)) return;
+      mapping.groups = mapping.groups.filter(x => x.id !== gid);
+      await persistMapping();
+      renderSettingsGroupsList();
+      renderGiftTable();
+    }
   });
 }
 

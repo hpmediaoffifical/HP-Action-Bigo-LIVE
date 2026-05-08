@@ -86,28 +86,36 @@ main { padding: 16px 24px; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
 /* Embed tab: layout 3fr left + 2fr right (60:40 ratio per user request) */
-.embed-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; align-items: stretch; }
+.embed-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; align-items: start; }
 .embed-center { min-width: 0; }
-/* Right panel: chia 3 phần (queue, gifts, chats) cao tương đương */
+/* Right panel: 3 sections, mỗi section resizable + collapsible */
 .embed-right {
-  display: grid;
-  grid-template-rows: 1fr 1fr 1fr;
+  display: flex; flex-direction: column;
   gap: 12px;
-  height: calc(100vh - 100px);
   position: sticky; top: 16px;
 }
 .embed-right .right-panel-section {
   margin-bottom: 0;
   display: flex; flex-direction: column;
-  min-height: 0;
 }
 .embed-right .right-panel-section .panel-head { flex-shrink: 0; }
 .embed-right .mini-queue,
 .embed-right .gifts,
 .embed-right .chats {
-  flex: 1; max-height: none; min-height: 0; overflow-y: auto;
+  height: 240px;
+  min-height: 60px;
+  max-height: 70vh;
+  resize: vertical;          /* user kéo edge dưới để tăng/giảm chiều cao */
+  overflow: auto;
 }
-@media (max-width: 1100px) { .embed-layout { grid-template-columns: 1fr; } .embed-right { position: static; height: auto; } }
+.embed-right .right-panel-section.collapsed .mini-queue,
+.embed-right .right-panel-section.collapsed .gifts,
+.embed-right .right-panel-section.collapsed .chats {
+  display: none;
+}
+.rps-collapse { transition: transform 0.15s; }
+.right-panel-section.collapsed .rps-collapse { transform: rotate(-90deg); }
+@media (max-width: 1100px) { .embed-layout { grid-template-columns: 1fr; } .embed-right { position: static; } }
 
 .panel { background: #1c1f28; border: 1px solid #262a35; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
 .panel h2 { margin: 0 0 12px; font-size: 14px; color: #ff8a3d; }

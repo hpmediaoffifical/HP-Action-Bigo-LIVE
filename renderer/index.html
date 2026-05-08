@@ -62,27 +62,34 @@
           </div>
         </div>
         <aside class="embed-right">
-          <div class="panel right-panel-section">
+          <div class="panel right-panel-section" data-rps="queue">
             <div class="panel-head">
               <h2>🎬 Đang phát / Hàng đợi</h2>
-              <button id="btnPopupQueueRight" class="tiny" title="Mở popup riêng">📤</button>
+              <div style="display:flex; gap:4px">
+                <button id="btnPopupQueueRight" class="tiny" title="Mở popup riêng">📤</button>
+                <button class="tiny rps-collapse" data-rps-target="queue" title="Thu gọn / mở">▼</button>
+              </div>
             </div>
             <div id="miniQueue" class="mini-queue"></div>
           </div>
-          <div class="panel right-panel-section">
+          <div class="panel right-panel-section" data-rps="gifts">
             <div class="panel-head">
               <h2>🎁 Quà đã nhận</h2>
-              <button id="btnPopupGifts" class="tiny" title="Mở popup riêng để xem song song">📤 Popup</button>
+              <div style="display:flex; gap:4px">
+                <button id="btnPopupGifts" class="tiny" title="Mở popup riêng để xem song song">📤 Popup</button>
+                <button class="tiny rps-collapse" data-rps-target="gifts" title="Thu gọn / mở">▼</button>
+              </div>
             </div>
             <div id="liveGifts" class="gifts"></div>
           </div>
-          <div class="panel right-panel-section">
+          <div class="panel right-panel-section" data-rps="chats">
             <div class="panel-head">
               <h2>💬 Bình luận live</h2>
               <div style="display:flex; gap:6px; align-items:center; font-size:11px; color:#8a8f9a">
                 <span>A-</span>
                 <input type="range" id="chatFontSize" min="11" max="18" value="12" style="width:80px" />
                 <span style="font-size:14px">A+</span>
+                <button class="tiny rps-collapse" data-rps-target="chats" title="Thu gọn / mở">▼</button>
               </div>
             </div>
             <div id="liveChats" class="chats"></div>

@@ -10,27 +10,6 @@
       "bigoId": "",
       "items": [
         {
-          "id": "g_mox4yxkelnd9",
-          "matchKeys": [
-            "1",
-            "Flower",
-            "1140",
-            "Kiss",
-            "3121",
-            "Pink Rose",
-            "501139",
-            "502703",
-            "Fragrant",
-            "503665",
-            "وردة العائلة",
-            "9"
-          ],
-          "alias": "Flower",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false
-        },
-        {
           "id": "g_mox220symqfo",
           "matchKeys": [
             "2463",
@@ -162,16 +141,38 @@
       "id": "g_mox9je2347fw",
       "name": "Peo",
       "type": "gift",
-      "enabled": true,
+      "enabled": false,
       "collapsed": false,
       "bigoId": "",
-      "items": []
+      "items": [
+        {
+          "id": "g_mox4yxkelnd9",
+          "matchKeys": [
+            "1",
+            "Flower",
+            "1140",
+            "Kiss",
+            "3121",
+            "Pink Rose",
+            "501139",
+            "502703",
+            "Fragrant",
+            "503665",
+            "وردة العائلة",
+            "9"
+          ],
+          "alias": "Flower",
+          "mediaFile": "Tơ nhện.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false
+        }
+      ]
     },
     {
       "id": "g_mox9jh2358um",
       "name": "Ada",
       "type": "gift",
-      "enabled": true,
+      "enabled": false,
       "collapsed": false,
       "bigoId": "",
       "items": []
