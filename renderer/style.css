@@ -67,6 +67,14 @@ main { padding: 16px 24px; }
 .tab-panel.active { display: block; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
+/* Embed tab: layout center + right sticky */
+.embed-layout { display: grid; grid-template-columns: 1fr 360px; gap: 16px; align-items: start; }
+.embed-center { min-width: 0; }
+.embed-right { position: sticky; top: 16px; }
+.embed-right .panel { margin-bottom: 0; }
+.embed-right .gifts { max-height: calc(100vh - 280px); }
+@media (max-width: 1100px) { .embed-layout { grid-template-columns: 1fr; } .embed-right { position: static; } }
+
 .panel { background: #1c1f28; border: 1px solid #262a35; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
 .panel h2 { margin: 0 0 12px; font-size: 14px; color: #ff8a3d; }
 .panel h3 { margin: 14px 0 6px; font-size: 12px; color: #8a8f9a; text-transform: uppercase; letter-spacing: 0.05em; }

@@ -452,6 +452,47 @@ ipcMain.on('gifts:start-drag', (event, typeid) => {
   }
 });
 
+// =================== Popup window (Lịch sử quà) ===================
+let giftsPopup = null;
+
+function ensureGiftsPopup() {
+  if (giftsPopup && !giftsPopup.isDestroyed()) return giftsPopup;
+  giftsPopup = new BrowserWindow({
+    width: 380,
+    height: 720,
+    title: '🎁 Lịch sử quà',
+    icon: APP_ICON || undefined,
+    parent: win,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+  giftsPopup.setMenuBarVisibility(false);
+  giftsPopup.loadFile(path.join(ROOT, 'renderer', 'popup-gifts.html'));
+  giftsPopup.on('closed', () => { giftsPopup = null; });
+  return giftsPopup;
+}
+
+ipcMain.handle('popup:open-gifts', () => {
+  const w = ensureGiftsPopup();
+  w.show();
+  w.focus();
+  return { ok: true };
+});
+ipcMain.handle('popup:reset-gifts', () => {
+  if (giftsPopup && !giftsPopup.isDestroyed()) {
+    giftsPopup.webContents.send('popup:reset');
+  }
+  return { ok: true };
+});
+
+function forwardToGiftsPopup(ev) {
+  if (giftsPopup && !giftsPopup.isDestroyed()) {
+    try { giftsPopup.webContents.send('popup:event', ev); } catch {}
+  }
+}
+
 // =================== Web Embed Listener ===================
 ipcMain.handle('embed:start', async (_e, opts) => {
   // Always stop and recreate — đảm bảo đổi ID là restart phiên
@@ -463,6 +504,10 @@ ipcMain.handle('embed:start', async (_e, opts) => {
       // Enrich gift events in-place using master catalog
       if (ev && ev.kind === 'parsed') enrichGiftEvent(ev);
       if (win && !win.isDestroyed()) win.webContents.send('embed:event', ev);
+      // Forward gift events to popup window if open
+      if (ev && ev.kind === 'parsed' && (ev.type === 'gift' || ev.type === 'gift_overlay')) {
+        forwardToGiftsPopup(ev);
+      }
     },
     onLog: (msg) => { if (win && !win.isDestroyed()) win.webContents.send('bigo:log', `[embed] ${msg}`); },
   });

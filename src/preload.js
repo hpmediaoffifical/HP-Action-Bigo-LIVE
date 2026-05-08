@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld('bigo', {
   giftsOnDownloadProgress: (cb) => ipcRenderer.on('gifts:download-progress', (_e, p) => cb(p)),
   giftsStartDrag: (typeid) => ipcRenderer.send('gifts:start-drag', typeid),
 
+  // Popup gifts window
+  popupOpenGifts: () => ipcRenderer.invoke('popup:open-gifts'),
+  popupResetGifts: () => ipcRenderer.invoke('popup:reset-gifts'),
+
   // Open API mode
   start: (opts) => ipcRenderer.invoke('bigo:start', opts),
   stop: () => ipcRenderer.invoke('bigo:stop'),

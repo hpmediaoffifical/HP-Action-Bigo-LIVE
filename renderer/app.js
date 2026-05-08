@@ -143,6 +143,7 @@ const els = {
   metaPanel: $('metaPanel'), metaInfo: $('metaInfo'),
   liveChats: $('liveChats'), liveGifts: $('liveGifts'),
   csEffects: $('csEffects'), csDiamond: $('csDiamond'), csUsers: $('csUsers'), csGifts: $('csGifts'),
+  btnPopupGifts: $('btnPopupGifts'),
   effectQueue: $('effectQueue'), btnClearQueue: $('btnClearQueue'),
   qStatGifts: $('qStatGifts'), qStatDiamond: $('qStatDiamond'), qStatUsers: $('qStatUsers'),
   qSizeFont: $('qSizeFont'), qSizeFontVal: $('qSizeFontVal'),
@@ -571,6 +572,8 @@ function resetEmbedUi() {
   els.liveChats.innerHTML = '';
   els.liveGifts.innerHTML = '';
   resetSessionStats();
+  // Reset popup nếu đang mở
+  if (window.bigo.popupResetGifts) window.bigo.popupResetGifts().catch(() => {});
 }
 
 // Toggle state: false=disconnected, true=connected
@@ -657,6 +660,8 @@ els.btnConnect.onclick = async () => {
   setConnectedUi(true);
   appendLog(`connected to ${id}`);
 };
+
+els.btnPopupGifts.onclick = () => window.bigo.popupOpenGifts();
 
 els.btnEmbedShow.onclick = async () => {
   const r = await window.bigo.embedShow();
