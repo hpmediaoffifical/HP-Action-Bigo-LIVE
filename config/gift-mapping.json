@@ -183,7 +183,7 @@
       "id": "ov_mowzeyw8m6as",
       "name": "Overlay 1",
       "bgColor": "#00ff00",
-      "opacity": 0,
+      "opacity": 0.25,
       "bounds": {
         "x": 2023,
         "y": 1197,

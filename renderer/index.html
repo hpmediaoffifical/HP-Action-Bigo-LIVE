@@ -51,8 +51,7 @@
             <div class="panel-head">
               <h2>🎁 Danh sách quà tặng</h2>
               <div>
-                <button id="btnAddGiftEmbed" class="primary tiny" title="Thêm quà mới">+ Thêm quà</button>
-                <button id="btnAddGroupEmbed" class="tiny" title="Thêm nhóm mới">+ Nhóm</button>
+                <button id="btnAddGiftEmbed" class="primary tiny" title="Thêm quà mới — nếu không chọn nhóm sẽ vào nhóm Mặc định">+ Thêm quà</button>
               </div>
             </div>
             <div class="row" style="margin-bottom:8px">
@@ -332,6 +331,40 @@
       <div class="modal-actions">
         <button value="cancel">Huỷ</button>
         <button id="dlgGiftSave" class="primary" value="default">Lưu</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- =================== MODAL: EDIT GROUP =================== -->
+  <dialog id="groupEditDialog" class="modal">
+    <form method="dialog">
+      <h3 id="groupEditTitle">Sửa nhóm</h3>
+      <div class="form-row">
+        <label style="flex:1">Tên nhóm
+          <input id="grpDlgName" required />
+        </label>
+      </div>
+      <div class="form-row">
+        <label style="flex:1">BIGO ID gắn nhóm (auto-fill khi bật nhóm — tuỳ chọn)
+          <input id="grpDlgBigoId" placeholder="vd: 1066691535" />
+        </label>
+      </div>
+      <div class="form-row">
+        <label style="flex:1">Nhạc nền riêng cho nhóm (override Cài đặt chung)
+          <div style="display:flex; gap:6px">
+            <input id="grpDlgBgmLabel" readonly placeholder="Chưa chọn (dùng nhạc Cài đặt chung)" style="flex:1" />
+            <button type="button" id="grpDlgBgmPick" class="tiny" title="Chọn file mp3/wav">📁</button>
+            <button type="button" id="grpDlgBgmClear" class="tiny danger" title="Xoá nhạc nhóm (về dùng Cài đặt chung)">🗑</button>
+          </div>
+        </label>
+      </div>
+      <div class="hint small">
+        Khi <b>BẬT nhóm</b>: nếu có nhạc nền riêng, app phát nhạc đó thay nhạc trong Cài đặt chung.
+        Tích "🔇 Tạm dừng nhạc nền khi phát" trên từng quà vẫn pause/resume nhạc đang phát.
+      </div>
+      <div class="modal-actions">
+        <button value="cancel">Huỷ</button>
+        <button id="grpDlgSave" class="primary" value="default">Lưu</button>
       </div>
     </form>
   </dialog>

@@ -668,11 +668,15 @@ async function groupAction(act, gid, value, itemId) {
     if (grp) {
       grp.enabled = !!value;
       await persistMapping();
-      // Khi BẬT nhóm: tự đưa tên nhóm vào search để focus duy nhất nhóm đó + tự phát BGM
+      // Khi BẬT nhóm: đưa tên nhóm vào search + auto-fill BIGO ID + apply BGM theo nhóm
       if (value && grp.name) {
         if (els.embedGroupSearch) els.embedGroupSearch.value = grp.name;
-        playBgmIfHas();
+        if (grp.bigoId && els.embedBigoId && !els.embedBigoId.value.trim()) {
+          els.embedBigoId.value = grp.bigoId;
+        }
       }
+      applyActiveBgm();
+      if (value) playBgmIfHas();
       renderGiftTable();
     }
     return;
@@ -683,11 +687,7 @@ async function groupAction(act, gid, value, itemId) {
   }
   if (act === 'edit-group') {
     if (!grp) return;
-    const newName = prompt('Tên nhóm:', grp.name);
-    if (!newName) return;
-    grp.name = newName.trim();
-    await persistMapping();
-    renderGiftTable();
+    openGroupEditDialog(grp);
     return;
   }
   if (act === 'del-group') {
@@ -931,28 +931,27 @@ els.dlgGiftSave.onclick = async (e) => {
 };
 
 els.btnAddGift.onclick = () => {
-  if (mapping.overlays.length === 0) { alert('Tạo ít nhất 1 overlay trước (tab Overlay)'); return; }
+  ensureDefaultOverlay();
   openGiftDialog();
 };
 
-// Tab Tương tác: nút Thêm quà / Thêm nhóm + search nhóm + sub-tabs
+// Tab Tương tác: nút Thêm quà — auto tạo overlay default nếu chưa có
+function ensureDefaultOverlay() {
+  if (!mapping.overlays || mapping.overlays.length === 0) {
+    mapping.overlays = mapping.overlays || [];
+    mapping.overlays.push({
+      id: uid('ov_'), name: 'Overlay 1', bgColor: '#00FF00',
+      opacity: 1.0, bounds: { x: null, y: null, width: 540, height: 960 },
+      alwaysOnTop: true,
+    });
+    persistMapping();
+    if (typeof renderOverlayTable === 'function') renderOverlayTable();
+  }
+}
 if (els.btnAddGiftEmbed) {
   els.btnAddGiftEmbed.onclick = () => {
-    if (mapping.overlays.length === 0) { alert('Tạo ít nhất 1 overlay trước (tab Overlay)'); return; }
-    openGiftDialog();
-  };
-}
-if (els.btnAddGroupEmbed) {
-  els.btnAddGroupEmbed.onclick = async () => {
-    const name = prompt('Tên nhóm mới:');
-    if (!name || !name.trim()) return;
-    if (!Array.isArray(mapping.groups)) mapping.groups = [];
-    mapping.groups.push({
-      id: uid('g_'), name: name.trim(), type: 'gift',
-      enabled: true, collapsed: false, bigoId: '', items: [],
-    });
-    await persistMapping();
-    renderGiftTable();
+    ensureDefaultOverlay();
+    openGiftDialog(); // không pass groupId → save sẽ vào "Mặc định"
   };
 }
 if (els.embedGroupSearch) {
@@ -1176,7 +1175,8 @@ els.btnConnect.onclick = async () => {
   els.status.classList.add('on');
   setConnectedUi(true);
   appendLog(`connected to ${id}`);
-  // Auto-play BGM khi kết nối thành công
+  // Auto-play BGM khi kết nối thành công (theo nhóm active hoặc Cài đặt chung)
+  applyActiveBgm();
   playBgmIfHas();
 };
 
@@ -1573,6 +1573,63 @@ if (els.maxListItems) {
   });
 }
 
+// =================== Group Edit Dialog ===================
+const groupEditDialog = document.getElementById('groupEditDialog');
+let editingGrpId = null;
+let editingGrpBgmFile = null;
+let editingGrpBgmName = '';
+
+function openGroupEditDialog(grp) {
+  if (!groupEditDialog) return;
+  editingGrpId = grp.id;
+  editingGrpBgmFile = grp.bgmFile || null;
+  editingGrpBgmName = grp.bgmFileName || '';
+  document.getElementById('grpDlgName').value = grp.name || '';
+  document.getElementById('grpDlgBigoId').value = grp.bigoId || '';
+  document.getElementById('grpDlgBgmLabel').value = editingGrpBgmName;
+  groupEditDialog.showModal();
+}
+
+const grpDlgBgmPick = document.getElementById('grpDlgBgmPick');
+const grpDlgBgmClear = document.getElementById('grpDlgBgmClear');
+const grpDlgSave = document.getElementById('grpDlgSave');
+if (grpDlgBgmPick) {
+  grpDlgBgmPick.onclick = async () => {
+    const r = await window.bigo.pickBgmFile();
+    if (!r.ok) return;
+    editingGrpBgmFile = r.fileUrl;
+    editingGrpBgmName = r.fileName;
+    document.getElementById('grpDlgBgmLabel').value = r.fileName;
+  };
+}
+if (grpDlgBgmClear) {
+  grpDlgBgmClear.onclick = () => {
+    editingGrpBgmFile = null;
+    editingGrpBgmName = '';
+    document.getElementById('grpDlgBgmLabel').value = '';
+  };
+}
+if (grpDlgSave) {
+  grpDlgSave.onclick = async (e) => {
+    const newName = document.getElementById('grpDlgName').value.trim();
+    if (!newName) { e.preventDefault(); alert('Tên nhóm không được trống'); return; }
+    const grp = findGroupById(editingGrpId);
+    if (!grp) return;
+    // Check trùng tên (case-insensitive, exclude self)
+    const lower = newName.toLowerCase();
+    const dup = (mapping.groups || []).find(x => x.id !== grp.id && x.name.toLowerCase() === lower);
+    if (dup) { e.preventDefault(); alert(`Đã có nhóm "${dup.name}" - tên trùng (không phân biệt hoa/thường)`); return; }
+    grp.name = newName;
+    grp.bigoId = document.getElementById('grpDlgBigoId').value.trim();
+    grp.bgmFile = editingGrpBgmFile;
+    grp.bgmFileName = editingGrpBgmName;
+    await persistMapping();
+    renderGiftTable();
+    renderSettingsGroupsList();
+    applyActiveBgm();
+  };
+}
+
 // =================== Quản lý nhóm trong tab Cài đặt ===================
 function renderSettingsGroupsList() {
   const container = document.getElementById('groupsListSettings');
@@ -1675,9 +1732,36 @@ if (window.bigo.onOverlayQueueEmpty) {
   });
 }
 
+// Tìm BGM nguồn ưu tiên: group enabled có bgmFile > Cài đặt chung
+function getActiveBgmSrc() {
+  for (const g of (mapping.groups || [])) {
+    if (g.enabled !== false && g.bgmFile) return g.bgmFile;
+  }
+  return appSettings?.bgm?.file || '';
+}
+
+// Switch BGM source nếu cần (khi enable/disable group có bgmFile riêng)
+function applyActiveBgm() {
+  if (!els.bgmAudio) return;
+  const target = getActiveBgmSrc();
+  const current = els.bgmAudio.src || '';
+  if (current === target) return;
+  const wasPlaying = !els.bgmAudio.paused && current;
+  if (target) {
+    els.bgmAudio.src = target;
+    if (wasPlaying) els.bgmAudio.play().catch(() => {});
+  } else {
+    els.bgmAudio.pause();
+    els.bgmAudio.removeAttribute('src');
+    els.bgmAudio.load();
+  }
+}
+
 // Helper: play BGM nếu có file và đang paused (dùng cho auto-trigger)
 function playBgmIfHas() {
-  if (!els.bgmAudio || !els.bgmAudio.src) return;
+  if (!els.bgmAudio) return;
+  applyActiveBgm();
+  if (!els.bgmAudio.src) return;
   if (els.bgmAudio.paused) {
     els.bgmAudio.play().catch(() => {});
   }
