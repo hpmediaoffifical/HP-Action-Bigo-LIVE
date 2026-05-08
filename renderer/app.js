@@ -1213,12 +1213,15 @@ els.dlgGiftSave.onclick = async (e) => {
   renderGiftTable();
 };
 
-els.btnAddGift.onclick = () => {
+// Shared handler cho TẤT CẢ button "+ Thêm quà" — dù bấm ở Tương tác hay Bảng quà,
+// flow giống hệt: ensure overlay default → mở giftDialog (no preselect group → vào NHÓM CHUNG).
+// Single source of truth: edit logic ở 1 chỗ → cả 2 button đồng bộ.
+function openNewGiftDialog() {
   ensureDefaultOverlay();
   openGiftDialog();
-};
+}
 
-// Tab Tương tác: nút Thêm quà — auto tạo overlay default nếu chưa có
+// Tab Tương tác/Bảng quà: nút Thêm quà — auto tạo overlay default nếu chưa có
 function ensureDefaultOverlay() {
   if (!mapping.overlays || mapping.overlays.length === 0) {
     mapping.overlays = mapping.overlays || [];
@@ -1231,12 +1234,10 @@ function ensureDefaultOverlay() {
     if (typeof renderOverlayTable === 'function') renderOverlayTable();
   }
 }
-if (els.btnAddGiftEmbed) {
-  els.btnAddGiftEmbed.onclick = () => {
-    ensureDefaultOverlay();
-    openGiftDialog(); // không pass groupId → save sẽ vào "Mặc định"
-  };
-}
+
+// Cả 2 button cùng wire vào openNewGiftDialog → đảm bảo bấm ở đâu cũng cùng flow.
+els.btnAddGift.onclick = openNewGiftDialog;
+if (els.btnAddGiftEmbed) els.btnAddGiftEmbed.onclick = openNewGiftDialog;
 if (els.embedGroupSearch) {
   let searchTimer = null;
   els.embedGroupSearch.addEventListener('input', () => {

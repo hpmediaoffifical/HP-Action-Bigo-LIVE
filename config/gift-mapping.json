@@ -68,7 +68,7 @@
             "7511"
           ],
           "alias": "Heart Lock",
-          "mediaFile": "Tơ nhện.webm",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/Tơ nhện.webm",
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": false,
           "preEffect": true,
@@ -81,7 +81,7 @@
             "Blue Flower"
           ],
           "alias": "Blue Flower",
-          "mediaFile": "02. Bướm Ảo.webm",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/02. Bướm Ảo.webm",
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": true,
           "preEffect": false,
@@ -169,7 +169,7 @@
       },
       "alwaysOnTop": true,
       "clickThrough": false,
-      "autoHide": true,
+      "autoHide": false,
       "lockRatio": true,
       "autoOpen": true,
       "autoFocus": true
