@@ -4,8 +4,13 @@
 
 const { BrowserWindow, screen } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
-const RENDERER_PATH = path.join(__dirname, '..', 'renderer', 'overlay.html');
+const ROOT = path.join(__dirname, '..');
+const RENDERER_PATH = path.join(ROOT, 'renderer', 'overlay.html');
+const APP_ICON = fs.existsSync(path.join(ROOT, 'logo-hp.ico'))
+  ? path.join(ROOT, 'logo-hp.ico')
+  : (fs.existsSync(path.join(ROOT, 'logo-hp.png')) ? path.join(ROOT, 'logo-hp.png') : null);
 
 function clampToScreen(b) {
   const { workArea } = screen.getPrimaryDisplay();
@@ -33,6 +38,7 @@ class OverlayWindow {
     const b = clampToScreen(this.cfg.bounds || {});
     this.win = new BrowserWindow({
       title: `Overlay · ${this.cfg.name || this.cfg.id}`,
+      icon: APP_ICON || undefined,
       x: b.x, y: b.y, width: b.width, height: b.height,
       frame: false,
       transparent: false,

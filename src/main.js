@@ -13,6 +13,16 @@ const EFFECTS_DIR = path.join(ROOT, 'assets', 'effects');
 const GIFT_ICONS_DIR = path.join(ROOT, 'assets', 'gift-icons');
 const GIFT_MASTER_TTL = 24 * 3600 * 1000; // 24h
 
+// App icon — Windows ưu tiên .ico, fallback .png
+const ICO_PATH = path.join(ROOT, 'logo-hp.ico');
+const PNG_PATH = path.join(ROOT, 'logo-hp.png');
+const APP_ICON = fs.existsSync(ICO_PATH) ? ICO_PATH : (fs.existsSync(PNG_PATH) ? PNG_PATH : null);
+
+// Windows: set AppUserModelID để taskbar group đúng và hiện icon
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.hp.bigoaction');
+}
+
 let win;
 let client = null;
 let listener = null;
@@ -178,6 +188,7 @@ function createWindow() {
     width: 1280,
     height: 860,
     title: 'BIGO Action',
+    icon: APP_ICON || undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

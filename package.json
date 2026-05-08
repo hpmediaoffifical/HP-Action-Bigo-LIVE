@@ -9,6 +9,19 @@
   },
   "author": "Phụng",
   "license": "ISC",
+  "build": {
+    "appId": "com.hp.bigoaction",
+    "productName": "BIGO Action",
+    "win": {
+      "icon": "logo-hp.ico"
+    },
+    "mac": {
+      "icon": "logo-hp.png"
+    },
+    "linux": {
+      "icon": "logo-hp.png"
+    }
+  },
   "devDependencies": {
     "electron": "^33.0.0"
   }

@@ -3,6 +3,12 @@
 
 const { BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+const ROOT = path.join(__dirname, '..');
+const APP_ICON = fs.existsSync(path.join(ROOT, 'logo-hp.ico'))
+  ? path.join(ROOT, 'logo-hp.ico')
+  : (fs.existsSync(path.join(ROOT, 'logo-hp.png')) ? path.join(ROOT, 'logo-hp.png') : null);
 
 class BigoWebListener {
   constructor({ onEvent, onLog }) {
@@ -34,6 +40,7 @@ class BigoWebListener {
       height: 720,
       show: visible,
       title: `Bigo Listener · ${bigoId}`,
+      icon: APP_ICON || undefined,
       webPreferences: {
         preload: path.join(__dirname, 'preload-embed.js'),
         contextIsolation: false,

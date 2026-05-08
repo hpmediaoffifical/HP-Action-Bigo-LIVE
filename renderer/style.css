@@ -1,7 +1,8 @@
 * { box-sizing: border-box; }
 body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #14161c; color: #e6e8ee; font-size: 13px; }
 
-header { padding: 14px 24px; background: linear-gradient(90deg, #ff3b6f, #ff8a3d); display: flex; align-items: baseline; gap: 16px; }
+header { padding: 12px 24px; background: linear-gradient(90deg, #ff3b6f, #ff8a3d); display: flex; align-items: center; gap: 14px; }
+header .header-logo { width: 36px; height: 36px; border-radius: 8px; object-fit: contain; background: rgba(0,0,0,0.15); padding: 2px; }
 header h1 { margin: 0; font-size: 20px; }
 .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; background: rgba(0,0,0,0.35); font-size: 12px; margin-left: 8px; }
 .badge.on { background: #1e8a4f; }
