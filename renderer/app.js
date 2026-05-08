@@ -340,6 +340,20 @@ document.querySelectorAll('.tab').forEach(t => {
 });
 
 // =================== Init ===================
+// Marquee suffix branding (chữ chạy)
+const LIVE_SUFFIX = ' - Phần mềm Độc quyền thuộc về HP Media | HPVN.MEDIA';
+function setLiveInfo(text, cls) {
+  if (!els.liveInfo) return;
+  els.liveInfo.className = `live-info-inline ${cls || ''}`;
+  const safe = escapeHtml(text);
+  const brand = escapeHtml(LIVE_SUFFIX);
+  // 2 bản copy để loop seamless via translateX(-50%)
+  els.liveInfo.innerHTML = `<div class="live-marquee">
+    <span>${safe}<span class="brand">${brand}</span></span>
+    <span>${safe}<span class="brand">${brand}</span></span>
+  </div>`;
+}
+
 async function init() {
   const s = await window.bigo.settingsLoad();
   els.embedBigoId.value = s.bigoId || '';
@@ -354,6 +368,19 @@ async function init() {
   renderQueue();
   renderMiniQueue();
   renderSettingsGroupsList();
+  // Chat font size slider — persist localStorage
+  const chatFont = document.getElementById('chatFontSize');
+  if (chatFont) {
+    const saved = parseInt(localStorage.getItem('chatFontSize') || '', 10);
+    if (saved >= 11 && saved <= 18) chatFont.value = saved;
+    const apply = () => {
+      const v = parseInt(chatFont.value, 10);
+      if (els.liveChats) els.liveChats.style.fontSize = v + 'px';
+      localStorage.setItem('chatFontSize', String(v));
+    };
+    chatFont.addEventListener('input', apply);
+    apply();
+  }
   // Pre-load master để gift table có icon ngay (background)
   ensureMasterLoaded().catch(() => {});
   updateBgmSidebarIcon();
@@ -1048,8 +1075,7 @@ async function disconnect() {
   els.status.textContent = 'disconnected';
   els.status.classList.remove('on');
   setConnectedUi(false);
-  els.liveInfo.textContent = 'Đã hủy kết nối. Nhập BIGO ID khác và bấm Kết nối phòng.';
-  els.liveInfo.className = 'live-info-inline';
+  setLiveInfo('Đã hủy kết nối. Nhập BIGO ID khác và bấm Kết nối phòng.', '');
   resetEmbedUi();
 }
 
@@ -1073,22 +1099,19 @@ els.btnConnect.onclick = async () => {
   // 2. Check live
   const check = await window.bigo.checkLive(id);
   if (!check.ok) {
-    els.liveInfo.textContent = `Lỗi check live: ${check.error}`;
-    els.liveInfo.className = 'live-info-inline dead';
+    setLiveInfo(`Lỗi check live: ${check.error}`, 'dead');
     els.btnConnect.disabled = false;
     return;
   }
   const d = check.data?.data || {};
   if (d.alive !== 1) {
-    els.liveInfo.className = 'live-info-inline dead';
-    els.liveInfo.textContent = `🔴 OFFLINE — ${d.nick_name || 'không tìm thấy ID'}`;
+    setLiveInfo(`🔴 OFFLINE — ${d.nick_name || 'không tìm thấy ID'}`, 'dead');
     els.status.textContent = 'offline';
     els.btnConnect.disabled = false;
     return;
   }
 
-  els.liveInfo.className = 'live-info-inline live';
-  els.liveInfo.textContent = `🟢 LIVE — ${d.nick_name} · roomId=${d.roomId} · uid=${d.uid} · "${d.roomTopic || ''}"`;
+  setLiveInfo(`🟢 LIVE — ${d.nick_name} · roomId=${d.roomId} · uid=${d.uid} · "${d.roomTopic || ''}"`, 'live');
 
   // 3. Lưu BIGO ID
   const s = await window.bigo.settingsLoad();
@@ -1301,9 +1324,7 @@ function shouldDropDuplicate(ev) {
 
 function renderParsed(ev) {
   // Bỏ gift_overlay UI render hoàn toàn — đây là duplicate của gift event từ chat
-  // (cùng người tặng cùng quà, chỉ khác source DOM). Skip giữ data sạch.
   if (ev.type === 'gift_overlay') {
-    // chỉ log debug, không render và không trigger play (gift event đã trigger rồi)
     console.log('[bigo gift_overlay skipped]', { user: ev.user, gift_name: ev.gift_name, combo: ev.combo });
     return;
   }
@@ -1311,7 +1332,6 @@ function renderParsed(ev) {
     console.log('[bigo dup-dropped]', { type: ev.type, user: ev.user, content: ev.content || ev.gift_name });
     return;
   }
-  // Debug: log gift events ra console
   if (ev.type === 'gift') {
     console.log('[bigo gift]', {
       user: ev.user, gift_name: ev.gift_name, gift_id: ev.gift_id,
@@ -1323,8 +1343,10 @@ function renderParsed(ev) {
     div.className = 'chat-row';
     const av = ev.user_avatar_url ? `<img class="avatar" src="${escapeHtml(ev.user_avatar_url)}" loading="lazy" style="width:20px;height:20px" />` : '';
     div.innerHTML = `${av}<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span><span class="what">${escapeHtml(ev.content)}</span>`;
-    els.liveChats.prepend(div);
-    while (els.liveChats.children.length > 200) els.liveChats.lastChild.remove();
+    // Mới nhất ở DƯỚI: append + auto scroll xuống cuối
+    els.liveChats.appendChild(div);
+    while (els.liveChats.children.length > 200) els.liveChats.firstChild.remove();
+    els.liveChats.scrollTop = els.liveChats.scrollHeight;
     return;
   }
   if (ev.type === 'gift' || ev.type === 'gift_overlay') {

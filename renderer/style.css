@@ -86,12 +86,28 @@ main { padding: 16px 24px; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
 /* Embed tab: layout 3fr left + 2fr right (60:40 ratio per user request) */
-.embed-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; align-items: start; }
+.embed-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; align-items: stretch; }
 .embed-center { min-width: 0; }
-.embed-right { position: sticky; top: 16px; }
-.embed-right .panel { margin-bottom: 0; }
-.embed-right .gifts { max-height: calc(100vh - 280px); }
-@media (max-width: 1100px) { .embed-layout { grid-template-columns: 1fr; } .embed-right { position: static; } }
+/* Right panel: chia 3 phần (queue, gifts, chats) cao tương đương */
+.embed-right {
+  display: grid;
+  grid-template-rows: 1fr 1fr 1fr;
+  gap: 12px;
+  height: calc(100vh - 100px);
+  position: sticky; top: 16px;
+}
+.embed-right .right-panel-section {
+  margin-bottom: 0;
+  display: flex; flex-direction: column;
+  min-height: 0;
+}
+.embed-right .right-panel-section .panel-head { flex-shrink: 0; }
+.embed-right .mini-queue,
+.embed-right .gifts,
+.embed-right .chats {
+  flex: 1; max-height: none; min-height: 0; overflow-y: auto;
+}
+@media (max-width: 1100px) { .embed-layout { grid-template-columns: 1fr; } .embed-right { position: static; height: auto; } }
 
 .panel { background: #1c1f28; border: 1px solid #262a35; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
 .panel h2 { margin: 0 0 12px; font-size: 14px; color: #ff8a3d; }
@@ -125,9 +141,32 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .panel-compact { padding: 10px 14px; }
 .connect-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .connect-input { flex: 0 1 220px; min-width: 160px; }
-.live-info-inline { flex: 1; min-width: 180px; font-family: 'Consolas', monospace; font-size: 12px; color: #8ad6ff; padding: 4px 10px; background: #0f1117; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live-info-inline { flex: 1; min-width: 180px; font-family: 'Consolas', monospace; font-size: 12px; color: #8ad6ff; padding: 4px 0; background: #0f1117; border-radius: 6px; white-space: nowrap; overflow: hidden; }
 .live-info-inline.live { color: #4ad07a; }
 .live-info-inline.dead { color: #ff6b6b; }
+
+/* Marquee chạy từ phải qua trái, loop seamless bằng 2 bản copy */
+.live-marquee {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: liveMarquee 28s linear infinite;
+  will-change: transform;
+}
+.live-marquee > span {
+  padding: 0 24px;
+  display: inline-block;
+}
+.live-marquee > span.brand {
+  color: #ff8a3d;
+  font-weight: 600;
+}
+@keyframes liveMarquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.live-info-inline:hover .live-marquee {
+  animation-play-state: paused;
+}
 
 .connect-stats { display: flex; gap: 14px; padding: 4px 12px; background: #0f1117; border-radius: 6px; font-size: 13px; color: #8a8f9a; }
 .connect-stats span { white-space: nowrap; }

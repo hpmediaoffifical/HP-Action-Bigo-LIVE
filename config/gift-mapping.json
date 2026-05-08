@@ -157,6 +157,24 @@
           "pauseBgm": false
         }
       ]
+    },
+    {
+      "id": "g_mox9je2347fw",
+      "name": "Peo",
+      "type": "gift",
+      "enabled": true,
+      "collapsed": false,
+      "bigoId": "",
+      "items": []
+    },
+    {
+      "id": "g_mox9jh2358um",
+      "name": "Ada",
+      "type": "gift",
+      "enabled": true,
+      "collapsed": false,
+      "bigoId": "",
+      "items": []
     }
   ],
   "overlays": [
