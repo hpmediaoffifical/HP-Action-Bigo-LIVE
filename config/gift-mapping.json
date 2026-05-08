@@ -9,7 +9,7 @@
       ],
       "alias": "Flower",
       "group": "TUNG HOA",
-      "mediaFile": "",
+      "mediaFile": "Tơ nhện.webm",
       "overlayId": "ov_mowzeyw8m6as"
     }
   ],
@@ -20,10 +20,10 @@
       "bgColor": "#00ff00",
       "opacity": 0,
       "bounds": {
-        "x": 1612,
-        "y": 546,
-        "width": 434,
-        "height": 736
+        "x": 1939,
+        "y": 145,
+        "width": 442,
+        "height": 801
       },
       "alwaysOnTop": true
     }

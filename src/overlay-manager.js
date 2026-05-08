@@ -41,9 +41,11 @@ class OverlayWindow {
       icon: APP_ICON || undefined,
       x: b.x, y: b.y, width: b.width, height: b.height,
       frame: false,
-      transparent: false,
+      // transparent: true cho phép body background RGBA alpha=0 thật sự xuyên thấu.
+      // OBS Window Capture vẫn bắt được window này dù trong suốt 100%.
+      transparent: true,
       hasShadow: false,
-      backgroundColor: this.cfg.bgColor || '#00FF00',
+      // Không set backgroundColor — để CSS body với RGBA quản lý.
       alwaysOnTop: !!this.cfg.alwaysOnTop,
       resizable: true,
       skipTaskbar: false,
@@ -62,14 +64,19 @@ class OverlayWindow {
 
   applyConfig() {
     if (!this.win || this.win.isDestroyed()) return;
-    try { this.win.setBackgroundColor(this.cfg.bgColor || '#00FF00'); } catch {}
-    // Window-level opacity: thật sự trong suốt cả frame, không chỉ body
-    const op = this.cfg.opacity != null ? Math.max(0.05, Math.min(1, this.cfg.opacity)) : 1.0;
-    try { this.win.setOpacity(op); } catch {}
+    // Always-on-top
     this.win.setAlwaysOnTop(!!this.cfg.alwaysOnTop, this.cfg.alwaysOnTop ? 'screen-saver' : 'normal');
-    // Body chỉ nhận bgColor — không set body opacity vì đã handle ở window level
+    // Click-through (OBS mode): window vẫn render nhưng không nhận click + ẩn taskbar
+    const ct = !!this.cfg.clickThrough;
+    try {
+      this.win.setIgnoreMouseEvents(ct, ct ? { forward: true } : undefined);
+      this.win.setSkipTaskbar(ct);
+    } catch {}
+    // Send config xuống renderer cho CSS RGBA
     this.win.webContents.send('overlay:config', {
       bgColor: this.cfg.bgColor || '#00FF00',
+      alpha: this.cfg.opacity != null ? this.cfg.opacity : 1.0,
+      clickThrough: ct,
     });
   }
 

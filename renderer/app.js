@@ -34,7 +34,8 @@ const els = {
   // Overlay modal
   overlayDialog: $('overlayDialog'), overlayDialogTitle: $('overlayDialogTitle'),
   ovName: $('ovName'), ovBgColor: $('ovBgColor'), ovOpacity: $('ovOpacity'), ovOpacityVal: $('ovOpacityVal'),
-  ovW: $('ovW'), ovH: $('ovH'), ovTop: $('ovTop'), dlgOverlaySave: $('dlgOverlaySave'),
+  ovW: $('ovW'), ovH: $('ovH'), ovTop: $('ovTop'), ovClickThrough: $('ovClickThrough'),
+  dlgOverlaySave: $('dlgOverlaySave'),
 };
 
 // =================== Utils ===================
@@ -313,10 +314,13 @@ els.btnTestGift.onclick = async () => {
 // =================== Overlay Table ===================
 function renderOverlayTable() {
   if (mapping.overlays.length === 0) {
-    els.overlayTableBody.innerHTML = '<tr><td colspan="7" style="color:#555;text-align:center;padding:20px">Chưa có overlay — bấm "+ Thêm overlay"</td></tr>';
+    els.overlayTableBody.innerHTML = '<tr><td colspan="8" style="color:#555;text-align:center;padding:20px">Chưa có overlay — bấm "+ Thêm overlay"</td></tr>';
   } else {
     els.overlayTableBody.innerHTML = mapping.overlays.map(o => {
       const b = o.bounds || {};
+      const lockBtn = o.clickThrough
+        ? `<button class="tiny" data-act="unlock" data-id="${o.id}" title="Đang khoá - bấm để mở khoá">🔓 Mở khoá</button>`
+        : `<button class="tiny" data-act="lock" data-id="${o.id}" title="Bật click-through OBS mode">🔒 Khoá</button>`;
       return `<tr data-id="${o.id}">
         <td>${escapeHtml(o.name)}</td>
         <td><span class="color-swatch" style="background:${o.bgColor}"></span><code>${escapeHtml(o.bgColor)}</code></td>
@@ -324,9 +328,10 @@ function renderOverlayTable() {
         <td>${b.width || '?'} × ${b.height || '?'}</td>
         <td>${b.x != null ? `${Math.round(b.x)}, ${Math.round(b.y)}` : 'auto'}</td>
         <td>${o.alwaysOnTop ? '✓' : '—'}</td>
+        <td>${o.clickThrough ? '🔒 Có' : '—'}</td>
         <td class="actions-col">
-          <button class="tiny" data-act="show" data-id="${o.id}">👁 Hiện</button>
-          <button class="tiny" data-act="hide" data-id="${o.id}">🙈 Ẩn</button>
+          <button class="tiny" data-act="show" data-id="${o.id}">👁 Mở</button>
+          ${lockBtn}
           <button class="tiny" data-act="edit" data-id="${o.id}">✏️</button>
           <button class="tiny danger" data-act="del" data-id="${o.id}">🗑</button>
         </td>
@@ -344,8 +349,10 @@ async function overlayAction(act, id) {
   if (act === 'show') {
     const r = await window.bigo.overlayShow(id);
     if (!r.ok) alert('Lỗi: ' + (r.error || 'unknown'));
-  } else if (act === 'hide') {
-    await window.bigo.overlayHide(id);
+  } else if (act === 'lock' || act === 'unlock') {
+    o.clickThrough = (act === 'lock');
+    await window.bigo.overlayApplyConfig({ ...o });
+    renderOverlayTable();
   } else if (act === 'edit') {
     openOverlayDialog(o);
   } else if (act === 'del') {
@@ -373,6 +380,7 @@ function openOverlayDialog(ov = null) {
   els.ovW.value = ov?.bounds?.width || 540;
   els.ovH.value = ov?.bounds?.height || 960;
   els.ovTop.checked = ov?.alwaysOnTop !== false;
+  els.ovClickThrough.checked = !!ov?.clickThrough;
   els.overlayDialog.dataset.editingId = ov?.id || '';
   els.overlayDialog.showModal();
 }
@@ -393,6 +401,7 @@ els.dlgOverlaySave.onclick = async (e) => {
       height: parseInt(els.ovH.value, 10) || 960,
     },
     alwaysOnTop: els.ovTop.checked,
+    clickThrough: els.ovClickThrough.checked,
   };
   if (existing) {
     Object.assign(existing, data);

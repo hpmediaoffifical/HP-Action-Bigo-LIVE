@@ -4,9 +4,11 @@ html, body {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #00FF00;
+  /* Default rgba(0,255,0,1) - sẽ được overlay.js override theo config */
+  background-color: rgba(0, 255, 0, 1);
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
+html { background: transparent; }
 
 #dragHandle {
   position: fixed;

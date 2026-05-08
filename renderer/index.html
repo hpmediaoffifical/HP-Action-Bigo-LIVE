@@ -105,10 +105,11 @@
               <tr>
                 <th>Tên</th>
                 <th>Màu nền</th>
-                <th>Độ trong</th>
+                <th>Độ đặc</th>
                 <th>Kích thước</th>
                 <th>Vị trí</th>
-                <th>Always on top</th>
+                <th>Always-top</th>
+                <th>Click-through</th>
                 <th class="actions-col">Thao tác</th>
               </tr>
             </thead>
@@ -116,8 +117,10 @@
           </table>
         </div>
         <div class="hint small">
-          Overlay là cửa sổ riêng phát mp4/webm/mp3 với phông xanh chroma key — đặt trong OBS bằng <b>Color Key</b> filter.
-          Mặc định 540×960 (vertical, scale 50% của 1080×1920). Bấm "Hiện" để mở cửa sổ rồi kéo/resize tự do — vị trí và kích thước được nhớ tự động.
+          Overlay là cửa sổ riêng phát mp4/webm/mp3. Đặt trong OBS bằng <b>Window Capture</b> (chọn cửa sổ Overlay) → thêm filter <b>Color Key</b> với chroma đúng màu nền.
+          Mặc định 540×960. Bấm "Hiện" để mở cửa sổ rồi kéo/resize tự do — vị trí được lưu tự động.
+          Khi sẵn sàng stream, bật <b>🔒 Click-through</b> — overlay không cản chuột, không hiện taskbar, nhưng OBS vẫn capture và hiệu ứng vẫn play.
+          <br>Hỗ trợ <b>nhiều overlay</b> chồng lên nhau (mỗi quà map vào 1 overlay riêng).
         </div>
       </div>
     </section>
@@ -247,8 +250,13 @@
         <label>Height
           <input type="number" id="ovH" min="100" max="3840" value="960" />
         </label>
+      </div>
+      <div class="form-row">
         <label class="checkbox-row">
           <input type="checkbox" id="ovTop" checked /> Always on top
+        </label>
+        <label class="checkbox-row" title="Window không nhận click + ẩn taskbar. Hiệu ứng vẫn play, OBS Window Capture vẫn bắt được">
+          <input type="checkbox" id="ovClickThrough" /> 🔒 Click-through (OBS mode)
         </label>
       </div>
       <div class="modal-actions">
