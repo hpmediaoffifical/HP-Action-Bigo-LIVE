@@ -1062,19 +1062,29 @@ ipcMain.on('overlay:queue-empty', (e) => {
   }
 });
 
-// Set tốc độ phát hiệu ứng (mp3/mp4/webm) trên TẤT CẢ overlays.
-// User: speed up/down trong Hieu Ung Dac Biet phai tac dong vao hieu ung qua,
-// KHONG phai BGM.
-ipcMain.handle('overlay:set-speed', (_e, rate) => {
-  const r = Math.max(0.25, Math.min(3, parseFloat(rate) || 1));
+// Set tốc độ phát hiệu ứng. Có thể nhận:
+// - number (legacy): apply cho cả audio + video.
+// - { audioRate, videoRate }: tách 2 axis độc lập (UNDEFINED → giữ nguyên).
+ipcMain.handle('overlay:set-speed', (_e, opts) => {
+  let payload;
+  if (typeof opts === 'number') {
+    const r = Math.max(0.25, Math.min(3, opts || 1));
+    payload = { audioRate: r, videoRate: r };
+  } else if (opts && typeof opts === 'object') {
+    payload = {};
+    if (opts.audioRate != null) payload.audioRate = Math.max(0.25, Math.min(3, parseFloat(opts.audioRate) || 1));
+    if (opts.videoRate != null) payload.videoRate = Math.max(0.25, Math.min(3, parseFloat(opts.videoRate) || 1));
+  } else {
+    return { ok: false, error: 'invalid opts' };
+  }
   if (overlayManager) {
     for (const ov of overlayManager.overlays.values()) {
       if (ov.win && !ov.win.isDestroyed()) {
-        try { ov.win.webContents.send('overlay:set-speed', r); } catch {}
+        try { ov.win.webContents.send('overlay:set-speed', payload); } catch {}
       }
     }
   }
-  return { ok: true, rate: r };
+  return { ok: true, ...payload };
 });
 
 // Stop hiệu ứng đang playing trên overlay (user xoá item khỏi DSHT)

@@ -31,9 +31,12 @@ let playing = false;
 let stopNonce = 0;
 let blockPlaysUntil = 0;
 
-// Tốc độ phát hiệu ứng — apply cho cả player + audio. Giữ giá trị qua các lần
-// playNext (khi load file mới sẽ áp dụng lại).
-let currentSpeed = 1.0;
+// Tốc độ phát — TÁCH 2 axis độc lập:
+//   currentAudioSpeed → audio.playbackRate (mp3/wav/ogg).
+//   currentVideoSpeed → player.playbackRate (mp4/webm).
+// Giữ giá trị qua các lần playNext (apply lại sau player.load()).
+let currentAudioSpeed = 1.0;
+let currentVideoSpeed = 1.0;
 
 function isVideo(url) { return /\.(mp4|webm)(\?|$)/i.test(url); }
 function isAudio(url) { return /\.(mp3|wav|ogg)(\?|$)/i.test(url); }
@@ -78,19 +81,19 @@ function playNext() {
     player.style.display = 'block';
     player.style.opacity = '1';
     player.style.visibility = 'visible';
-    player.playbackRate = currentSpeed;  // Apply speed cho video
+    player.playbackRate = currentVideoSpeed;  // VIDEO speed
     player.play().catch(() => setTimeout(playNext, 100));
   } else if (isAudio(url)) {
     clearPlayer();
     audio.src = url;
-    audio.playbackRate = currentSpeed;   // Apply speed cho audio
+    audio.playbackRate = currentAudioSpeed;   // AUDIO speed
     audio.play().catch(() => setTimeout(playNext, 100));
   } else {
     player.src = url;
     player.style.display = 'block';
     player.style.opacity = '1';
     player.style.visibility = 'visible';
-    player.playbackRate = currentSpeed;
+    player.playbackRate = currentVideoSpeed;
     player.play().catch(() => setTimeout(playNext, 100));
   }
 }
@@ -119,12 +122,19 @@ audio.addEventListener('error', () => {
 
 ipcRenderer.on('overlay:config', (_e, cfg) => applyConfig(cfg));
 
-// Set tốc độ phát hiệu ứng (mp3/mp4/webm). Apply ngay nếu đang play + lưu để
-// dùng cho file kế tiếp trong queue.
-ipcRenderer.on('overlay:set-speed', (_e, rate) => {
-  currentSpeed = Math.max(0.25, Math.min(3, parseFloat(rate) || 1));
-  try { player.playbackRate = currentSpeed; } catch {}
-  try { audio.playbackRate = currentSpeed; } catch {}
+// Set tốc độ. Nhận { audioRate, videoRate } object hoặc number (legacy).
+// Apply ngay nếu đang play + lưu cho file kế tiếp.
+ipcRenderer.on('overlay:set-speed', (_e, opts) => {
+  if (typeof opts === 'number') {
+    const r = Math.max(0.25, Math.min(3, opts || 1));
+    currentAudioSpeed = r;
+    currentVideoSpeed = r;
+  } else if (opts && typeof opts === 'object') {
+    if (opts.audioRate != null) currentAudioSpeed = Math.max(0.25, Math.min(3, parseFloat(opts.audioRate) || 1));
+    if (opts.videoRate != null) currentVideoSpeed = Math.max(0.25, Math.min(3, parseFloat(opts.videoRate) || 1));
+  }
+  try { player.playbackRate = currentVideoSpeed; } catch {}
+  try { audio.playbackRate = currentAudioSpeed; } catch {}
 });
 
 // QUAN TRỌNG: ignore plays during block window (sau stop) hoặc stale nonce.

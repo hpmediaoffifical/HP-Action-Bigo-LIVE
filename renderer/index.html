@@ -218,45 +218,102 @@
           </div>
         </div>
 
+        <!-- 🎵 NHẠC (audio mp3/wav) — 2 hàng -->
         <div class="se-row">
           <div class="se-row-head">
-            <span class="se-icon">⏩</span>
-            <b class="se-title">Tăng tốc hiệu ứng (mp3/mp4/webm)</b>
-            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedUpFactor" step="0.05" min="1" max="3" value="1.25" style="width:60px" /></label>
-            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">⏱ <input type="number" id="seSpeedUpDuration" min="1" max="600" value="10" style="width:60px" />s</label>
-            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedUpEnabled" /> Bật</label>
+            <span class="se-icon">🎵⏩</span>
+            <b class="se-title">Tăng tốc nhạc (mp3/wav)</b>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedUpAudioFactor" step="0.05" min="1" max="3" value="1.25" style="width:60px" /></label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">⏱ <input type="number" id="seSpeedUpAudioDuration" min="1" max="600" value="10" style="width:60px" />s</label>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedUpAudioEnabled" /> Bật</label>
           </div>
           <div class="se-row-body">
-            <span id="seSpeedUpLabel" class="se-gift-label">— chưa chọn —</span>
-            <button type="button" class="tiny primary se-test" data-se-key="speedUp" title="Phát thử ngay">▶ Test</button>
-            <button type="button" class="tiny se-pick" data-se-key="speedUp">🎁 Chọn</button>
-            <button type="button" class="tiny danger se-unpick" data-se-key="speedUp">🗑</button>
+            <span id="seSpeedUpAudioLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny primary se-test" data-se-key="speedUpAudio">▶ Test</button>
+            <button type="button" class="tiny se-pick" data-se-key="speedUpAudio">🎁 Chọn</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="speedUpAudio">🗑</button>
           </div>
         </div>
 
         <div class="se-row">
           <div class="se-row-head">
-            <span class="se-icon">⏪</span>
-            <b class="se-title">Giảm tốc hiệu ứng (mp3/mp4/webm)</b>
-            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedDownFactor" step="0.05" min="0.25" max="1" value="0.75" style="width:60px" /></label>
-            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">⏱ <input type="number" id="seSpeedDownDuration" min="1" max="600" value="10" style="width:60px" />s</label>
-            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedDownEnabled" /> Bật</label>
+            <span class="se-icon">🎵⏪</span>
+            <b class="se-title">Giảm tốc nhạc (mp3/wav)</b>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedDownAudioFactor" step="0.05" min="0.25" max="1" value="0.75" style="width:60px" /></label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">⏱ <input type="number" id="seSpeedDownAudioDuration" min="1" max="600" value="10" style="width:60px" />s</label>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedDownAudioEnabled" /> Bật</label>
           </div>
           <div class="se-row-body">
-            <span id="seSpeedDownLabel" class="se-gift-label">— chưa chọn —</span>
-            <button type="button" class="tiny primary se-test" data-se-key="speedDown" title="Phát thử ngay">▶ Test</button>
-            <button type="button" class="tiny se-pick" data-se-key="speedDown">🎁 Chọn</button>
-            <button type="button" class="tiny danger se-unpick" data-se-key="speedDown">🗑</button>
+            <span id="seSpeedDownAudioLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny primary se-test" data-se-key="speedDownAudio">▶ Test</button>
+            <button type="button" class="tiny se-pick" data-se-key="speedDownAudio">🎁 Chọn</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="speedDownAudio">🗑</button>
+          </div>
+        </div>
+
+        <!-- 🎬 VIDEO (mp4/webm) — 2 hàng. Factor giới hạn nhỏ hơn để tránh khó chịu -->
+        <div class="se-row">
+          <div class="se-row-head">
+            <span class="se-icon">🎬⏩</span>
+            <b class="se-title">Tăng tốc video (mp4/webm)</b>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedUpVideoFactor" step="0.05" min="1" max="2" value="1.20" style="width:60px" /></label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">⏱ <input type="number" id="seSpeedUpVideoDuration" min="1" max="600" value="8" style="width:60px" />s</label>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedUpVideoEnabled" /> Bật</label>
+          </div>
+          <div class="se-row-body">
+            <span id="seSpeedUpVideoLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny primary se-test" data-se-key="speedUpVideo">▶ Test</button>
+            <button type="button" class="tiny se-pick" data-se-key="speedUpVideo">🎁 Chọn</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="speedUpVideo">🗑</button>
+          </div>
+        </div>
+
+        <div class="se-row">
+          <div class="se-row-head">
+            <span class="se-icon">🎬⏪</span>
+            <b class="se-title">Giảm tốc video (mp4/webm)</b>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedDownVideoFactor" step="0.05" min="0.5" max="1" value="0.80" style="width:60px" /></label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">⏱ <input type="number" id="seSpeedDownVideoDuration" min="1" max="600" value="8" style="width:60px" />s</label>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedDownVideoEnabled" /> Bật</label>
+          </div>
+          <div class="se-row-body">
+            <span id="seSpeedDownVideoLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny primary se-test" data-se-key="speedDownVideo">▶ Test</button>
+            <button type="button" class="tiny se-pick" data-se-key="speedDownVideo">🎁 Chọn</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="speedDownVideo">🗑</button>
           </div>
         </div>
 
         <div class="row" style="margin-top:8px; align-items:center">
-          <button type="button" id="btnResetBgmSpeed" class="tiny" title="Đưa hiệu ứng về tốc độ 1.0×">↻ Reset tốc độ hiệu ứng</button>
-          <span id="bgmSpeedDisplay" style="color:#8a8f9a; font-size:11px">Tốc độ hiệu ứng: ×1.0</span>
+          <button type="button" id="btnResetBgmSpeed" class="tiny" title="Đưa audio + video về tốc độ 1.0×">↻ Reset tốc độ</button>
+          <span id="bgmSpeedDisplay" style="color:#8a8f9a; font-size:11px">Tốc độ: ×1.0</span>
+        </div>
+
+        <!-- ❤ TÁP TIM (heart goal KPI) -->
+        <div class="se-row" style="border-top: 2px solid #1c1f28; margin-top:12px; padding-top:12px">
+          <div class="se-row-head">
+            <span class="se-icon">❤</span>
+            <b class="se-title">Mục tiêu lượt tym (Táp tim)</b>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">🎯 <input type="number" id="seHeartTarget" min="1" max="10000" value="100" style="width:80px" /> tym</label>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seHeartEnabled" /> Bật</label>
+          </div>
+          <div class="se-row-body">
+            <span id="seHeartProgress" class="se-gift-label" style="flex:1">Hiện tại: <b id="seHeartCount">0</b> / <b id="seHeartTargetDisp">100</b> tym</span>
+            <button type="button" class="tiny" id="btnHeartReset" title="Đặt lại bộ đếm">🔄 Reset</button>
+          </div>
+          <div class="se-row-body" style="margin-top:6px">
+            <select id="seHeartFile" class="se-gift-label" style="flex:1; min-width:0; padding:4px 8px; background:#1c1f28; color:#fff; border:1px solid #3a3f4b; border-radius:4px"></select>
+            <button type="button" class="tiny" id="btnHeartPickFile" title="Chọn file mp3/mp4 phát khi đạt mục tiêu">📁 File</button>
+            <select id="seHeartOverlay" style="padding:4px 8px; background:#1c1f28; color:#fff; border:1px solid #3a3f4b; border-radius:4px"></select>
+          </div>
+          <div class="hint small" style="margin-top:6px">
+            📌 Khi tổng số tym viewer tap đạt <b>mục tiêu</b> → app phát file đã chọn. Counter reset sau khi đạt.
+            <span style="color:#ffb627">⚠️ Cần test trên live: scraper detect heart count đang trong development.</span>
+          </div>
         </div>
 
         <div class="hint small" style="margin-top:8px">
-          📌 Sắp tới: <b>Táp màn hình theo yêu cầu</b> để phát hiệu ứng riêng + nhiều trigger khác.
+          📌 Sắp tới: <b>Táp màn hình theo yêu cầu</b> + nhiều trigger khác.
         </div>
       </div>
     </section>

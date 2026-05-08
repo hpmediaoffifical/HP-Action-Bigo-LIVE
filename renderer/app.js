@@ -370,17 +370,16 @@ function checkSpecialEffectsTriggers(ev) {
     clearAllQueue();
     triggered = true;
   }
-  if (matchSpecialGift(ev, se.speedUp)) {
-    const dur = parseInt(se.speedUp.duration, 10) || 10;
-    appendLog(`[se:speedUp] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → BGM ×${se.speedUp.factor} trong ${dur}s`);
-    triggerSpeedEffect('speedUp');
-    triggered = true;
-  }
-  if (matchSpecialGift(ev, se.speedDown)) {
-    const dur = parseInt(se.speedDown.duration, 10) || 10;
-    appendLog(`[se:speedDown] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → BGM ×${se.speedDown.factor} trong ${dur}s`);
-    triggerSpeedEffect('speedDown');
-    triggered = true;
+  // 4 speed triggers: audio/video × up/down
+  for (const key of ['speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo']) {
+    if (matchSpecialGift(ev, se[key])) {
+      const dur = parseInt(se[key].duration, 10) || 10;
+      const axis = SPEED_AXIS[key];
+      appendLog(`[se:${key}] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → ${axis} ×${se[key].factor} trong ${dur}s`);
+      triggerSpeedEffect(key);
+      triggered = true;
+      break; // chỉ 1 speed trigger 1 lúc (lock semantics)
+    }
   }
   return triggered;
 }
@@ -1469,6 +1468,9 @@ els.dlgGiftSave.onclick = async (e) => {
     preEffect: els.dlgPreFx ? els.dlgPreFx.checked : false,
     priority: els.dlgPriority ? Math.max(0, Math.min(100, parseInt(els.dlgPriority.value, 10) || 0)) : 0,
   };
+  // Diagnostic log để user verify priority được save đúng
+  console.log('[gift saved]', { id: data.id, alias: data.alias, priority: data.priority });
+  if (data.priority > 0) appendLog(`[gift saved] "${data.alias || data.matchKeys?.[0]}" priority = ${data.priority}`);
   // Tìm/tạo group case-insensitive (NPC = npc = Npc)
   const targetGroup = findOrCreateGroupCI(targetGroupName, 'gift');
   if (itemId) {
@@ -2095,6 +2097,11 @@ function renderEmbedEvent(ev) {
   if (ev.kind === 'parsed') {
     // Auto-focus on gift or chat event
     if (ev.type === 'gift' || ev.type === 'chat') nudgeAutoFocusOverlays();
+    // Heart event → bump heart KPI counter
+    if (ev.type === 'heart') {
+      const n = parseInt(ev.count, 10) || 1;
+      bumpHeartCount(n);
+    }
     return renderParsed(ev);
   }
   if (ev.kind === 'meta') {
@@ -2120,9 +2127,15 @@ let appSettings = {
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
   // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
   specialEffects: {
-    clearQueue:  { enabled: false, typeid: null, giftName: '', iconUrl: '' },
-    speedUp:     { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 1.25, duration: 10 },
-    speedDown:   { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 0.75, duration: 10 },
+    clearQueue:      { enabled: false, typeid: null, giftName: '', iconUrl: '' },
+    // 4 speed riêng — tách audio (mp3/wav) vs video (mp4/webm) độc lập.
+    // Video không nên tăng giảm tốc nhiều (cảm giác khó chịu) → user setup factor riêng.
+    speedUpAudio:    { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 1.25, duration: 10 },
+    speedDownAudio:  { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 0.75, duration: 10 },
+    speedUpVideo:    { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 1.20, duration: 8 },
+    speedDownVideo:  { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 0.80, duration: 8 },
+    // TÁP TIM: KPI hearts. Khi đạt target → phát media (mp3/mp4).
+    heartGoal:       { enabled: false, target: 100, mediaFile: '', overlayId: '', currentCount: 0 },
   },
   fxVolume: 100,
   maxListItems: 200,
@@ -2215,7 +2228,16 @@ async function initAppSettings(s) {
     };
   }
   if (s.specialEffects) {
-    for (const k of ['clearQueue', 'speedUp', 'speedDown']) {
+    // Migrate speedUp/speedDown cu → speedUpAudio + speedUpVideo (cùng factor).
+    if (s.specialEffects.speedUp && !s.specialEffects.speedUpAudio) {
+      appSettings.specialEffects.speedUpAudio = { ...appSettings.specialEffects.speedUpAudio, ...s.specialEffects.speedUp };
+      appSettings.specialEffects.speedUpVideo = { ...appSettings.specialEffects.speedUpVideo, ...s.specialEffects.speedUp };
+    }
+    if (s.specialEffects.speedDown && !s.specialEffects.speedDownAudio) {
+      appSettings.specialEffects.speedDownAudio = { ...appSettings.specialEffects.speedDownAudio, ...s.specialEffects.speedDown };
+      appSettings.specialEffects.speedDownVideo = { ...appSettings.specialEffects.speedDownVideo, ...s.specialEffects.speedDown };
+    }
+    for (const k of ['clearQueue','speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo','heartGoal']) {
       if (s.specialEffects[k]) {
         appSettings.specialEffects[k] = { ...appSettings.specialEffects[k], ...s.specialEffects[k] };
       }
@@ -2225,6 +2247,7 @@ async function initAppSettings(s) {
   appSettings.maxListItems = s.maxListItems || 200;
   // Apply special effects UI
   applySpecialEffectsUi();
+  applyHeartGoalUi();
   // Apply BGM
   if (els.bgmAudio) {
     els.bgmAudio.volume = (appSettings.bgm.volume || 80) / 100;
@@ -2289,9 +2312,11 @@ if (els.preFxEnabled) {
 // có master table giống dlgMaster. User click row → save typeid+name+icon.
 
 const SE_LABELS = {
-  clearQueue: { id: 'seClearQueueLabel', enabled: 'seClearQueueEnabled', factor: null,                duration: null },
-  speedUp:    { id: 'seSpeedUpLabel',    enabled: 'seSpeedUpEnabled',    factor: 'seSpeedUpFactor',   duration: 'seSpeedUpDuration' },
-  speedDown:  { id: 'seSpeedDownLabel',  enabled: 'seSpeedDownEnabled',  factor: 'seSpeedDownFactor', duration: 'seSpeedDownDuration' },
+  clearQueue:      { id: 'seClearQueueLabel',      enabled: 'seClearQueueEnabled',      factor: null,                     duration: null },
+  speedUpAudio:    { id: 'seSpeedUpAudioLabel',    enabled: 'seSpeedUpAudioEnabled',    factor: 'seSpeedUpAudioFactor',   duration: 'seSpeedUpAudioDuration' },
+  speedDownAudio:  { id: 'seSpeedDownAudioLabel',  enabled: 'seSpeedDownAudioEnabled',  factor: 'seSpeedDownAudioFactor', duration: 'seSpeedDownAudioDuration' },
+  speedUpVideo:    { id: 'seSpeedUpVideoLabel',    enabled: 'seSpeedUpVideoEnabled',    factor: 'seSpeedUpVideoFactor',   duration: 'seSpeedUpVideoDuration' },
+  speedDownVideo:  { id: 'seSpeedDownVideoLabel',  enabled: 'seSpeedDownVideoEnabled',  factor: 'seSpeedDownVideoFactor', duration: 'seSpeedDownVideoDuration' },
 };
 
 function applySpecialEffectsUi() {
@@ -2433,7 +2458,7 @@ document.querySelectorAll('.se-unpick').forEach(btn => {
     applySpecialEffectsUi();
   };
 });
-['clearQueue','speedUp','speedDown'].forEach(key => {
+['clearQueue','speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].forEach(key => {
   const enabledEl = document.getElementById(SE_LABELS[key].enabled);
   if (enabledEl) enabledEl.addEventListener('change', async () => {
     appSettings.specialEffects[key].enabled = !!enabledEl.checked;
@@ -2459,6 +2484,112 @@ document.querySelectorAll('.se-unpick').forEach(btn => {
     });
   }
 });
+
+// =================== TÁP TIM (heart goal KPI) ===================
+// Trigger: khi tổng số tym đạt target → phát media. Counter reset sau đó.
+// Nguồn data heart count: scraper bigo.tv (preload-embed) phải detect heart UI
+// element và emit 'heart_count' event. Hiện tại scraper CHƯA detect → tính năng
+// này wire UI + logic, chờ DOM live test để add scraper hook.
+function applyHeartGoalUi() {
+  const cfg = appSettings.specialEffects?.heartGoal || {};
+  const enabledEl = document.getElementById('seHeartEnabled');
+  const targetEl = document.getElementById('seHeartTarget');
+  const targetDispEl = document.getElementById('seHeartTargetDisp');
+  const countEl = document.getElementById('seHeartCount');
+  if (enabledEl) enabledEl.checked = !!cfg.enabled;
+  if (targetEl) targetEl.value = cfg.target || 100;
+  if (targetDispEl) targetDispEl.textContent = cfg.target || 100;
+  if (countEl) countEl.textContent = cfg.currentCount || 0;
+  // Populate file dropdown from effects
+  const fileEl = document.getElementById('seHeartFile');
+  if (fileEl) {
+    fileEl.innerHTML = '<option value="">— chọn file hoặc bấm 📁 —</option>'
+      + (effects || []).map(e => `<option value="${escapeHtml(e.file)}"${cfg.mediaFile === e.file ? ' selected' : ''}>${escapeHtml(e.file)}</option>`).join('');
+    if (cfg.mediaFile && !(effects || []).find(e => e.file === cfg.mediaFile)) {
+      // URL → add option
+      const opt = document.createElement('option');
+      opt.value = cfg.mediaFile;
+      opt.textContent = '📁 ' + (cfg.mediaFile.split(/[\/\\]/).pop() || cfg.mediaFile);
+      opt.selected = true;
+      fileEl.appendChild(opt);
+    }
+  }
+  // Populate overlay dropdown
+  const ovEl = document.getElementById('seHeartOverlay');
+  if (ovEl) {
+    ovEl.innerHTML = (mapping?.overlays || []).map(o =>
+      `<option value="${o.id}"${cfg.overlayId === o.id ? ' selected' : ''}>${escapeHtml(o.name)}</option>`
+    ).join('') || '<option value="">(chưa có overlay)</option>';
+  }
+}
+
+function bumpHeartCount(n = 1) {
+  const cfg = appSettings.specialEffects.heartGoal;
+  if (!cfg || !cfg.enabled) return;
+  cfg.currentCount = (cfg.currentCount || 0) + n;
+  const countEl = document.getElementById('seHeartCount');
+  if (countEl) countEl.textContent = cfg.currentCount;
+  if (cfg.currentCount >= (cfg.target || 100)) {
+    // Reach target → fire media + reset counter
+    appendLog(`[se:heartGoal] Đạt ${cfg.currentCount}/${cfg.target} tym → phát media`);
+    if (cfg.mediaFile && cfg.overlayId) {
+      const payload = resolveMediaPayload(cfg.mediaFile);
+      window.bigo.overlayPlay({ overlayId: cfg.overlayId, ...payload }).catch(() => {});
+    }
+    cfg.currentCount = 0;
+    if (countEl) countEl.textContent = 0;
+    saveAppSettings({ specialEffects: { heartGoal: { currentCount: 0 } } });
+  }
+}
+
+// Wire UI
+(function wireHeartGoal() {
+  const enabledEl = document.getElementById('seHeartEnabled');
+  const targetEl = document.getElementById('seHeartTarget');
+  const fileEl = document.getElementById('seHeartFile');
+  const ovEl = document.getElementById('seHeartOverlay');
+  const pickBtn = document.getElementById('btnHeartPickFile');
+  const resetBtn = document.getElementById('btnHeartReset');
+  if (enabledEl) enabledEl.addEventListener('change', () => {
+    appSettings.specialEffects.heartGoal.enabled = enabledEl.checked;
+    saveAppSettings({ specialEffects: { heartGoal: { enabled: enabledEl.checked } } });
+  });
+  if (targetEl) targetEl.addEventListener('change', () => {
+    const v = Math.max(1, Math.min(10000, parseInt(targetEl.value, 10) || 100));
+    appSettings.specialEffects.heartGoal.target = v;
+    targetEl.value = v;
+    document.getElementById('seHeartTargetDisp').textContent = v;
+    saveAppSettings({ specialEffects: { heartGoal: { target: v } } });
+  });
+  if (fileEl) fileEl.addEventListener('change', () => {
+    appSettings.specialEffects.heartGoal.mediaFile = fileEl.value;
+    saveAppSettings({ specialEffects: { heartGoal: { mediaFile: fileEl.value } } });
+  });
+  if (ovEl) ovEl.addEventListener('change', () => {
+    appSettings.specialEffects.heartGoal.overlayId = ovEl.value;
+    saveAppSettings({ specialEffects: { heartGoal: { overlayId: ovEl.value } } });
+  });
+  if (pickBtn) pickBtn.onclick = async () => {
+    const r = await window.bigo.effectsPickFiles();
+    if (!r.ok || !r.files?.length) return;
+    const picked = r.files[0];
+    appSettings.specialEffects.heartGoal.mediaFile = picked.fileUrl;
+    if (fileEl) {
+      const opt = document.createElement('option');
+      opt.value = picked.fileUrl;
+      opt.textContent = '📁 ' + picked.fileName;
+      opt.selected = true;
+      fileEl.appendChild(opt);
+      fileEl.value = picked.fileUrl;
+    }
+    saveAppSettings({ specialEffects: { heartGoal: { mediaFile: picked.fileUrl } } });
+  };
+  if (resetBtn) resetBtn.onclick = () => {
+    appSettings.specialEffects.heartGoal.currentCount = 0;
+    document.getElementById('seHeartCount').textContent = 0;
+    saveAppSettings({ specialEffects: { heartGoal: { currentCount: 0 } } });
+  };
+})();
 
 // "▶ Test" button: phát thử ngay (không cần gift trigger).
 document.querySelectorAll('.se-test').forEach(btn => {
@@ -2492,15 +2623,36 @@ if (btnResetBgmSpeed) {
   };
 }
 
-// Effect speed control — tác động vào HIỆU ỨNG (mp3/mp4/webm) trên overlay,
-// KHÔNG phải BGM. User feedback: tăng/giảm tốc phải áp vào hiệu ứng quà tặng.
-function applyEffectSpeed(rate) {
+// Effect speed control — tác động vào HIỆU ỨNG (mp3/mp4/webm) trên overlay.
+// Tách 2 axis: audioRate (mp3/wav) + videoRate (mp4/webm) độc lập.
+let _currentAudioSpeed = 1.0;
+let _currentVideoSpeed = 1.0;
+
+function applyAudioSpeed(rate) {
   const r = Math.max(0.25, Math.min(3, parseFloat(rate) || 1));
-  if (window.bigo.overlaySetSpeed) {
-    window.bigo.overlaySetSpeed(r).catch(() => {});
-  }
+  _currentAudioSpeed = r;
+  if (window.bigo.overlaySetSpeed) window.bigo.overlaySetSpeed({ audioRate: r }).catch(() => {});
+  updateSpeedDisplay();
+}
+function applyVideoSpeed(rate) {
+  const r = Math.max(0.25, Math.min(3, parseFloat(rate) || 1));
+  _currentVideoSpeed = r;
+  if (window.bigo.overlaySetSpeed) window.bigo.overlaySetSpeed({ videoRate: r }).catch(() => {});
+  updateSpeedDisplay();
+}
+function applyAllSpeed(rate) { applyAudioSpeed(rate); applyVideoSpeed(rate); }
+// Backward compat alias
+function applyEffectSpeed(rate) { applyAllSpeed(rate); }
+
+function updateSpeedDisplay() {
   const disp = document.getElementById('bgmSpeedDisplay');
-  if (disp) disp.textContent = `Tốc độ hiệu ứng: ×${r.toFixed(2).replace(/\.?0+$/, '')}`;
+  if (!disp) return;
+  const fmtRate = (r) => r.toFixed(2).replace(/\.?0+$/, '');
+  if (_currentAudioSpeed === _currentVideoSpeed) {
+    disp.textContent = `Tốc độ: ×${fmtRate(_currentAudioSpeed)} (cả audio + video)`;
+  } else {
+    disp.textContent = `🎵 Audio: ×${fmtRate(_currentAudioSpeed)} · 🎬 Video: ×${fmtRate(_currentVideoSpeed)}`;
+  }
 }
 
 // Trigger speed effect: apply factor + auto-revert về 1.0 sau duration giây.
@@ -2527,30 +2679,42 @@ function triggerSpeedEffect(key) {
   _applyAndScheduleSpeed(key);
 }
 
+// Map key → axis ('audio' / 'video' / 'both') để biết apply lên đâu.
+const SPEED_AXIS = {
+  speedUpAudio: 'audio', speedDownAudio: 'audio',
+  speedUpVideo: 'video', speedDownVideo: 'video',
+  // legacy keys (đã migrate, vẫn handle nếu còn)
+  speedUp: 'both', speedDown: 'both',
+};
+
 function _applyAndScheduleSpeed(key) {
   const cfg = appSettings.specialEffects?.[key];
   if (!cfg) return;
   const factor = parseFloat(cfg.factor) || 1;
   const duration = Math.max(1, parseInt(cfg.duration, 10) || 10);
-  applyEffectSpeed(factor);
+  const axis = SPEED_AXIS[key] || 'both';
+  // Apply theo axis
+  if (axis === 'audio') applyAudioSpeed(factor);
+  else if (axis === 'video') applyVideoSpeed(factor);
+  else applyAllSpeed(factor);
   _speedRevertEndsAt = Date.now() + duration * 1000;
   _speedRevertTimer = setTimeout(() => {
-    applyEffectSpeed(1.0);
-    appendLog(`[se] Speed effect kết thúc (${duration}s) → revert ×1.0`);
+    // Revert cùng axis về 1.0
+    if (axis === 'audio') applyAudioSpeed(1.0);
+    else if (axis === 'video') applyVideoSpeed(1.0);
+    else applyAllSpeed(1.0);
+    appendLog(`[se] ${key} (${axis}) kết thúc (${duration}s) → revert ×1.0`);
     _speedRevertTimer = null;
     _speedRevertEndsAt = 0;
-    // Apply pending key nếu có (latest wins khi nhiều triggers queue trong thời gian active)
     if (_pendingSpeedKey) {
       const nextKey = _pendingSpeedKey;
       _pendingSpeedKey = null;
       setTimeout(() => {
         appendLog(`[se] Apply pending speed: ${nextKey}`);
         _applyAndScheduleSpeed(nextKey);
-      }, 100); // 100ms breath cho user thấy speed về 1.0× rõ rệt
+      }, 100);
     }
   }, duration * 1000);
-  const disp = document.getElementById('bgmSpeedDisplay');
-  if (disp) disp.textContent = `Tốc độ hiệu ứng: ×${factor} (revert sau ${duration}s)`;
 }
 
 // Backward compat: old code có thể gọi applyBgmSpeed → forward sang applyEffectSpeed.

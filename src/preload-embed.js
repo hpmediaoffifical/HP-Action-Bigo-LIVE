@@ -200,6 +200,32 @@ function scanGiftOverlay() {
   return out;
 }
 
+// Detect số tym (heart count) hiển thị trên bigo.tv.
+// Bigo show heart count gần nick name dạng: "❤ 1.2K", "10K likes", "♥ 500".
+// Track diff từ tick trước → emit 'heart' event với count tăng thêm.
+let _lastHeartCount = -1;
+function scanHeartCount() {
+  if (!document.body) return null;
+  // Heuristic: tìm element có pattern heart icon + number (K/M shorthand)
+  const text = document.body.innerText || '';
+  // Match patterns: "❤️ 1.2K", "1234 likes", "🤍 500"
+  const patterns = [
+    /[♥♡❤🤍🧡💛💚💙💜🖤🤎♥️❤️]\s*(\d+(?:[.,]\d+)?)\s*([KMkm])?/u,
+    /(\d+(?:[.,]\d+)?)\s*([KMkm])?\s*(?:lượt\s+)?(?:tym|likes?|hearts?)/iu,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (m) {
+      let n = parseFloat(m[1].replace(',', '.')) || 0;
+      const unit = (m[2] || '').toUpperCase();
+      if (unit === 'K') n *= 1000;
+      else if (unit === 'M') n *= 1_000_000;
+      return Math.floor(n);
+    }
+  }
+  return null;
+}
+
 function scanRoomMeta() {
   const meta = {};
   if (!document.body) return meta;
@@ -247,6 +273,15 @@ function attach() {
       for (const ev of chats) send('embed:parsed', { ...ev, ts: Date.now() });
       for (const ev of gifts) send('embed:parsed', { ...ev, ts: Date.now() });
       for (const ev of scanGiftOverlay()) send('embed:parsed', { ...ev, ts: Date.now() });
+      // Heart count: emit diff khi tăng lên (tym mới)
+      const heartNow = scanHeartCount();
+      if (heartNow != null) {
+        if (_lastHeartCount >= 0 && heartNow > _lastHeartCount) {
+          const delta = heartNow - _lastHeartCount;
+          send('embed:parsed', { type: 'heart', count: delta, total: heartNow, ts: Date.now() });
+        }
+        _lastHeartCount = heartNow;
+      }
       const meta = scanRoomMeta();
       const j = JSON.stringify(meta);
       if (j !== lastMeta) { lastMeta = j; send('embed:meta', { ...meta, ts: Date.now() }); }
