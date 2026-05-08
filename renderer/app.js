@@ -184,6 +184,8 @@ function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 function appendLog(msg) {
+  // Log panel đã được bỏ. Giữ console.log để debug qua DevTools.
+  if (!els.log) { console.log('[bigo]', msg); return; }
   const t = new Date().toLocaleTimeString();
   els.log.textContent = `[${t}] ${msg}\n` + els.log.textContent;
   if (els.log.textContent.length > 12000) els.log.textContent = els.log.textContent.slice(0, 12000);

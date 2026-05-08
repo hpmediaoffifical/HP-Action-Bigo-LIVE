@@ -173,10 +173,23 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   background: #0f1117;
   border-radius: 6px;
   padding: 6px;
-  max-height: 380px;
+  /* Stretch tới đáy viewport: trừ header + connect bar + tab head + sliders ~ 280px */
+  height: calc(100vh - 280px);
   overflow-y: auto;
   --queue-font: 13px;
   --queue-icon: 36px;
+}
+
+/* Tab queue panel kéo dài full */
+.tab-panel[data-tab="queue"] #effectQueuePanel {
+  height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+}
+.tab-panel[data-tab="queue"] #effectQueuePanel #effectQueue {
+  flex: 1;
+  height: auto;
+  max-height: none;
 }
 .queue-row {
   display: grid;
