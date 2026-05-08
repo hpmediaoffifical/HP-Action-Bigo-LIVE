@@ -186,6 +186,8 @@ function createWindow() {
   });
   win.setMenuBarVisibility(false);
   win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
+  // Null out ref khi window closed - tránh gọi method trên destroyed object
+  win.on('closed', () => { win = null; });
   if (process.argv.includes('--dev')) win.webContents.openDevTools({ mode: 'detach' });
 }
 
@@ -197,7 +199,7 @@ if (!gotLock) {
   process.exit(0);
 }
 app.on('second-instance', () => {
-  if (win) {
+  if (win && !win.isDestroyed()) {
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
@@ -218,18 +220,18 @@ app.whenReady().then(async () => {
   // Background: load master → auto-download icons nếu thiếu
   (async () => {
     const r = await ensureGiftMaster().catch(e => ({ ok: false, error: e.message }));
-    if (win) win.webContents.send('bigo:log', `[gift-master] ${r.cached ? 'cache' : 'fetch'} ${r.count || 0} quà`);
+    if (win && !win.isDestroyed()) win.webContents.send('bigo:log', `[gift-master] ${r.cached ? 'cache' : 'fetch'} ${r.count || 0} quà`);
     if (!r.ok || !giftMaster.gifts) return;
     fs.mkdirSync(GIFT_ICONS_DIR, { recursive: true });
     const have = fs.readdirSync(GIFT_ICONS_DIR).filter(f => /\.png$/i.test(f)).length;
     const total = giftMaster.gifts.length;
     if (have >= total) return; // đủ rồi
-    if (win) win.webContents.send('bigo:log', `[icons] auto-tải ${total - have} icons còn thiếu...`);
+    if (win && !win.isDestroyed()) win.webContents.send('bigo:log', `[icons] auto-tải ${total - have} icons còn thiếu...`);
     setTimeout(async () => {
       const dl = await downloadAllIcons((p) => {
-        if (win) win.webContents.send('gifts:download-progress', p);
+        if (win && !win.isDestroyed()) win.webContents.send('gifts:download-progress', p);
       });
-      if (win) win.webContents.send('bigo:log', `[icons] auto xong: +${dl.ok} mới, ${dl.skip} sẵn, ${dl.fail} lỗi`);
+      if (win && !win.isDestroyed()) win.webContents.send('bigo:log', `[icons] auto xong: +${dl.ok} mới, ${dl.skip} sẵn, ${dl.fail} lỗi`);
     }, 1500);
   })().catch(() => {});
 });
@@ -265,8 +267,8 @@ ipcMain.handle('bigo:start', async (_e, opts) => {
   if (client) await client.stop().catch(() => {});
   client = new BigoClient({
     env: opts.env, accessToken: opts.accessToken, gameId: opts.gameId, openid: opts.openid,
-    onEvent: (ev) => { if (win) win.webContents.send('bigo:event', ev); },
-    onLog: (msg) => { if (win) win.webContents.send('bigo:log', msg); },
+    onEvent: (ev) => { if (win && !win.isDestroyed()) win.webContents.send('bigo:event', ev); },
+    onLog: (msg) => { if (win && !win.isDestroyed()) win.webContents.send('bigo:log', msg); },
   });
   try { await client.start(); return { ok: true, gameSess: client.gameSess }; }
   catch (e) { return { ok: false, error: e.message }; }
@@ -393,7 +395,7 @@ ipcMain.on('gifts:start-drag', (event, typeid) => {
     const sized = icon.isEmpty() ? nativeImage.createEmpty() : icon.resize({ width: 64, height: 64 });
     event.sender.startDrag({ file: filePath, icon: sized });
   } catch (err) {
-    if (win) win.webContents.send('bigo:log', `[drag err] ${err.message}`);
+    if (win && !win.isDestroyed()) win.webContents.send('bigo:log', `[drag err] ${err.message}`);
   }
 });
 
@@ -407,9 +409,9 @@ ipcMain.handle('embed:start', async (_e, opts) => {
     onEvent: (ev) => {
       // Enrich gift events in-place using master catalog
       if (ev && ev.kind === 'parsed') enrichGiftEvent(ev);
-      if (win) win.webContents.send('embed:event', ev);
+      if (win && !win.isDestroyed()) win.webContents.send('embed:event', ev);
     },
-    onLog: (msg) => { if (win) win.webContents.send('bigo:log', `[embed] ${msg}`); },
+    onLog: (msg) => { if (win && !win.isDestroyed()) win.webContents.send('bigo:log', `[embed] ${msg}`); },
   });
   try {
     await listener.start(opts.bigoId, { visible: !!opts.visible });
