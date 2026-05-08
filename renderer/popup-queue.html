@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <title>Hàng đợi hiệu ứng — BIGO Action</title>
+  <title>Danh sách hiệu ứng — BIGO Action</title>
   <link rel="icon" type="image/png" href="../logo-hp.png" />
   <link rel="stylesheet" href="style.css" />
   <style>
@@ -10,14 +10,20 @@
     h1 { font-size: 14px; color: #ff8a3d; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center; }
     .pop-stats { font-size: 11px; color: #8a8f9a; }
     .pop-stats b { color: #ffd166; }
-    .pop-controls { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; font-size: 11px; color: #8a8f9a; }
+    .pop-controls { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; font-size: 11px; color: #8a8f9a; flex-wrap: wrap; }
     #popQueue { background: #0f1117; border-radius: 6px; padding: 6px; max-height: calc(100vh - 140px); overflow-y: auto;
                 --queue-font: 14px; --queue-icon: 40px; }
+    .pop-stt { color: #8a8f9a; font-weight: 700; min-width: 22px; display: inline-block; text-align: center;
+               background: #1c1f28; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 6px; }
+    .queue-row.playing .pop-stt { background: #fe2c55; color: #fff; }
+    .pop-del { background: transparent; border: 1px solid #3a3f4b; color: #8a8f9a; cursor: pointer;
+               padding: 2px 7px; border-radius: 4px; font-size: 13px; margin-left: 4px; }
+    .pop-del:hover { background: #d23046; color: #fff; border-color: #d23046; }
   </style>
 </head>
 <body>
   <h1>
-    🎬 Hàng đợi hiệu ứng
+    📋 DANH SÁCH HIỆU ỨNG
     <span class="pop-stats">🎁<b id="popQGifts">0</b> · 💎<b id="popQDiamond">0</b> · 👤<b id="popQUsers">0</b></span>
   </h1>
   <div class="pop-controls">
@@ -25,7 +31,7 @@
     <span id="popQFontVal">14</span>
     Cỡ icon <input type="range" id="popQIcon" min="24" max="80" value="40" />
     <span id="popQIconVal">40</span>
-    <button id="popQClear" class="tiny">🗑</button>
+    <button id="popQClear" class="tiny danger" title="Xoá tất cả hiệu ứng đang chờ">🗑 Xoá tất cả</button>
   </div>
   <div id="popQueue"></div>
   <script>
@@ -33,7 +39,8 @@
     function escapeHtml(s) {
       return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
-    const items = new Map(); // id → item
+    // Snapshot model: app gửi full array, popup chỉ render theo thứ tự nhận.
+    let snapshot = [];
     const stats = { gifts: 0, diamond: 0, users: new Set() };
 
     function applySize() {
@@ -49,35 +56,55 @@
     document.getElementById('popQIcon').addEventListener('input', applySize);
     applySize();
 
-    function renderRow(q) {
+    function renderRow(q, idx) {
+      const isPlaying = q.status === 'playing';
+      // STT: playing → "▶", queued items numbered từ 1 (sau playing).
+      // Đang phát luôn nằm trên cùng (idx=0). Dưới đó STT 1, 2, ..., N.
+      const stt = isPlaying ? '▶' : String(idx); // idx đã offset (xem renderAll)
       const avatar = q.avatar
         ? `<img class="avatar" src="${escapeHtml(q.avatar)}" />`
         : `<div class="avatar"></div>`;
       const giftIcon = q.gift_icon
         ? `<img class="gift-icon" src="${escapeHtml(q.gift_icon)}" />`
         : `<div class="gift-icon"></div>`;
-      const status = q.status === 'playing' ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>'
+      const status = isPlaying
+        ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>'
         : q.status === 'done' ? '<span class="badge-status done">✓ xong</span>'
         : '<span class="badge-status queued">⏳ chờ</span>';
-      const playInfo = q.playTimes > 1 ? ` · phát ${q.playTimes} lần` : '';
-      return `<div class="queue-row ${q.status}" data-id="${q.id}">
+      return `<div class="queue-row ${q.status}" data-id="${escapeHtml(q.id)}">
+        <span class="pop-stt" title="${isPlaying ? 'Đang phát' : 'Hàng số ' + idx}">${stt}</span>
         ${avatar}${giftIcon}
         <div class="meta">
           <div class="who">${escapeHtml(q.user)}${status}</div>
-          <div class="what">tặng <span class="name">${escapeHtml(q.gift_name)}</span>${q.gift_id ? ` <span style="color:#666">id ${q.gift_id}</span>` : ''}<span style="color:#ffd166">${playInfo}</span></div>
+          <div class="what">tặng <span class="name">${escapeHtml(q.gift_name)}</span>${q.gift_id ? ` <span style="color:#666">id ${q.gift_id}</span>` : ''}</div>
         </div>
         <div class="right">
           <div class="cnt">×${q.count}${q.combo > 1 ? ` · combo ${q.combo}` : ''}</div>
           ${q.diamond != null ? `<div class="beans">💎 ${q.diamond}</div>` : ''}
         </div>
+        <button class="pop-del" data-del="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
       </div>`;
     }
 
     function renderAll() {
       const q = document.getElementById('popQueue');
-      const arr = Array.from(items.values()).sort((a, b) => b.ts - a.ts);
-      q.innerHTML = arr.map(renderRow).join('') ||
-        '<div style="color:#555;text-align:center;padding:20px">Chưa có hiệu ứng nào</div>';
+      // Sort: playing trước (chỉ có 1), rồi theo thứ tự trong snapshot (đã sort ở app).
+      // STT: playing không tính, hàng đầu sau playing là STT 1.
+      let playingCount = 0;
+      const html = snapshot.map((it, i) => {
+        if (it.status === 'playing') { playingCount++; return renderRow(it, 0); }
+        // STT cho non-playing = i - playingCount + 1 (offset cho playing items đứng trước)
+        return renderRow(it, i - playingCount + 1);
+      }).join('');
+      q.innerHTML = html || '<div style="color:#555;text-align:center;padding:20px">Chưa có hiệu ứng nào</div>';
+      // Wire delete buttons
+      q.querySelectorAll('[data-del]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const id = btn.dataset.del;
+          ipcRenderer.send('popup-queue:remove', id);
+        };
+      });
     }
 
     function updateStats() {
@@ -86,31 +113,42 @@
       document.getElementById('popQUsers').textContent = stats.users.size;
     }
 
-    ipcRenderer.on('popup-queue:item', (_e, item) => {
-      const existing = items.get(item.id);
-      if (!existing) {
-        // New item
-        stats.gifts += item.count || 0;
-        stats.diamond += item.diamond || 0;
-        if (item.user) stats.users.add(item.user);
-        if (items.size >= 200) {
-          // remove oldest
-          const oldest = [...items.values()].sort((a, b) => a.ts - b.ts)[0];
-          if (oldest) items.delete(oldest.id);
-        }
+    // Snapshot từ app: full array thay thế cũ → re-render.
+    ipcRenderer.on('popup-queue:snapshot', (_e, items) => {
+      snapshot = Array.isArray(items) ? items : [];
+      // Recompute stats từ snapshot
+      stats.gifts = 0; stats.diamond = 0; stats.users.clear();
+      for (const q of snapshot) {
+        stats.gifts += q.count || 0;
+        stats.diamond += q.diamond || 0;
+        if (q.user) stats.users.add(q.user);
       }
-      items.set(item.id, item);
+      renderAll();
+      updateStats();
+    });
+    // Legacy single-item update (vẫn dùng nếu app gửi từng item)
+    ipcRenderer.on('popup-queue:item', (_e, item) => {
+      const idx = snapshot.findIndex(x => x.id === item.id);
+      if (idx === -1) snapshot.push(item);
+      else snapshot[idx] = item;
+      // Recompute stats
+      stats.gifts = 0; stats.diamond = 0; stats.users.clear();
+      for (const q of snapshot) {
+        stats.gifts += q.count || 0;
+        stats.diamond += q.diamond || 0;
+        if (q.user) stats.users.add(q.user);
+      }
       renderAll();
       updateStats();
     });
     ipcRenderer.on('popup-queue:reset', () => {
-      items.clear();
+      snapshot = [];
       stats.gifts = 0; stats.diamond = 0; stats.users.clear();
       renderAll(); updateStats();
     });
     document.getElementById('popQClear').onclick = () => {
-      items.clear(); stats.gifts = 0; stats.diamond = 0; stats.users.clear();
-      renderAll(); updateStats();
+      // Báo app clear toàn bộ queue thực tế (không chỉ popup)
+      ipcRenderer.send('popup-queue:clear-all');
     };
     renderAll();
   </script>

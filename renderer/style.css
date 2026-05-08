@@ -380,6 +380,43 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .group-item .grow-sub { color: #8a8f9a; font-size: 11px; margin-top: 2px; word-break: break-all; }
 .group-item .grow-sub code { background: #0f1117; padding: 1px 6px; border-radius: 4px; color: #ffd166; }
 .group-item .grow-actions { display: flex; gap: 4px; align-items: center; }
+.mini-stt, .queue-stt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  background: #1c1f28;
+  color: #8a8f9a;
+  font-weight: 700;
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 0 6px;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+.mini-stt.playing, .queue-stt.playing {
+  background: linear-gradient(135deg, #fe2c55, #ff8a3d);
+  color: #fff;
+}
+.mini-del, .queue-del {
+  background: transparent;
+  border: 1px solid #3a3f4b;
+  color: #8a8f9a;
+  cursor: pointer;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 13px;
+  margin-left: 6px;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.mini-del:hover, .queue-del:hover {
+  background: #d23046;
+  color: #fff;
+  border-color: #d23046;
+}
+
 .prio-badge {
   background: linear-gradient(135deg, #fe2c55, #ff8a3d);
   color: #fff;

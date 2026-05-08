@@ -126,7 +126,8 @@ function applyQueueSize() {
 function pushPlayBatch(item, ev, playTimes) {
   const batchId = 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 4);
   const baseUser = ev?.user || 'NHPHUNG';
-  const baseAvatar = ev?.user_avatar_url || '';
+  // Avatar: NHPHUNG → logo HP. User thường → raw avatar (nếu scraper bắt được).
+  const baseAvatar = resolveAvatarForUser(baseUser, ev?.user_avatar_url);
   const baseName = ev?.gift_name || item?.alias || (item?.matchKeys || [])[0] || '?';
   const baseId = ev?.gift_id ?? null;
   const baseIcon = ev?.gift_icon || ev?.gift_icon_url || (item ? getGiftIcon(item) : '');
@@ -172,30 +173,29 @@ function pushPlayBatch(item, ev, playTimes) {
     queueItems[0].status = 'playing';
   }
   renderQueue(); renderMiniQueue(); updateQueueStats();
-  batch.forEach(forwardToQueuePopup);
+  forwardQueueSnapshot();
 }
 
 // Hook: overlay:effect-ended từ overlay window (player/audio fire 'ended')
 // → advance UI queue: shift entry đang playing, mark new [0] playing.
+// User wants: quà hết hiệu ứng → XOÁ LUÔN khỏi danh sách (không giữ 'done' state).
 if (window.bigo.onOverlayEffectEnded) {
   window.bigo.onOverlayEffectEnded(() => {
     if (queueItems.length === 0) return;
-    // Tìm entry đang playing (thường là [0]) và mark done
     const playingIdx = queueItems.findIndex(q => q.status === 'playing');
     if (playingIdx !== -1) {
-      const finished = queueItems[playingIdx];
-      finished.status = 'done';
-      forwardToQueuePopup({ ...finished });
-      renderQueue(); renderMiniQueue();
-      // Sau 400ms remove + advance
+      // Xoá ngay để tránh memory bloat
+      queueItems.splice(playingIdx, 1);
+      // Mark next queued as playing
+      if (queueItems.length > 0 && !queueItems.some(q => q.status === 'playing')) {
+        const nextQ = queueItems.find(q => q.status === 'queued');
+        if (nextQ) nextQ.status = 'playing';
+      }
+      renderQueue(); renderMiniQueue(); updateQueueStats();
+      forwardQueueSnapshot();
+      // Cũ: setTimeout(...) — bỏ delay, xoá thẳng để DSHT luôn chỉ chứa playing + queued
       setTimeout(() => {
-        const idx = queueItems.findIndex(q => q.id === finished.id);
-        if (idx !== -1) queueItems.splice(idx, 1);
-        // Mark new top as playing nếu còn
-        if (queueItems.length > 0 && !queueItems.some(q => q.status === 'playing')) {
-          queueItems[0].status = 'playing';
-          forwardToQueuePopup({ ...queueItems[0] });
-        }
+        // Empty placeholder để giữ tương thích với code cũ. Có thể xoá block sau.
         renderQueue(); renderMiniQueue();
       }, 400);
     }
@@ -204,32 +204,103 @@ if (window.bigo.onOverlayEffectEnded) {
 
 function pushQueueManual(item, group, playTimes) { pushPlayBatch(item, null, playTimes); }
 
+// Sort queue: status='playing' luôn đứng đầu (thường chỉ có 1), sau đó queued theo
+// thứ tự queueItems (đã được apply priority khi insert). 'done' items không hiển thị.
+function getQueueDisplayList() {
+  // Lọc ra non-done, đảm bảo playing đầu tiên (nếu có nhiều playing — hiếm — vẫn đầu)
+  const playing = queueItems.filter(q => q.status === 'playing');
+  const queued = queueItems.filter(q => q.status === 'queued');
+  return [...playing, ...queued];
+}
+
 function renderMiniQueue() {
   const el = document.getElementById('miniQueue');
   if (!el) return;
-  if (queueItems.length === 0) {
+  const list = getQueueDisplayList();
+  if (list.length === 0) {
     el.innerHTML = '<div style="color:#555;text-align:center;padding:14px;font-size:11px">Chưa có hiệu ứng</div>';
     return;
   }
-  // Top 10 entries — mỗi entry là 1 lần phát riêng (pushPlayBatch tách thành N hàng)
-  el.innerHTML = queueItems.slice(0, 10).map(q => {
+  // Top 10 entries — playing trên cùng (STT ▶), tiếp là STT 1, 2, 3...
+  let playingCount = 0;
+  el.innerHTML = list.slice(0, 10).map((q, i) => {
+    const isPlaying = q.status === 'playing';
+    if (isPlaying) playingCount++;
+    const stt = isPlaying ? '▶' : String(i - playingCount + 1);
     const iconHtml = q.gift_icon
       ? `<img class="gift-icon" src="${escapeHtml(q.gift_icon)}" loading="lazy" />`
       : '<div class="gift-icon"></div>';
-    const status = q.status === 'playing' ? '<span class="badge-status playing">▶</span>'
-      : q.status === 'done' ? '<span class="badge-status done">✓</span>'
+    const status = isPlaying ? '<span class="badge-status playing">▶</span>'
       : '<span class="badge-status queued">⏳</span>';
-    // Hiện step/total nếu là batch (vd 3/10), ngược lại hiện ×count
     const cntLabel = q.total > 1 ? `<span class="step">${q.step}/${q.total}</span>` : `×${q.count}`;
     return `<div class="mini-queue-row ${q.status}">
+      <span class="mini-stt ${isPlaying ? 'playing' : ''}" title="${isPlaying ? 'Đang phát' : 'STT ' + (i - playingCount + 1)}">${stt}</span>
       ${iconHtml}
       <div class="mini-meta">
         <div class="who">${escapeHtml(q.user)}</div>
         <div class="what"><b>${escapeHtml(q.gift_name)}</b> ${cntLabel}</div>
       </div>
       ${status}
+      <button class="mini-del" data-qid="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
     </div>`;
   }).join('');
+  // Wire delete buttons
+  el.querySelectorAll('[data-qid]').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      removeQueueItemById(btn.dataset.qid);
+    };
+  });
+}
+
+function removeQueueItemById(id) {
+  const idx = queueItems.findIndex(q => q.id === id);
+  if (idx === -1) return;
+  const removed = queueItems[idx];
+  queueItems.splice(idx, 1);
+  // Nếu xoá item đang playing → mark playing cho item tiếp theo
+  if (removed.status === 'playing' && queueItems.length > 0) {
+    const nextQ = queueItems.find(q => q.status === 'queued');
+    if (nextQ) nextQ.status = 'playing';
+  }
+  renderQueue(); renderMiniQueue(); updateQueueStats();
+  forwardQueueSnapshot();
+}
+
+function clearAllQueue() {
+  queueItems.length = 0;
+  renderQueue(); renderMiniQueue(); updateQueueStats();
+  forwardQueueSnapshot();
+  if (window.bigo.popupResetQueue) window.bigo.popupResetQueue().catch(() => {});
+}
+
+// Forward FULL snapshot of queue to popup. Mỗi lần queue thay đổi gọi 1 lần.
+function forwardQueueSnapshot() {
+  if (!window.bigo.popupQueueSnapshot) return;
+  const list = getQueueDisplayList();
+  window.bigo.popupQueueSnapshot(list).catch(() => {});
+}
+
+// Default avatar URL cho admin NHPHUNG → logo HP. Cho mọi user khác trả về raw URL.
+const HP_LOGO_URL = './../logo-hp.png';
+function resolveAvatarForUser(user, rawAvatar) {
+  const u = String(user || '').trim().toUpperCase();
+  if (u === 'NHPHUNG' || u === 'NHPHUNG (ADMIN)') return HP_LOGO_URL;
+  return rawAvatar || '';
+}
+
+// Special clear-queue trigger check: settings.clearGift.enabled + matching typeid/name.
+function checkClearGiftTrigger(ev) {
+  const cfg = appSettings?.clearGift;
+  if (!cfg || !cfg.enabled) return false;
+  if (!cfg.typeid && !cfg.giftName) return false;
+  if (cfg.typeid && ev.gift_id && Number(ev.gift_id) === Number(cfg.typeid)) return true;
+  if (cfg.giftName && ev.gift_name) {
+    const a = String(ev.gift_name).toLowerCase().trim();
+    const b = String(cfg.giftName).toLowerCase().trim();
+    if (a === b) return true;
+  }
+  return false;
 }
 
 function pushQueue(ev, matched, playTimes) {
@@ -239,23 +310,28 @@ function pushQueue(ev, matched, playTimes) {
 }
 
 function renderQueue() {
-  if (!queueItems.length) {
-    els.effectQueue.innerHTML = '<div style="color:#555;text-align:center;padding:16px">Chưa có hiệu ứng nào trong hàng đợi</div>';
+  const list = getQueueDisplayList();
+  if (!list.length) {
+    els.effectQueue.innerHTML = '<div style="color:#555;text-align:center;padding:16px">Chưa có hiệu ứng nào trong danh sách</div>';
     return;
   }
-  els.effectQueue.innerHTML = queueItems.map(q => {
+  let playingCount = 0;
+  els.effectQueue.innerHTML = list.map((q, i) => {
+    const isPlaying = q.status === 'playing';
+    if (isPlaying) playingCount++;
+    const stt = isPlaying ? '▶' : String(i - playingCount + 1);
     const avatarHtml = q.avatar
       ? `<img class="avatar" src="${escapeHtml(q.avatar)}" loading="lazy" />`
       : `<div class="avatar"></div>`;
     const giftIconHtml = q.gift_icon
       ? `<img class="gift-icon" src="${escapeHtml(q.gift_icon)}" loading="lazy" />`
       : `<div class="gift-icon"></div>`;
-    const statusBadge = q.status === 'playing'
+    const statusBadge = isPlaying
       ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>'
-      : q.status === 'done' ? '<span class="badge-status done">✓ xong</span>'
       : '<span class="badge-status queued">⏳ chờ</span>';
     const playInfo = q.playTimes > 1 ? `<span style="color:#ffd166"> · phát ${q.playTimes} lần</span>` : '';
     return `<div class="queue-row ${q.status}" data-id="${q.id}">
+      <span class="queue-stt ${isPlaying ? 'playing' : ''}" title="${isPlaying ? 'Đang phát' : 'STT ' + (i - playingCount + 1)}">${stt}</span>
       ${avatarHtml}
       ${giftIconHtml}
       <div class="meta">
@@ -266,8 +342,13 @@ function renderQueue() {
         <div class="cnt">×${q.count}${q.combo > 1 ? ` · combo ${q.combo}` : ''}</div>
         ${q.diamond != null ? `<div class="beans">💎 ${q.diamond}</div>` : ''}
       </div>
+      <button class="queue-del" data-qid="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
     </div>`;
   }).join('');
+  // Wire delete buttons
+  els.effectQueue.querySelectorAll('[data-qid]').forEach(btn => {
+    btn.onclick = (e) => { e.stopPropagation(); removeQueueItemById(btn.dataset.qid); };
+  });
 }
 
 function updateQueueStats() {
@@ -297,6 +378,10 @@ const els = {
   // Pre-effect sound (Cài đặt chung)
   preFxFileLabel: $('preFxFileLabel'), preFxEnabled: $('preFxEnabled'),
   btnPickPreFx: $('btnPickPreFx'), btnTestPreFx: $('btnTestPreFx'), btnClearPreFx: $('btnClearPreFx'),
+  // Clear-queue trigger gift
+  clearGiftLabel: $('clearGiftLabel'), clearGiftId: $('clearGiftId'),
+  clearGiftEnabled: $('clearGiftEnabled'),
+  btnPickClearGift: $('btnPickClearGift'), btnClearClearGift: $('btnClearClearGift'),
   audioDevice: $('audioDevice'), btnRefreshDevices: $('btnRefreshDevices'),
   bgmVol: $('bgmVol'), bgmVolVal: $('bgmVolVal'),
   fxVol: $('fxVol'), fxVolVal: $('fxVolVal'),
@@ -350,6 +435,16 @@ function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().t
 els.qSizeFont.addEventListener('input', () => { applyQueueSize(); saveQueueSettings(); });
 els.qSizeIcon.addEventListener('input', () => { applyQueueSize(); saveQueueSettings(); });
 els.btnClearQueue.onclick = () => {
+  if (!confirm('Xoá tất cả hiệu ứng đang chờ?')) return;
+  clearAllQueue();
+};
+
+// IPC listeners từ popup window (popup user bấm X / Xoá tất cả)
+if (window.bigo.onQueueRemove) window.bigo.onQueueRemove(id => removeQueueItemById(id));
+if (window.bigo.onQueueClearAll) window.bigo.onQueueClearAll(() => clearAllQueue());
+
+// (legacy, bỏ qua dòng dưới — giữ để giảm rủi ro break code khác)
+if (false) {
   queueItems.length = 0;
   renderQueue();
   updateQueueStats();
@@ -1435,7 +1530,7 @@ function addReceivedGift(ev) {
     id: 'rg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
     ts: Date.now(),
     user: ev.user || '?',
-    avatar: ev.user_avatar_url || '',
+    avatar: resolveAvatarForUser(ev.user, ev.user_avatar_url),
     gift_name: ev.gift_name || '?',
     gift_id: ev.gift_id,
     gift_icon: ev.gift_icon || ev.gift_icon_url || '',
@@ -1582,7 +1677,8 @@ function renderParsed(ev) {
   if (ev.type === 'chat') {
     const div = document.createElement('div');
     div.className = 'chat-row';
-    const av = ev.user_avatar_url ? `<img class="avatar" src="${escapeHtml(ev.user_avatar_url)}" loading="lazy" style="width:20px;height:20px" />` : '';
+    const avUrl = resolveAvatarForUser(ev.user, ev.user_avatar_url);
+    const av = avUrl ? `<img class="avatar" src="${escapeHtml(avUrl)}" loading="lazy" style="width:20px;height:20px" />` : '';
     div.innerHTML = `${av}<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span><span class="what">${escapeHtml(ev.content)}</span>`;
     // Mới nhất ở DƯỚI: append + auto scroll xuống cuối
     els.liveChats.appendChild(div);
@@ -1591,6 +1687,12 @@ function renderParsed(ev) {
     return;
   }
   if (ev.type === 'gift' || ev.type === 'gift_overlay') {
+    // Special clear-queue trigger: nếu user trong live tặng quà đã set ở Cài đặt chung → xoá toàn bộ queue
+    if (ev.type === 'gift' && checkClearGiftTrigger(ev)) {
+      appendLog(`[clear-trigger] ${ev.user} tặng "${ev.gift_name}" → tự xoá toàn bộ DANH SÁCH HIỆU ỨNG`);
+      clearAllQueue();
+      // Vẫn xử lý event tiếp (cập nhật stats, log) nhưng không push vào queue đã clear
+    }
     const matched = findGiftByEvent(ev);
     // Update session stats (chỉ count gift, không count gift_overlay duplicate)
     if (ev.type === 'gift') {
@@ -1663,6 +1765,7 @@ function renderEmbedEvent(ev) {
 let appSettings = {
   bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
+  clearGift: { enabled: false, typeid: null, giftName: '' },  // Quà tự xoá DSHT khi user tặng
   fxVolume: 100,
   maxListItems: 200,
 };
@@ -1672,6 +1775,7 @@ async function saveAppSettings(patch) {
   if (patch) {
     if (patch.bgm) s.bgm = { ...(s.bgm || {}), ...patch.bgm };
     if (patch.preFx) s.preFx = { ...(s.preFx || {}), ...patch.preFx };
+    if (patch.clearGift) s.clearGift = { ...(s.clearGift || {}), ...patch.clearGift };
     if ('fxVolume' in patch) s.fxVolume = patch.fxVolume;
     if ('maxListItems' in patch) s.maxListItems = patch.maxListItems;
   }
@@ -1738,8 +1842,13 @@ async function applyBgmSinkId() {
 async function initAppSettings(s) {
   appSettings.bgm = { ...appSettings.bgm, ...(s.bgm || {}) };
   appSettings.preFx = { ...appSettings.preFx, ...(s.preFx || {}) };
+  appSettings.clearGift = { ...appSettings.clearGift, ...(s.clearGift || {}) };
   appSettings.fxVolume = s.fxVolume != null ? s.fxVolume : 100;
   appSettings.maxListItems = s.maxListItems || 200;
+  // Apply clear-gift UI
+  if (els.clearGiftLabel) els.clearGiftLabel.value = appSettings.clearGift.giftName || '';
+  if (els.clearGiftId) els.clearGiftId.value = appSettings.clearGift.typeid || '';
+  if (els.clearGiftEnabled) els.clearGiftEnabled.checked = !!appSettings.clearGift.enabled;
   // Apply BGM
   if (els.bgmAudio) {
     els.bgmAudio.volume = (appSettings.bgm.volume || 80) / 100;
@@ -1796,6 +1905,50 @@ if (els.preFxEnabled) {
   els.preFxEnabled.addEventListener('change', async () => {
     appSettings.preFx.enabled = !!els.preFxEnabled.checked;
     await saveAppSettings({ preFx: { enabled: appSettings.preFx.enabled } });
+  });
+}
+
+// =================== Clear-queue trigger gift picker ===================
+// Reuse master gift picker dialog (đã có sẵn) — đơn giản hoá: prompt user nhập typeid hoặc tên.
+// Nâng cấp sau có thể dùng full master table như dlgMasterFilter.
+if (els.btnPickClearGift) {
+  els.btnPickClearGift.onclick = async () => {
+    const q = prompt('Nhập typeid (số) hoặc tên quà chính xác để dùng làm trigger xoá DSHT:\n(Quà này khi user tặng → app tự xoá toàn bộ hiệu ứng đang chờ)', appSettings.clearGift.giftName || '');
+    if (q == null || !q.trim()) return;
+    const trimmed = q.trim();
+    const asNum = parseInt(trimmed, 10);
+    let typeid = null, giftName = trimmed;
+    if (!isNaN(asNum) && String(asNum) === trimmed) {
+      // Numeric → coi là typeid, lookup tên qua master
+      typeid = asNum;
+      try {
+        const list = await window.bigo.giftsLookup(String(asNum));
+        if (list && list.length) giftName = list[0].name || trimmed;
+      } catch {}
+    } else {
+      // Text → giữ raw, không cần typeid
+      giftName = trimmed;
+    }
+    appSettings.clearGift.typeid = typeid;
+    appSettings.clearGift.giftName = giftName;
+    if (els.clearGiftLabel) els.clearGiftLabel.value = `${giftName}${typeid ? ' (id ' + typeid + ')' : ''}`;
+    if (els.clearGiftId) els.clearGiftId.value = typeid || '';
+    await saveAppSettings({ clearGift: { typeid, giftName } });
+  };
+}
+if (els.btnClearClearGift) {
+  els.btnClearClearGift.onclick = async () => {
+    appSettings.clearGift.typeid = null;
+    appSettings.clearGift.giftName = '';
+    if (els.clearGiftLabel) els.clearGiftLabel.value = '';
+    if (els.clearGiftId) els.clearGiftId.value = '';
+    await saveAppSettings({ clearGift: { typeid: null, giftName: '' } });
+  };
+}
+if (els.clearGiftEnabled) {
+  els.clearGiftEnabled.addEventListener('change', async () => {
+    appSettings.clearGift.enabled = !!els.clearGiftEnabled.checked;
+    await saveAppSettings({ clearGift: { enabled: appSettings.clearGift.enabled } });
   });
 }
 

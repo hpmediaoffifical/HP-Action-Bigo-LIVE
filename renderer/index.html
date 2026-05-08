@@ -65,7 +65,7 @@
         <aside class="embed-right">
           <div class="panel right-panel-section" data-rps="queue">
             <div class="panel-head">
-              <h2>🎬 Đang phát / Hàng đợi</h2>
+              <h2>📋 DANH SÁCH HIỆU ỨNG</h2>
               <div style="display:flex; gap:4px">
                 <button id="btnPopupQueueRight" class="tiny" title="Mở popup riêng">📤</button>
                 <button class="tiny rps-collapse" data-rps-target="queue" title="Thu gọn / mở">▼</button>
@@ -104,7 +104,7 @@
     <section class="tab-panel" data-tab="queue">
       <div class="panel" id="effectQueuePanel">
         <div class="panel-head">
-          <h2>🎬 Hàng đợi hiệu ứng</h2>
+          <h2>📋 DANH SÁCH HIỆU ỨNG</h2>
           <div class="queue-stats">
             <span>🎁 quà: <b id="qStatGifts">0</b></span>
             <span>💎 đậu: <b id="qStatDiamond">0</b></span>
@@ -227,6 +227,22 @@
         </div>
         <div class="hint small" style="margin-top:-6px; margin-bottom:6px">
           Mặc định <b>TẮT</b> cho tất cả quà. Vào dialog "Sửa quà" tick riêng từng quà cần phát pre-effect. Toggle Bật/Tắt ô này nhiều lần <b>KHÔNG tự bật lại</b> quà nào — mỗi quà giữ trạng thái user đã set.
+        </div>
+        <div class="row">
+          <label style="flex:2">🧹 Quà tặng "Xoá danh sách hiệu ứng"
+            <div style="display:flex; gap:6px; align-items:center">
+              <input id="clearGiftLabel" placeholder="Chưa chọn — bấm 🎁 để pick từ master" readonly style="flex:1" />
+              <input type="hidden" id="clearGiftId" />
+              <button type="button" id="btnPickClearGift" class="tiny" title="Chọn 1 quà từ master làm trigger xoá">🎁 Chọn</button>
+              <button type="button" id="btnClearClearGift" class="tiny danger" title="Bỏ trigger">🗑</button>
+            </div>
+          </label>
+          <label class="checkbox-row" style="flex:0 0 auto; align-self:flex-end; padding-bottom:8px">
+            <input type="checkbox" id="clearGiftEnabled" /> Bật
+          </label>
+        </div>
+        <div class="hint small" style="margin-top:-6px; margin-bottom:6px">
+          Khi bật: nếu user trong LIVE tặng quà này, app sẽ <b>tự xoá toàn bộ DANH SÁCH HIỆU ỨNG</b> (queue) — tiện cho streamer reset queue khi cần.
         </div>
         <div class="row">
           <label style="flex:2">🔊 Thiết bị phát (output)

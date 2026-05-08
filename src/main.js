@@ -720,6 +720,28 @@ ipcMain.handle('popup:reset-queue', () => {
   return { ok: true };
 });
 
+// Popup gửi full snapshot xuống popup window. Đồng bộ thứ tự queue chuẩn xác.
+ipcMain.handle('popup:queue-snapshot', (_e, items) => {
+  if (queuePopup && !queuePopup.isDestroyed()) {
+    try { queuePopup.webContents.send('popup-queue:snapshot', items || []); } catch {}
+  }
+  return { ok: true };
+});
+
+// Popup user bấm X → forward về main app renderer để remove khỏi queueItems.
+ipcMain.on('popup-queue:remove', (_e, id) => {
+  if (win && !win.isDestroyed()) {
+    try { win.webContents.send('queue:remove', id); } catch {}
+  }
+});
+
+// Popup user bấm "Xoá tất cả" → forward về main app renderer.
+ipcMain.on('popup-queue:clear-all', () => {
+  if (win && !win.isDestroyed()) {
+    try { win.webContents.send('queue:clear-all'); } catch {}
+  }
+});
+
 // =================== Popup window (Lịch sử quà) ===================
 let giftsPopup = null;
 

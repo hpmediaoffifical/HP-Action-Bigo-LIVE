@@ -15,7 +15,7 @@
             "1140",
             "Kiss"
           ],
-          "alias": "Kiss",
+          "alias": "HÔN TÔI ĐI",
           "mediaFile": "09. Phóng Dây Leo.webm",
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": false,
@@ -35,6 +35,19 @@
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": false,
           "priority": 0
+        },
+        {
+          "id": "i_moxdzuao0rkl",
+          "matchKeys": [
+            "5355",
+            "Duck Box"
+          ],
+          "alias": "Duck Box",
+          "mediaFile": "02. Bướm Ảo.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": true,
+          "priority": 0
         }
       ],
       "isCommon": true
@@ -43,7 +56,7 @@
       "id": "g_mox8ulzfk04f",
       "name": "NPC",
       "type": "gift",
-      "enabled": false,
+      "enabled": true,
       "collapsed": false,
       "bigoId": "",
       "items": [
@@ -93,7 +106,7 @@
       "id": "g_mox9je2347fw",
       "name": "Peo",
       "type": "gift",
-      "enabled": false,
+      "enabled": true,
       "collapsed": false,
       "bigoId": "",
       "items": [
@@ -124,7 +137,7 @@
       "id": "g_mox9jh2358um",
       "name": "Ada",
       "type": "gift",
-      "enabled": false,
+      "enabled": true,
       "collapsed": false,
       "bigoId": "",
       "items": [
