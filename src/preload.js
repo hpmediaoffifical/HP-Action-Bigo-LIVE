@@ -27,6 +27,11 @@ contextBridge.exposeInMainWorld('bigo', {
   popupOpenGifts: () => ipcRenderer.invoke('popup:open-gifts'),
   popupResetGifts: () => ipcRenderer.invoke('popup:reset-gifts'),
 
+  // Popup queue window
+  popupOpenQueue: () => ipcRenderer.invoke('popup:open-queue'),
+  popupSendQueue: (item) => ipcRenderer.invoke('popup:queue-item', item),
+  popupResetQueue: () => ipcRenderer.invoke('popup:reset-queue'),
+
   // Open API mode
   start: (opts) => ipcRenderer.invoke('bigo:start', opts),
   stop: () => ipcRenderer.invoke('bigo:stop'),

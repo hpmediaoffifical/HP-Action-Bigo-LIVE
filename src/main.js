@@ -452,6 +452,40 @@ ipcMain.on('gifts:start-drag', (event, typeid) => {
   }
 });
 
+// =================== Popup window (Hàng đợi hiệu ứng) ===================
+let queuePopup = null;
+function ensureQueuePopup() {
+  if (queuePopup && !queuePopup.isDestroyed()) return queuePopup;
+  queuePopup = new BrowserWindow({
+    width: 420, height: 760,
+    title: '🎬 Hàng đợi hiệu ứng',
+    icon: APP_ICON || undefined,
+    parent: win,
+    webPreferences: { nodeIntegration: true, contextIsolation: false },
+  });
+  queuePopup.setMenuBarVisibility(false);
+  queuePopup.loadFile(path.join(ROOT, 'renderer', 'popup-queue.html'));
+  queuePopup.on('closed', () => { queuePopup = null; });
+  return queuePopup;
+}
+ipcMain.handle('popup:open-queue', () => {
+  const w = ensureQueuePopup();
+  w.show(); w.focus();
+  return { ok: true };
+});
+ipcMain.handle('popup:queue-item', (_e, item) => {
+  if (queuePopup && !queuePopup.isDestroyed()) {
+    try { queuePopup.webContents.send('popup-queue:item', item); } catch {}
+  }
+  return { ok: true };
+});
+ipcMain.handle('popup:reset-queue', () => {
+  if (queuePopup && !queuePopup.isDestroyed()) {
+    try { queuePopup.webContents.send('popup-queue:reset'); } catch {}
+  }
+  return { ok: true };
+});
+
 // =================== Popup window (Lịch sử quà) ===================
 let giftsPopup = null;
 

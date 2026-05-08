@@ -77,6 +77,7 @@
             <span>🎁 quà: <b id="qStatGifts">0</b></span>
             <span>💎 đậu: <b id="qStatDiamond">0</b></span>
             <span>👤 user: <b id="qStatUsers">0</b></span>
+            <button id="btnPopupQueue" class="tiny" title="Mở popup riêng để giám sát">📤 Popup</button>
           </div>
         </div>
         <div class="row" style="margin-bottom:8px; align-items:center">
@@ -220,10 +221,10 @@
         </label>
         <label>Sắp xếp
           <select id="dlgMasterSort">
+            <option value="kc-asc" selected>KC thấp → cao</option>
+            <option value="kc-desc">KC cao → thấp</option>
             <option value="id-asc">Mã ↑</option>
             <option value="id-desc">Mã ↓</option>
-            <option value="kc-asc">KC thấp → cao</option>
-            <option value="kc-desc">KC cao → thấp</option>
             <option value="name-asc">Tên A → Z</option>
             <option value="name-desc">Tên Z → A</option>
           </select>

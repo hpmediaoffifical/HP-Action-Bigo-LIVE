@@ -187,8 +187,13 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   border-bottom: 1px solid #1c1f28;
   font-size: var(--queue-font);
 }
-.queue-row.playing { background: #1e2a1f; }
-.queue-row.done { opacity: 0.5; }
+.queue-row.playing {
+  background: linear-gradient(90deg, rgba(254, 44, 85, 0.22), rgba(255, 138, 61, 0.08));
+  border-left: 3px solid #fe2c55;
+  box-shadow: inset 0 0 0 1px rgba(254, 44, 85, 0.25);
+}
+.queue-row.queued { border-left: 3px solid transparent; }
+.queue-row.done { opacity: 0.55; border-left: 3px solid transparent; }
 .queue-row .avatar { width: var(--queue-icon); height: var(--queue-icon); border-radius: 50%; background: #2c303d; object-fit: cover; }
 .queue-row .gift-icon { width: var(--queue-icon); height: var(--queue-icon); border-radius: 6px; object-fit: contain; background: #1c1f28; }
 .queue-row .meta { min-width: 0; }

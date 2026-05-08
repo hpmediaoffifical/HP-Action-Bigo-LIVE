@@ -56,6 +56,8 @@ function applyQueueSize() {
 function pushQueue(ev, matched, playTimes) {
   // Chỉ push gift events có hiệu ứng được map
   if (!matched || !matched.mediaFile) return;
+  // Tổng count = gift_count × combo (Bigo render combo trong overlay panel)
+  const totalCount = ev.total_count || (ev.gift_count || 1) * (ev.combo || 1);
   const item = {
     id: 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
     ts: Date.now(),
@@ -64,7 +66,8 @@ function pushQueue(ev, matched, playTimes) {
     gift_id: ev.gift_id,
     gift_name: ev.gift_name || matched.alias || '?',
     gift_icon: ev.gift_icon || ev.gift_icon_url || '',
-    count: ev.gift_count || 1,
+    count: totalCount,            // ← dùng total_count (đã nhân combo)
+    rawCount: ev.gift_count || 1,
     combo: ev.combo || 1,
     playTimes: playTimes || 1,
     diamond: ev.total_diamond,
@@ -76,6 +79,7 @@ function pushQueue(ev, matched, playTimes) {
   if (queueItems.length > QUEUE_MAX) queueItems.length = QUEUE_MAX;
   renderQueue();
   updateQueueStats();
+  forwardToQueuePopup(item);
 
   // Mark as playing sau 1 chút (giả định push vào overlay queue → sẽ play)
   setTimeout(() => {
@@ -83,10 +87,11 @@ function pushQueue(ev, matched, playTimes) {
     if (found && found.status === 'queued') {
       found.status = 'playing';
       renderQueue();
+      forwardToQueuePopup({ ...found });
       // Sau 5s giả định effect xong (TODO: thay bằng IPC từ overlay khi ended)
       setTimeout(() => {
         const f2 = queueItems.find(q => q.id === item.id);
-        if (f2) { f2.status = 'done'; renderQueue(); }
+        if (f2) { f2.status = 'done'; renderQueue(); forwardToQueuePopup({ ...f2 }); }
       }, PLAY_DURATION_MS);
     }
   }, 100);
@@ -145,6 +150,7 @@ const els = {
   csEffects: $('csEffects'), csDiamond: $('csDiamond'), csUsers: $('csUsers'), csGifts: $('csGifts'),
   btnPopupGifts: $('btnPopupGifts'),
   effectQueue: $('effectQueue'), btnClearQueue: $('btnClearQueue'),
+  btnPopupQueue: $('btnPopupQueue'),
   qStatGifts: $('qStatGifts'), qStatDiamond: $('qStatDiamond'), qStatUsers: $('qStatUsers'),
   qSizeFont: $('qSizeFont'), qSizeFontVal: $('qSizeFontVal'),
   qSizeIcon: $('qSizeIcon'), qSizeIconVal: $('qSizeIconVal'),
@@ -410,7 +416,7 @@ async function openGiftDialog(gift = null) {
   els.dlgAlias.value = gift?.alias || '';
   els.dlgGroup.value = gift?.group || '';
   els.dlgMasterFilter.value = '';
-  els.dlgMasterSort.value = 'id-asc';
+  els.dlgMasterSort.value = 'kc-asc';
   // refresh overlay options
   els.dlgOverlay.innerHTML = mapping.overlays.length
     ? mapping.overlays.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('')
@@ -574,6 +580,7 @@ function resetEmbedUi() {
   resetSessionStats();
   // Reset popup nếu đang mở
   if (window.bigo.popupResetGifts) window.bigo.popupResetGifts().catch(() => {});
+  if (window.bigo.popupResetQueue) window.bigo.popupResetQueue().catch(() => {});
 }
 
 // Toggle state: false=disconnected, true=connected
@@ -662,6 +669,7 @@ els.btnConnect.onclick = async () => {
 };
 
 els.btnPopupGifts.onclick = () => window.bigo.popupOpenGifts();
+if (els.btnPopupQueue) els.btnPopupQueue.onclick = () => window.bigo.popupOpenQueue();
 
 els.btnEmbedShow.onclick = async () => {
   const r = await window.bigo.embedShow();
@@ -752,14 +760,20 @@ function renderParsed(ev) {
     }
 
     if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
-      // Combo: tặng N lần thì phát N lần. total_count = gift_count × combo (combo mặc định 1).
-      // Cap 50 để tránh spam quá đáng (vd tặng 1000 quà combo).
+      // Combo: tặng N lần thì phát N lần. total_count = gift_count × combo.
       const playTimes = Math.max(1, Math.min(50, ev.total_count || ev.gift_count || 1));
       for (let i = 0; i < playTimes; i++) {
         window.bigo.overlayPlay({ overlayId: matched.overlayId, file: matched.mediaFile });
       }
       pushQueue(ev, matched, playTimes);
     }
+  }
+}
+
+// Forward to queue popup if open
+function forwardToQueuePopup(item) {
+  if (window.bigo.popupSendQueue) {
+    window.bigo.popupSendQueue(item).catch(() => {});
   }
 }
 

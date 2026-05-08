@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Hàng đợi hiệu ứng — BIGO Action</title>
+  <link rel="icon" type="image/png" href="../logo-hp.png" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { padding: 12px; min-width: 360px; }
+    h1 { font-size: 14px; color: #ff8a3d; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center; }
+    .pop-stats { font-size: 11px; color: #8a8f9a; }
+    .pop-stats b { color: #ffd166; }
+    .pop-controls { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; font-size: 11px; color: #8a8f9a; }
+    #popQueue { background: #0f1117; border-radius: 6px; padding: 6px; max-height: calc(100vh - 140px); overflow-y: auto;
+                --queue-font: 14px; --queue-icon: 40px; }
+  </style>
+</head>
+<body>
+  <h1>
+    🎬 Hàng đợi hiệu ứng
+    <span class="pop-stats">🎁<b id="popQGifts">0</b> · 💎<b id="popQDiamond">0</b> · 👤<b id="popQUsers">0</b></span>
+  </h1>
+  <div class="pop-controls">
+    Cỡ chữ <input type="range" id="popQFont" min="11" max="22" value="14" />
+    <span id="popQFontVal">14</span>
+    Cỡ icon <input type="range" id="popQIcon" min="24" max="80" value="40" />
+    <span id="popQIconVal">40</span>
+    <button id="popQClear" class="tiny">🗑</button>
+  </div>
+  <div id="popQueue"></div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    const items = new Map(); // id → item
+    const stats = { gifts: 0, diamond: 0, users: new Set() };
+
+    function applySize() {
+      const f = document.getElementById('popQFont').value;
+      const i = document.getElementById('popQIcon').value;
+      const q = document.getElementById('popQueue');
+      q.style.setProperty('--queue-font', f + 'px');
+      q.style.setProperty('--queue-icon', i + 'px');
+      document.getElementById('popQFontVal').textContent = f;
+      document.getElementById('popQIconVal').textContent = i;
+    }
+    document.getElementById('popQFont').addEventListener('input', applySize);
+    document.getElementById('popQIcon').addEventListener('input', applySize);
+    applySize();
+
+    function renderRow(q) {
+      const avatar = q.avatar
+        ? `<img class="avatar" src="${escapeHtml(q.avatar)}" />`
+        : `<div class="avatar"></div>`;
+      const giftIcon = q.gift_icon
+        ? `<img class="gift-icon" src="${escapeHtml(q.gift_icon)}" />`
+        : `<div class="gift-icon"></div>`;
+      const status = q.status === 'playing' ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>'
+        : q.status === 'done' ? '<span class="badge-status done">✓ xong</span>'
+        : '<span class="badge-status queued">⏳ chờ</span>';
+      const playInfo = q.playTimes > 1 ? ` · phát ${q.playTimes} lần` : '';
+      return `<div class="queue-row ${q.status}" data-id="${q.id}">
+        ${avatar}${giftIcon}
+        <div class="meta">
+          <div class="who">${escapeHtml(q.user)}${status}</div>
+          <div class="what">tặng <span class="name">${escapeHtml(q.gift_name)}</span>${q.gift_id ? ` <span style="color:#666">id ${q.gift_id}</span>` : ''}<span style="color:#ffd166">${playInfo}</span></div>
+        </div>
+        <div class="right">
+          <div class="cnt">×${q.count}${q.combo > 1 ? ` · combo ${q.combo}` : ''}</div>
+          ${q.diamond != null ? `<div class="beans">💎 ${q.diamond}</div>` : ''}
+        </div>
+      </div>`;
+    }
+
+    function renderAll() {
+      const q = document.getElementById('popQueue');
+      const arr = Array.from(items.values()).sort((a, b) => b.ts - a.ts);
+      q.innerHTML = arr.map(renderRow).join('') ||
+        '<div style="color:#555;text-align:center;padding:20px">Chưa có hiệu ứng nào</div>';
+    }
+
+    function updateStats() {
+      document.getElementById('popQGifts').textContent = stats.gifts;
+      document.getElementById('popQDiamond').textContent = stats.diamond;
+      document.getElementById('popQUsers').textContent = stats.users.size;
+    }
+
+    ipcRenderer.on('popup-queue:item', (_e, item) => {
+      const existing = items.get(item.id);
+      if (!existing) {
+        // New item
+        stats.gifts += item.count || 0;
+        stats.diamond += item.diamond || 0;
+        if (item.user) stats.users.add(item.user);
+        if (items.size >= 200) {
+          // remove oldest
+          const oldest = [...items.values()].sort((a, b) => a.ts - b.ts)[0];
+          if (oldest) items.delete(oldest.id);
+        }
+      }
+      items.set(item.id, item);
+      renderAll();
+      updateStats();
+    });
+    ipcRenderer.on('popup-queue:reset', () => {
+      items.clear();
+      stats.gifts = 0; stats.diamond = 0; stats.users.clear();
+      renderAll(); updateStats();
+    });
+    document.getElementById('popQClear').onclick = () => {
+      items.clear(); stats.gifts = 0; stats.diamond = 0; stats.users.clear();
+      renderAll(); updateStats();
+    };
+    renderAll();
+  </script>
+</body>
+</html>

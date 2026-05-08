@@ -62,11 +62,27 @@ function findAvatarUrl(el) {
   const imgs = el.querySelectorAll('img');
   for (const img of imgs) {
     const src = img.src || img.getAttribute('data-src') || '';
-    // avatar Bigo thường ở host esx.bigo.sg/avatar hoặc tương tự
-    if (/avatar|user_pic|live_pic|bigocdn/i.test(src)) return src;
+    // Bigo avatar thường: esx.bigo.sg, avatar, user_pic, live_pic, bigocdn,
+    // hoặc bất kỳ URL có /head/ , /avatar/, hoặc giàu pattern.
+    if (/avatar|user_pic|live_pic|bigocdn|head\/|profile/i.test(src)) return src;
+  }
+  // Fallback: lấy img đầu tiên không phải gift icon
+  for (const img of imgs) {
+    const src = img.src || img.getAttribute('data-src') || '';
+    if (!src) continue;
+    if (/giftpic|pgc-live-manage|gift\//i.test(src)) continue;
+    if (/^data:|\.svg/.test(src)) continue;
+    return src;
   }
   return '';
 }
+
+// Normalize whitespace để dedup chính xác
+function normalize(s) { return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+
+// WeakSet đánh dấu element đã scan để tránh scan lại trong cùng tick (cũng tránh
+// parent + child cùng match khi text concat của parent vẫn nằm trong giới hạn).
+const elementsScanned = new WeakSet();
 
 function scanChatsAndGifts() {
   const chats = [];
@@ -75,13 +91,28 @@ function scanChatsAndGifts() {
 
   for (const el of walkAllElements(document.body)) {
     if (el.nodeType !== 1) continue;
+    if (elementsScanned.has(el)) continue;
     const text = (el.textContent || '').trim();
-    if (text.length < 5 || text.length > 500) continue;
+    if (text.length < 5 || text.length > 300) continue;
+
+    // Filter "shared this LIVE" enter notification — không phải chat thật
+    if (/shared\s+this\s+(live|LIVE)\s*$/i.test(text)) {
+      elementsScanned.add(el);
+      continue;
+    }
+    // Filter joined messages
+    if (/has\s+joined|joined\s+the\s+room/i.test(text)) {
+      elementsScanned.add(el);
+      continue;
+    }
 
     const m = tryMatchChat(text);
     if (!m) continue;
 
-    const hash = `${m.level}|${m.user}|${m.content}`;
+    elementsScanned.add(el);
+
+    // Hash với normalize whitespace để bắt duplicate có khoảng trắng khác
+    const hash = `${m.level}|${normalize(m.user)}|${normalize(m.content)}`;
     if (seenChats.has(hash)) continue;
     seenChats.set(hash, Date.now());
 

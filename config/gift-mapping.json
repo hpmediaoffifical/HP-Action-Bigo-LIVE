@@ -4,8 +4,10 @@
     {
       "id": "g_mox220symqfo",
       "matchKeys": [
-        "1",
-        "Flower"
+        "2463",
+        "Bell",
+        "7750",
+        "Bell-测试68372/60190"
       ],
       "alias": "Flower",
       "group": "TUNG HOA",
@@ -18,15 +20,15 @@
       "id": "ov_mowzeyw8m6as",
       "name": "Overlay 1",
       "bgColor": "#00ff00",
-      "opacity": 0,
+      "opacity": 0.42,
       "bounds": {
-        "x": 41,
-        "y": 1155,
-        "width": 447,
-        "height": 805
+        "x": 1736,
+        "y": 353,
+        "width": 452,
+        "height": 809
       },
       "alwaysOnTop": true,
-      "clickThrough": true
+      "clickThrough": false
     }
   ],
   "groups": []
