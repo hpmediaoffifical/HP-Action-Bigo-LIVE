@@ -15,6 +15,7 @@
 
   <nav class="tabs">
     <button class="tab active" data-tab="embed">🌐 Web Listener</button>
+    <button class="tab" data-tab="queue">🎬 Hàng đợi</button>
     <button class="tab" data-tab="gifts">🎁 Bảng quà</button>
     <button class="tab" data-tab="overlays">🪟 Overlay</button>
     <button class="tab" data-tab="oauth">🔐 Open API</button>
@@ -23,20 +24,13 @@
   <main>
     <!-- =================== TAB: WEB LISTENER =================== -->
     <section class="tab-panel active" data-tab="embed">
-      <div class="panel">
-        <h2>Kết nối phòng live</h2>
-        <div class="row">
-          <label style="flex:2">BIGO ID
-            <input id="embedBigoId" placeholder="vd: 1066691535 hoặc kurumiyu0308" />
-          </label>
-          <label>&nbsp;
-            <button id="btnConnect" class="primary">🔌 Kết nối phòng</button>
-          </label>
-          <label>&nbsp;
-            <button id="btnEmbedShow" disabled>👁 Hiện cửa sổ Bigo</button>
-          </label>
+      <div class="panel panel-compact">
+        <div class="connect-row">
+          <input id="embedBigoId" placeholder="BIGO ID (vd: 1066691535)" class="connect-input" />
+          <button id="btnConnect" class="primary">🔌 Kết nối</button>
+          <button id="btnEmbedShow" disabled>👁 Cửa sổ Bigo</button>
+          <span id="liveInfo" class="live-info-inline">Nhập ID rồi bấm Kết nối</span>
         </div>
-        <div id="liveInfo" class="live-info">Nhập BIGO ID rồi bấm Kết nối phòng — app tự check live và bắt đầu nghe.</div>
       </div>
 
       <div class="panel" id="metaPanel" style="display:none">
@@ -55,6 +49,10 @@
         </div>
       </div>
 
+    </section>
+
+    <!-- =================== TAB: EFFECT QUEUE =================== -->
+    <section class="tab-panel" data-tab="queue">
       <div class="panel" id="effectQueuePanel">
         <div class="panel-head">
           <h2>🎬 Hàng đợi hiệu ứng</h2>

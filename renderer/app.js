@@ -38,7 +38,7 @@ els.btnClearQueue.onclick = () => {
   updateQueueStats();
 };
 
-function pushQueue(ev, matched) {
+function pushQueue(ev, matched, playTimes) {
   // Chỉ push gift events có hiệu ứng được map
   if (!matched || !matched.mediaFile) return;
   const item = {
@@ -50,6 +50,8 @@ function pushQueue(ev, matched) {
     gift_name: ev.gift_name || matched.alias || '?',
     gift_icon: ev.gift_icon || ev.gift_icon_url || '',
     count: ev.gift_count || 1,
+    combo: ev.combo || 1,
+    playTimes: playTimes || 1,
     diamond: ev.total_diamond,
     mediaFile: matched.mediaFile,
     overlayId: matched.overlayId,
@@ -91,15 +93,16 @@ function renderQueue() {
       ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>'
       : q.status === 'done' ? '<span class="badge-status done">✓ xong</span>'
       : '<span class="badge-status queued">⏳ chờ</span>';
+    const playInfo = q.playTimes > 1 ? `<span style="color:#ffd166"> · phát ${q.playTimes} lần</span>` : '';
     return `<div class="queue-row ${q.status}" data-id="${q.id}">
       ${avatarHtml}
       ${giftIconHtml}
       <div class="meta">
         <div class="who">${escapeHtml(q.user)}${statusBadge}</div>
-        <div class="what">tặng <span class="name">${escapeHtml(q.gift_name)}</span>${q.gift_id ? ` <span style="color:#666">id ${q.gift_id}</span>` : ''}</div>
+        <div class="what">tặng <span class="name">${escapeHtml(q.gift_name)}</span>${q.gift_id ? ` <span style="color:#666">id ${q.gift_id}</span>` : ''}${playInfo}</div>
       </div>
       <div class="right">
-        <div class="cnt">×${q.count}</div>
+        <div class="cnt">×${q.count}${q.combo > 1 ? ` · combo ${q.combo}` : ''}</div>
         ${q.diamond != null ? `<div class="beans">💎 ${q.diamond}</div>` : ''}
       </div>
     </div>`;
@@ -565,7 +568,7 @@ async function disconnect() {
   els.status.classList.remove('on');
   setConnectedUi(false);
   els.liveInfo.textContent = 'Đã hủy kết nối. Nhập BIGO ID khác và bấm Kết nối phòng.';
-  els.liveInfo.className = 'live-info';
+  els.liveInfo.className = 'live-info-inline';
   resetEmbedUi();
 }
 
@@ -590,20 +593,20 @@ els.btnConnect.onclick = async () => {
   const check = await window.bigo.checkLive(id);
   if (!check.ok) {
     els.liveInfo.textContent = `Lỗi check live: ${check.error}`;
-    els.liveInfo.className = 'live-info dead';
+    els.liveInfo.className = 'live-info-inline dead';
     els.btnConnect.disabled = false;
     return;
   }
   const d = check.data?.data || {};
   if (d.alive !== 1) {
-    els.liveInfo.className = 'live-info dead';
+    els.liveInfo.className = 'live-info-inline dead';
     els.liveInfo.textContent = `🔴 OFFLINE — ${d.nick_name || 'không tìm thấy ID'}`;
     els.status.textContent = 'offline';
     els.btnConnect.disabled = false;
     return;
   }
 
-  els.liveInfo.className = 'live-info live';
+  els.liveInfo.className = 'live-info-inline live';
   els.liveInfo.textContent = `🟢 LIVE — ${d.nick_name} · roomId=${d.roomId} · uid=${d.uid} · "${d.roomTopic || ''}"`;
 
   // 3. Lưu BIGO ID
@@ -705,8 +708,13 @@ function renderParsed(ev) {
     }
 
     if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
-      window.bigo.overlayPlay({ overlayId: matched.overlayId, file: matched.mediaFile });
-      pushQueue(ev, matched);
+      // Combo: tặng N lần thì phát N lần. total_count = gift_count × combo (combo mặc định 1).
+      // Cap 50 để tránh spam quá đáng (vd tặng 1000 quà combo).
+      const playTimes = Math.max(1, Math.min(50, ev.total_count || ev.gift_count || 1));
+      for (let i = 0; i < playTimes; i++) {
+        window.bigo.overlayPlay({ overlayId: matched.overlayId, file: matched.mediaFile });
+      }
+      pushQueue(ev, matched, playTimes);
     }
   }
 }
