@@ -101,12 +101,18 @@ function normalize(s) {
 // parent + child cùng match khi text concat của parent vẫn nằm trong giới hạn).
 const elementsScanned = new WeakSet();
 
-function scanChatsAndGifts() {
+// Counter diagnostic — track tổng gifts captured cumulative.
+let _totalGiftsCaptured = 0;
+let _totalChatsCaptured = 0;
+let _totalHeartsCaptured = 0;
+
+// Process 1 element (+ descendants nếu có) → return { chats, gifts } captured.
+// Dùng cả từ tick scan VÀ MutationObserver (real-time).
+function processElement(rootEl) {
   const chats = [];
   const gifts = [];
-  if (!document.body) return { chats, gifts };
-
-  for (const el of walkAllElements(document.body)) {
+  if (!rootEl) return { chats, gifts };
+  for (const el of walkAllElements(rootEl)) {
     if (el.nodeType !== 1) continue;
     if (elementsScanned.has(el)) continue;
     const text = (el.textContent || '').trim();
@@ -183,9 +189,46 @@ function scanChatsAndGifts() {
     }
   }
 
-  pruneMap(seenChats, 2000, 60_000);
-  pruneMap(seenGifts, 500, 1500); // gift hash chỉ giữ 1.5s
   return { chats, gifts };
+}
+
+// Wrapper backward-compat: scan toàn bộ document.body.
+function scanChatsAndGifts() {
+  if (!document.body) return { chats: [], gifts: [] };
+  const r = processElement(document.body);
+  pruneMap(seenChats, 2000, 60_000);
+  pruneMap(seenGifts, 500, 1500);
+  return r;
+}
+
+// MutationObserver: bắt new chat row REAL-TIME khi Bigo render vào DOM.
+// Tránh miss gifts khi chat row tồn tại < 1 tick interval (300-800ms).
+// Mỗi addedNode → process ngay → emit events tức thời.
+let _moAttached = false;
+function attachMutationObserver() {
+  if (_moAttached || !document.body) return;
+  _moAttached = true;
+  const observer = new MutationObserver((mutations) => {
+    const collected = { chats: [], gifts: [] };
+    for (const m of mutations) {
+      if (m.type !== 'childList') continue;
+      for (const node of m.addedNodes) {
+        if (!node || node.nodeType !== 1) continue;
+        const r = processElement(node);
+        collected.chats.push(...r.chats);
+        collected.gifts.push(...r.gifts);
+      }
+    }
+    if (collected.chats.length || collected.gifts.length) {
+      _totalChatsCaptured += collected.chats.length;
+      _totalGiftsCaptured += collected.gifts.filter(g => g.type === 'gift').length;
+      _totalHeartsCaptured += collected.gifts.filter(g => g.type === 'heart').length;
+      for (const ev of collected.chats) send('embed:parsed', { ...ev, ts: Date.now() });
+      for (const ev of collected.gifts) send('embed:parsed', { ...ev, ts: Date.now() });
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  send('embed:scrape-error', { msg: '[mutation-observer] attached realtime DOM watcher' });
 }
 
 function scanGiftOverlay() {
@@ -266,32 +309,31 @@ function attach() {
   }
   send('embed:dom-attached', { url: location.href, isMain: true, ts: Date.now() });
 
+  // Attach MutationObserver NGAY → bắt new chat rows realtime.
+  // Đây là PRIMARY path. Tick scan là SAFETY NET cho elements existed pre-attach.
+  attachMutationObserver();
+
   let lastMeta = '';
   let tickCount = 0;
-  let totalChats = 0;
-  let totalGifts = 0;
-  let totalElements = 0;
   const tick = () => {
     try {
       tickCount++;
-      // Đếm tổng elements cho diagnostic (chỉ tick đầu để không tốn CPU)
-      if (tickCount === 5 || tickCount === 30) {
+      // Diagnostic mỗi 30 ticks (~9s với 300ms interval).
+      if (tickCount === 5 || tickCount % 30 === 0) {
         let count = 0;
         for (const _ of walkAllElements(document.body)) count++;
-        totalElements = count;
         send('embed:scrape-error', {
-          msg: `[diag tick=${tickCount}] DOM elements=${count}, accumulated chats=${totalChats}, gifts=${totalGifts}`,
+          msg: `[diag tick=${tickCount}] DOM=${count} elements | TOTAL captured: ${_totalChatsCaptured} chats, ${_totalGiftsCaptured} gifts, ${_totalHeartsCaptured} hearts`,
         });
       }
       const { chats, gifts } = scanChatsAndGifts();
-      totalChats += chats.length;
-      totalGifts += gifts.length;
+      // Track via global counters (cùng processElement với MutationObserver).
+      _totalChatsCaptured += chats.length;
+      _totalGiftsCaptured += gifts.filter(g => g.type === 'gift').length;
+      _totalHeartsCaptured += gifts.filter(g => g.type === 'heart').length;
       for (const ev of chats) send('embed:parsed', { ...ev, ts: Date.now() });
       for (const ev of gifts) send('embed:parsed', { ...ev, ts: Date.now() });
       for (const ev of scanGiftOverlay()) send('embed:parsed', { ...ev, ts: Date.now() });
-      // Heart events giờ đến qua chat scan (BIGO emit message "gửi N lượt thích")
-      // → đã được handle trong scanChatsAndGifts → push vào gifts[] với type='heart'.
-      // Không cần global counter scan nữa.
       const meta = scanRoomMeta();
       const j = JSON.stringify(meta);
       if (j !== lastMeta) { lastMeta = j; send('embed:meta', { ...meta, ts: Date.now() }); }
@@ -299,8 +341,10 @@ function attach() {
       send('embed:scrape-error', { msg: e.message });
     }
   };
-  setTimeout(tick, 4000);
-  setInterval(tick, 800);
+  setTimeout(tick, 3000);
+  // Tick interval 300ms (giảm từ 800ms) cho safety net — MutationObserver đã catch
+  // hầu hết events realtime, tick này backup nếu observer miss (rare).
+  setInterval(tick, 300);
 }
 
 attach();
