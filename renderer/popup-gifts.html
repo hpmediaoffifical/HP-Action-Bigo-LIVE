@@ -56,15 +56,16 @@
     }
 
     function renderRow(g) {
+      // Avatar chỉ render khi CÓ URL — bỏ empty circle cho gọn
       const avatar = g.avatar
         ? `<img class="rcv-avatar" src="${escapeHtml(g.avatar)}" />`
-        : `<div class="rcv-avatar-empty"></div>`;
+        : '';
       const giftIcon = g.gift_icon
         ? `<img class="rcv-icon" src="${escapeHtml(g.gift_icon)}" />`
         : `<div class="rcv-icon-empty"></div>`;
       const lvlBadge = g.level
         ? `<span class="lvl tier-${levelTier(g.level)}" style="margin-right:4px">Lv.${g.level}</span>` : '';
-      return `<div class="rcv-row" data-gid="${escapeHtml(g.id)}">
+      return `<div class="rcv-row ${g.avatar ? '' : 'no-avatar'}" data-gid="${escapeHtml(g.id)}">
         ${avatar}
         ${giftIcon}
         <div class="rcv-meta">

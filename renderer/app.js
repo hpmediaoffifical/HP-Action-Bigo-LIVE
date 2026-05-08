@@ -191,6 +191,9 @@ if (window.bigo.onOverlayEffectEnded) {
         const nextQ = queueItems.find(q => q.status === 'queued');
         if (nextQ) nextQ.status = 'playing';
       }
+      // Decrement 🎵 counter khi item end naturally
+      sessionStats.effects = Math.max(0, sessionStats.effects - 1);
+      updateConnectStats();
       renderQueue(); renderMiniQueue(); updateQueueStats();
       forwardQueueSnapshot();
       // Cũ: setTimeout(...) — bỏ delay, xoá thẳng để DSHT luôn chỉ chứa playing + queued
@@ -233,8 +236,12 @@ function renderMiniQueue() {
     const status = isPlaying ? '<span class="badge-status playing">▶</span>'
       : '<span class="badge-status queued">⏳</span>';
     const cntLabel = q.total > 1 ? `<span class="step">${q.step}/${q.total}</span>` : `×${q.count}`;
+    // Avatar (NHPHUNG → logo HP, user khác → raw nếu scrape được, ngược lại bỏ)
+    const avUrl = resolveAvatarForUser(q.user, q.avatar);
+    const avHtml = avUrl ? `<img class="avatar" src="${escapeHtml(avUrl)}" loading="lazy" />` : '';
     return `<div class="mini-queue-row ${q.status}">
       <span class="mini-stt ${isPlaying ? 'playing' : ''}" title="${isPlaying ? 'Đang phát' : 'STT ' + (i - playingCount + 1)}">${stt}</span>
+      ${avHtml}
       ${iconHtml}
       <div class="mini-meta">
         <div class="who">${escapeHtml(q.user)}</div>
@@ -263,11 +270,17 @@ function removeQueueItemById(id) {
     const nextQ = queueItems.find(q => q.status === 'queued');
     if (nextQ) nextQ.status = 'playing';
   }
+  // Decrement counter 🎵 effects (bộ đếm phải giảm khi danh sách giảm)
+  sessionStats.effects = Math.max(0, sessionStats.effects - 1);
+  updateConnectStats();
   renderQueue(); renderMiniQueue(); updateQueueStats();
   forwardQueueSnapshot();
 }
 
 function clearAllQueue() {
+  // Decrement counter 🎵 effects theo số item bị xoá
+  sessionStats.effects = Math.max(0, sessionStats.effects - queueItems.length);
+  updateConnectStats();
   queueItems.length = 0;
   renderQueue(); renderMiniQueue(); updateQueueStats();
   forwardQueueSnapshot();
@@ -363,9 +376,10 @@ function renderQueue() {
     const isPlaying = q.status === 'playing';
     if (isPlaying) playingCount++;
     const stt = isPlaying ? '▶' : String(i - playingCount + 1);
-    const avatarHtml = q.avatar
-      ? `<img class="avatar" src="${escapeHtml(q.avatar)}" loading="lazy" />`
-      : `<div class="avatar"></div>`;
+    const avUrl = resolveAvatarForUser(q.user, q.avatar);
+    const avatarHtml = avUrl
+      ? `<img class="avatar" src="${escapeHtml(avUrl)}" loading="lazy" />`
+      : '';
     const giftIconHtml = q.gift_icon
       ? `<img class="gift-icon" src="${escapeHtml(q.gift_icon)}" loading="lazy" />`
       : `<div class="gift-icon"></div>`;
@@ -1597,10 +1611,11 @@ function renderReceivedGifts() {
     const iconHtml = g.gift_icon
       ? `<img class="rcv-icon" src="${escapeHtml(g.gift_icon)}" loading="lazy" />`
       : '<div class="rcv-icon-empty"></div>';
+    // Avatar: chỉ render khi CÓ URL — bỏ avatar trống cho gọn UI.
     const avUrl = resolveAvatarForUser(g.user, g.avatar);
-    const avHtml = avUrl ? `<img class="rcv-avatar" src="${escapeHtml(avUrl)}" loading="lazy" />` : '<div class="rcv-avatar-empty"></div>';
+    const avHtml = avUrl ? `<img class="rcv-avatar" src="${escapeHtml(avUrl)}" loading="lazy" />` : '';
     const lvlBadge = g.level ? `<span class="lvl tier-${levelTier(g.level)}" style="margin-right:4px">Lv.${g.level}</span>` : '';
-    return `<div class="rcv-row" data-gid="${g.id}">
+    return `<div class="rcv-row ${avUrl ? '' : 'no-avatar'}" data-gid="${g.id}">
       ${avHtml}
       ${iconHtml}
       <div class="rcv-meta">

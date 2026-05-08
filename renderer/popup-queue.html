@@ -63,7 +63,7 @@
       const stt = isPlaying ? '▶' : String(idx); // idx đã offset (xem renderAll)
       const avatar = q.avatar
         ? `<img class="avatar" src="${escapeHtml(q.avatar)}" />`
-        : `<div class="avatar"></div>`;
+        : '';
       const giftIcon = q.gift_icon
         ? `<img class="gift-icon" src="${escapeHtml(q.gift_icon)}" />`
         : `<div class="gift-icon"></div>`;

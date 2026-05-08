@@ -317,6 +317,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ============ Received gifts row (right panel) ============ */
 .rcv-row { display: grid; grid-template-columns: 28px 36px 1fr auto auto; gap: 8px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #1c1f28; cursor: default; user-select: none; }
+/* Khi không có avatar → bỏ cột để row gọn hơn */
+.rcv-row.no-avatar { grid-template-columns: 36px 1fr auto auto; }
 .rcv-row:hover { background: #20242f; }
 .rcv-row .rcv-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #0f1117; }
 .rcv-row .rcv-avatar-empty { width: 28px; height: 28px; border-radius: 50%; background: #1c1f28; }

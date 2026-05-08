@@ -16,10 +16,11 @@
       <button class="tab sidebar-tab" data-tab="queue" title="Hàng đợi hiệu ứng">🎬</button>
       <button class="tab sidebar-tab" data-tab="gifts" title="Bảng quà">🎁</button>
       <button class="tab sidebar-tab" data-tab="overlays" title="Overlay">🪟</button>
-      <button class="tab sidebar-tab" data-tab="settings" title="Cài đặt chung">⚙️</button>
+      <button class="tab sidebar-tab" data-tab="special" title="Hiệu Ứng Đặc Biệt">✨</button>
       <div class="sidebar-spacer"></div>
       <button class="sidebar-tab" id="sidebarBgmToggle" title="Phát / Dừng nhạc nền">🎵</button>
       <button class="sidebar-tab" id="sidebarLockSettings" title="Khoá cài đặt — chống chỉnh nhầm trong khi stream">🔐</button>
+      <button class="tab sidebar-tab" data-tab="settings" title="Cài đặt chung">⚙️</button>
     </aside>
 
     <div class="main-content">
@@ -197,6 +198,66 @@
       </div>
     </section>
 
+    <!-- =================== TAB: HIỆU ỨNG ĐẶC BIỆT =================== -->
+    <section class="tab-panel" data-tab="special">
+      <div class="panel">
+        <h2>✨ Hiệu Ứng Đặc Biệt</h2>
+        <div class="hint small" style="margin-bottom:10px">
+          Gắn quà tặng làm trigger cho action đặc biệt. User trong LIVE tặng đúng quà này → app tự thực hiện.
+        </div>
+
+        <div class="se-row">
+          <div class="se-row-head">
+            <span class="se-icon">🧹</span>
+            <b class="se-title">Xoá danh sách hiệu ứng</b>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seClearQueueEnabled" /> Bật</label>
+          </div>
+          <div class="se-row-body">
+            <span id="seClearQueueLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny se-pick" data-se-key="clearQueue" title="Chọn quà từ master">🎁 Chọn</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="clearQueue" title="Bỏ trigger">🗑</button>
+          </div>
+        </div>
+
+        <div class="se-row">
+          <div class="se-row-head">
+            <span class="se-icon">⏩</span>
+            <b class="se-title">Tăng tốc nhạc nền</b>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedUpFactor" step="0.05" min="1" max="3" value="1.25" style="width:60px" /></label>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedUpEnabled" /> Bật</label>
+          </div>
+          <div class="se-row-body">
+            <span id="seSpeedUpLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny se-pick" data-se-key="speedUp">🎁 Chọn</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="speedUp">🗑</button>
+          </div>
+        </div>
+
+        <div class="se-row">
+          <div class="se-row-head">
+            <span class="se-icon">⏪</span>
+            <b class="se-title">Giảm tốc nhạc nền</b>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedDownFactor" step="0.05" min="0.25" max="1" value="0.75" style="width:60px" /></label>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedDownEnabled" /> Bật</label>
+          </div>
+          <div class="se-row-body">
+            <span id="seSpeedDownLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny se-pick" data-se-key="speedDown">🎁 Chọn</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="speedDown">🗑</button>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px; align-items:center">
+          <button type="button" id="btnResetBgmSpeed" class="tiny" title="Đưa BGM về tốc độ 1.0×">↻ Reset tốc độ BGM</button>
+          <span id="bgmSpeedDisplay" style="color:#8a8f9a; font-size:11px">Tốc độ hiện tại: ×1.0</span>
+        </div>
+
+        <div class="hint small" style="margin-top:8px">
+          📌 Sắp tới: <b>Táp màn hình theo yêu cầu</b> để phát hiệu ứng riêng + nhiều trigger khác.
+        </div>
+      </div>
+    </section>
+
     <!-- =================== TAB: CÀI ĐẶT CHUNG =================== -->
     <section class="tab-panel" data-tab="settings">
       <div class="panel">
@@ -252,63 +313,6 @@
         <div class="hint small">
           Nhạc nền sẽ phát loop, có thể chọn output device (loa ngoài hoặc cable virtual cho OBS).
           Khi gift bật <b>"Tạm dừng nhạc nền khi phát"</b>, nhạc nền tự pause trong lúc effect chạy rồi resume.
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>✨ Hiệu Ứng Đặc Biệt</h2>
-        <div class="hint small" style="margin-bottom:10px">
-          Gắn quà tặng làm trigger cho action đặc biệt. User trong LIVE tặng đúng quà này → app tự thực hiện.
-        </div>
-
-        <div class="se-row">
-          <div class="se-row-head">
-            <span class="se-icon">🧹</span>
-            <b class="se-title">Xoá danh sách hiệu ứng</b>
-            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seClearQueueEnabled" /> Bật</label>
-          </div>
-          <div class="se-row-body">
-            <span id="seClearQueueLabel" class="se-gift-label">— chưa chọn —</span>
-            <button type="button" class="tiny se-pick" data-se-key="clearQueue" title="Chọn quà từ master">🎁 Chọn</button>
-            <button type="button" class="tiny danger se-unpick" data-se-key="clearQueue" title="Bỏ trigger">🗑</button>
-          </div>
-        </div>
-
-        <div class="se-row">
-          <div class="se-row-head">
-            <span class="se-icon">⏩</span>
-            <b class="se-title">Tăng tốc nhạc nền</b>
-            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedUpFactor" step="0.05" min="1" max="3" value="1.25" style="width:60px" /></label>
-            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedUpEnabled" /> Bật</label>
-          </div>
-          <div class="se-row-body">
-            <span id="seSpeedUpLabel" class="se-gift-label">— chưa chọn —</span>
-            <button type="button" class="tiny se-pick" data-se-key="speedUp">🎁 Chọn</button>
-            <button type="button" class="tiny danger se-unpick" data-se-key="speedUp">🗑</button>
-          </div>
-        </div>
-
-        <div class="se-row">
-          <div class="se-row-head">
-            <span class="se-icon">⏪</span>
-            <b class="se-title">Giảm tốc nhạc nền</b>
-            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">×<input type="number" id="seSpeedDownFactor" step="0.05" min="0.25" max="1" value="0.75" style="width:60px" /></label>
-            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seSpeedDownEnabled" /> Bật</label>
-          </div>
-          <div class="se-row-body">
-            <span id="seSpeedDownLabel" class="se-gift-label">— chưa chọn —</span>
-            <button type="button" class="tiny se-pick" data-se-key="speedDown">🎁 Chọn</button>
-            <button type="button" class="tiny danger se-unpick" data-se-key="speedDown">🗑</button>
-          </div>
-        </div>
-
-        <div class="row" style="margin-top:8px; align-items:center">
-          <button type="button" id="btnResetBgmSpeed" class="tiny" title="Đưa BGM về tốc độ 1.0×">↻ Reset tốc độ BGM</button>
-          <span id="bgmSpeedDisplay" style="color:#8a8f9a; font-size:11px">Tốc độ hiện tại: ×1.0</span>
-        </div>
-
-        <div class="hint small" style="margin-top:8px">
-          📌 Sắp tới: <b>Táp màn hình theo yêu cầu</b> để phát hiệu ứng riêng + nhiều trigger khác.
         </div>
       </div>
 

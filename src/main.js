@@ -401,6 +401,18 @@ ipcMain.handle('effects:list', () => {
   } catch { return []; }
 });
 
+// Kiểm tra file effect tồn tại — nhận basename (assets/effects) hoặc file:// URL hoặc absolute path.
+ipcMain.handle('effects:exists', (_e, mediaFile) => {
+  if (!mediaFile || typeof mediaFile !== 'string') return false;
+  let p = mediaFile;
+  if (/^file:\/\//i.test(p)) {
+    try { p = decodeURIComponent(p.replace(/^file:\/\/\/?/i, '')).replace(/\//g, path.sep); } catch { return false; }
+  } else if (!path.isAbsolute(p)) {
+    p = path.join(EFFECTS_DIR, p);
+  }
+  try { return fs.existsSync(p); } catch { return false; }
+});
+
 // Pick BGM file - giữ nguyên ở vị trí gốc, trả về file:// URL
 ipcMain.handle('bgm:pick-file', async () => {
   if (!win) return { ok: false };
