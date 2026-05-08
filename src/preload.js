@@ -1,6 +1,12 @@
 const { contextBridge, ipcRenderer } = require('electron');
+// Embed logo data URL — renderer dùng thay vì <img src="../logo-hp.png">.
+// Bảo vệ: không có file riêng để user replace.
+const { LOGO_PNG_DATA_URL, LOGO_ICO_DATA_URL } = require('./embedded-logos');
 
 contextBridge.exposeInMainWorld('bigo', {
+  // Logo data URLs (embedded base64) — set vào <img> src khi cần
+  LOGO_PNG: LOGO_PNG_DATA_URL,
+  LOGO_ICO: LOGO_ICO_DATA_URL,
   // Settings
   settingsLoad: () => ipcRenderer.invoke('settings:load'),
   settingsSave: (d) => ipcRenderer.invoke('settings:save', d),

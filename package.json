@@ -5,15 +5,48 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev"
+    "dev": "electron . --dev",
+    "embed-logos": "node tools/embed-logos.js",
+    "prebuild": "npm run embed-logos",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win"
   },
   "author": "Phụng",
   "license": "ISC",
   "build": {
     "appId": "com.hp.bigoaction",
     "productName": "BIGO Action",
+    "asar": true,
+    "files": [
+      "**/*",
+      "!logo-hp.png",
+      "!logo-hp.ico",
+      "!tools/**/*",
+      "!.gitignore",
+      "!README*"
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "embeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "loadBrowserProcessSpecificV8Snapshot": false,
+      "grantFileProtocolExtraPrivileges": false
+    },
     "win": {
-      "icon": "logo-hp.ico"
+      "icon": "logo-hp.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
     },
     "mac": {
       "icon": "logo-hp.png"
@@ -23,6 +56,7 @@
     }
   },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
   }
 }

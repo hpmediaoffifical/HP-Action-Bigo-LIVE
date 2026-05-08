@@ -13,10 +13,33 @@ const EFFECTS_DIR = path.join(ROOT, 'assets', 'effects');
 const GIFT_ICONS_DIR = path.join(ROOT, 'assets', 'gift-icons');
 const GIFT_MASTER_TTL = 24 * 3600 * 1000; // 24h
 
-// App icon — Windows ưu tiên .ico, fallback .png
+// App icon — Embedded base64 trong JS (bảo vệ logo, không cần file riêng).
+// Sau khi pack vào app.asar, user không thể thay logo bằng cách swap file.
+// Hash SHA-256 check at startup phát hiện nếu base64 bị modify.
+const crypto = require('crypto');
+const EMBEDDED_LOGOS = require('./embedded-logos');
+
+(function verifyLogosIntegrity() {
+  const checks = [
+    { name: 'PNG', base64: EMBEDDED_LOGOS.LOGO_PNG_BASE64, expected: EMBEDDED_LOGOS.LOGO_PNG_HASH },
+    { name: 'ICO', base64: EMBEDDED_LOGOS.LOGO_ICO_BASE64, expected: EMBEDDED_LOGOS.LOGO_ICO_HASH },
+  ];
+  for (const c of checks) {
+    const buf = Buffer.from(c.base64, 'base64');
+    const got = crypto.createHash('sha256').update(buf).digest('hex');
+    if (got !== c.expected) {
+      console.error(`[security] LOGO INTEGRITY FAILED: ${c.name} expected ${c.expected.slice(0,16)}... got ${got.slice(0,16)}...`);
+      // App quit ngay — tránh chạy với logo đã modify.
+      app.exit(1);
+    }
+  }
+})();
+
+// nativeImage từ data URL → dùng cho BrowserWindow icon options.
+const APP_ICON = nativeImage.createFromDataURL(EMBEDDED_LOGOS.LOGO_ICO_DATA_URL);
+// Legacy file path fallbacks (giữ cho electron-builder build-time icon).
 const ICO_PATH = path.join(ROOT, 'logo-hp.ico');
 const PNG_PATH = path.join(ROOT, 'logo-hp.png');
-const APP_ICON = fs.existsSync(ICO_PATH) ? ICO_PATH : (fs.existsSync(PNG_PATH) ? PNG_PATH : null);
 
 // Windows: set AppUserModelID để taskbar group đúng và hiện icon
 if (process.platform === 'win32') {
