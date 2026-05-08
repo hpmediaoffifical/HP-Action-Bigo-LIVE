@@ -2119,9 +2119,11 @@ function normEv(s) {
     .toLowerCase();
 }
 
-// Defensive dedup ở renderer (lớp 2 — primary là preload-embed seenGifts/seenChats).
-// User report: tặng quà 2 lần liên tiếp → chỉ count 1. Vì 1s window quá rộng cho gift.
-// Fix: chia type-window — gift chỉ 250ms (chỉ tránh DOM race), chat giữ 1s.
+// Defensive dedup ở renderer (lớp 2). User report: tặng 2 quà liên tiếp chỉ thấy 1.
+// Sau khi scraper bỏ hash dedup (rely WeakSet), layer này còn risk drop gifts
+// nếu IPC echo cùng event 2 lần. Window CỰC NGẮN (50ms) — đủ catch IPC race
+// (~1-10ms) nhưng KHÔNG drop human taps (200ms+).
+// Chat giữ 1s (re-rendered chat row legitimately).
 const recentEventHashes = new Map();
 function shouldDropDuplicate(ev) {
   if (!ev || (ev.type !== 'chat' && ev.type !== 'gift' && ev.type !== 'gift_overlay')) return false;
@@ -2129,7 +2131,7 @@ function shouldDropDuplicate(ev) {
   const key = ev.type === 'chat'
     ? `c|${ev.level}|${normEv(ev.user)}|${normEv(ev.content)}`
     : `g|${normEv(ev.user)}|${normEv(ev.gift_name)}|${ev.gift_count || 1}`;
-  const window = isGift ? 250 : 1000;  // Gift: 250ms, Chat: 1s.
+  const window = isGift ? 50 : 1000;  // Gift 50ms (IPC race only), Chat 1s.
   const now = Date.now();
   const last = recentEventHashes.get(key);
   if (last && now - last < window) return true;

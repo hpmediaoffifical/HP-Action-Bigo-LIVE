@@ -135,27 +135,27 @@ function scanChatsAndGifts() {
     const isGift = !!giftM || /^sent\s+/i.test(m.content);
 
     if (isGift) {
-      // GIFT DEDUP NGẮN — chỉ tránh DOM render race (cùng 1 chat row được scan
-      // 2 lần do MutationObserver bắt re-render). User: tặng cùng quà 2 lần liên
-      // tiếp PHẢI ra 2 events. Window 500ms đủ cover race nhưng không drop
-      // legitimate consecutive gifts (manual tap > 500ms).
-      const giftHash = `g|${m.level}|${normalize(m.user)}|${normalize(m.content)}`;
-      const last = seenGifts.get(giftHash);
-      if (last && Date.now() - last < 500) continue;
-      seenGifts.set(giftHash, Date.now());
-
+      // KHÔNG hash-dedup nữa cho gifts — tin tưởng WeakSet elementsScanned đã
+      // handle per-DOM-element dedup. 2 chat rows khác nhau dù cùng content
+      // (vd "X sent Rose" 2 lần liên tiếp) sẽ là 2 elements khác → cả 2 fire.
+      // Trước đây 500ms window drop 2nd → bug user "tặng 2 quà chỉ thấy 1".
+      // (Pre-effect race protection làm ở overlay.js block window, không ở đây.)
       if (giftM) {
-        gifts.push({
+        const ev = {
           type: 'gift', level: m.level, user: m.user,
           gift_name: giftM[1].trim(), gift_count: +giftM[2],
           gift_icon_url: giftIconUrl, user_avatar_url: avatarUrl, raw: text,
-        });
+        };
+        gifts.push(ev);
+        send('embed:scrape-error', { msg: `[gift parse] ${m.user} | ${ev.gift_name} ×${ev.gift_count} | raw: "${text.slice(0, 80)}"` });
       } else {
-        gifts.push({
+        const ev = {
           type: 'gift', level: m.level, user: m.user,
           gift_name: m.content.replace(/^sent\s+(?:an?\s+)?/i, '').trim(), gift_count: 1,
           gift_icon_url: giftIconUrl, user_avatar_url: avatarUrl, raw: text,
-        });
+        };
+        gifts.push(ev);
+        send('embed:scrape-error', { msg: `[gift parse-fallback] ${m.user} | ${ev.gift_name} ×1 | raw: "${text.slice(0, 80)}"` });
       }
     } else {
       // CHECK HEART: trước khi xử lý như chat thường, detect message "gửi N lượt thích".
