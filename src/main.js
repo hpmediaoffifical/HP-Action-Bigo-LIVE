@@ -189,6 +189,21 @@ function createWindow() {
   if (process.argv.includes('--dev')) win.webContents.openDevTools({ mode: 'detach' });
 }
 
+// Single-instance lock: nếu đã có instance đang chạy, focus vào nó và quit instance mới.
+// Tránh conflict trên user-data cache + tránh nhiều cửa sổ trùng lặp.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+  process.exit(0);
+}
+app.on('second-instance', () => {
+  if (win) {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  }
+});
+
 app.whenReady().then(async () => {
   mapping = loadMapping();
   overlayManager = new OverlayManager({
