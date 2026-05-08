@@ -333,19 +333,8 @@ function forwardQueueSnapshot() {
   window.bigo.popupQueueSnapshot(list).catch(() => {});
 }
 
-// Default avatar URL cho admin NHPHUNG → logo HP (embedded base64, không cần file).
-// Bảo vệ: sau khi pack vào asar, không có file logo-hp.png riêng để user thay thế.
-const HP_LOGO_URL = (typeof window !== 'undefined' && window.bigo && window.bigo.LOGO_PNG)
-  ? window.bigo.LOGO_PNG
-  : './../logo-hp.png'; // fallback dev
-
-// Inject sidebar logo từ embedded base64
-(function injectSidebarLogo() {
-  const sidebarLogo = document.getElementById('appSidebarLogo');
-  if (sidebarLogo && window.bigo && window.bigo.LOGO_PNG) {
-    sidebarLogo.src = window.bigo.LOGO_PNG;
-  }
-})();
+// Default avatar URL cho admin NHPHUNG → logo HP. Cho mọi user khác trả về raw URL.
+const HP_LOGO_URL = './../logo-hp.png';
 function resolveAvatarForUser(user, rawAvatar) {
   const u = String(user || '').trim().toUpperCase();
   if (u === 'NHPHUNG' || u === 'NHPHUNG (ADMIN)') return HP_LOGO_URL;
