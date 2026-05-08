@@ -2282,11 +2282,13 @@ document.querySelectorAll('.se-test').forEach(btn => {
   if (el.tagName === 'INPUT' && el.type !== 'checkbox') el.addEventListener('input', scheduleSpecialPickerRender);
   else el.addEventListener('change', renderSpecialPickerTable);
 });
-// Reset Effect speed button
+// Reset Effect speed button — clear cả pending để bypass lock
 const btnResetBgmSpeed = document.getElementById('btnResetBgmSpeed');
 if (btnResetBgmSpeed) {
   btnResetBgmSpeed.onclick = () => {
     if (_speedRevertTimer) { clearTimeout(_speedRevertTimer); _speedRevertTimer = null; }
+    _speedRevertEndsAt = 0;
+    _pendingSpeedKey = null;
     applyEffectSpeed(1.0);
   };
 }
@@ -2303,19 +2305,50 @@ function applyEffectSpeed(rate) {
 }
 
 // Trigger speed effect: apply factor + auto-revert về 1.0 sau duration giây.
-// Multiple triggers cùng key reset timer (latest wins).
+//
+// LOCK SEMANTICS (theo yêu cầu user): Trong thời gian speed effect đang active
+// (timer chưa expire), trigger MỚI sẽ KHÔNG apply ngay — thay vào đó được QUEUE
+// để apply sau khi current revert về 1.0. Tránh việc "ai tặng nhanh/chậm là
+// thay đổi liền" → effect dứt khoát theo duration đã cài.
 let _speedRevertTimer = null;
+let _speedRevertEndsAt = 0;     // timestamp ms — khi nào current speed effect kết thúc
+let _pendingSpeedKey = null;     // key tiếp theo đang đợi (latest wins)
+
 function triggerSpeedEffect(key) {
+  if (_speedRevertTimer) {
+    // Đang có speed effect active → queue trigger này, sẽ apply sau khi revert.
+    _pendingSpeedKey = key;
+    const remainMs = Math.max(0, _speedRevertEndsAt - Date.now());
+    const remainSec = Math.ceil(remainMs / 1000);
+    appendLog(`[se:${key}] đang có speed effect chạy → queued, áp dụng sau ${remainSec}s`);
+    const disp = document.getElementById('bgmSpeedDisplay');
+    if (disp) disp.textContent += ` · queued: ${key}`;
+    return;
+  }
+  _applyAndScheduleSpeed(key);
+}
+
+function _applyAndScheduleSpeed(key) {
   const cfg = appSettings.specialEffects?.[key];
   if (!cfg) return;
   const factor = parseFloat(cfg.factor) || 1;
   const duration = Math.max(1, parseInt(cfg.duration, 10) || 10);
   applyEffectSpeed(factor);
-  if (_speedRevertTimer) clearTimeout(_speedRevertTimer);
+  _speedRevertEndsAt = Date.now() + duration * 1000;
   _speedRevertTimer = setTimeout(() => {
     applyEffectSpeed(1.0);
-    appendLog(`[se] Tốc độ hiệu ứng auto-revert ×1.0 sau ${duration}s`);
+    appendLog(`[se] Speed effect kết thúc (${duration}s) → revert ×1.0`);
     _speedRevertTimer = null;
+    _speedRevertEndsAt = 0;
+    // Apply pending key nếu có (latest wins khi nhiều triggers queue trong thời gian active)
+    if (_pendingSpeedKey) {
+      const nextKey = _pendingSpeedKey;
+      _pendingSpeedKey = null;
+      setTimeout(() => {
+        appendLog(`[se] Apply pending speed: ${nextKey}`);
+        _applyAndScheduleSpeed(nextKey);
+      }, 100); // 100ms breath cho user thấy speed về 1.0× rõ rệt
+    }
   }, duration * 1000);
   const disp = document.getElementById('bgmSpeedDisplay');
   if (disp) disp.textContent = `Tốc độ hiệu ứng: ×${factor} (revert sau ${duration}s)`;
