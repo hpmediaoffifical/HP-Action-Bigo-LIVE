@@ -97,13 +97,20 @@ function normalize(s) {
     .toLowerCase();
 }
 
-// WeakMap track LAST-PROCESSED-TEXT per element (thay vì WeakSet element identity).
-// Lý do: nếu Bigo virtualize chat list (recycle DOM elements with new content),
-// WeakSet skip → miss new content. WeakMap re-process khi text element thay đổi.
-//   - Same element + same text → skip (tránh duplicate per-tick).
-//   - Same element + different text → process (Bigo recycled, content mới).
-//   - New element → process.
+// 2-LAYER DEDUP cho chat/gift detection:
+//
+// Layer A — WeakMap elementContent (per-element):
+//   Skip nếu cùng element + cùng text. Handle MutationObserver + tick scan
+//   trùng element. Khác text trên cùng element → process lại (virtualized).
+//
+// Layer B — Map recentTextHashes (cross-element, 100ms window):
+//   Khi React/Vue re-render: tạo NEW element với SAME content trong vài ms.
+//   WeakMap không catch (different element). Layer B catch via text + timestamp.
+//   100ms đủ ngắn để KHÔNG drop manual taps (>150ms tap rate) nhưng đủ rộng
+//   để catch render duplicates (~1-50ms).
 const elementContent = new WeakMap();
+const recentTextHashes = new Map();
+const TEXT_DEDUP_WINDOW_MS = 100;
 
 // Counter diagnostic — track tổng gifts captured cumulative.
 let _totalGiftsCaptured = 0;
@@ -120,8 +127,7 @@ function processElement(rootEl) {
     if (el.nodeType !== 1) continue;
     const text = (el.textContent || '').trim();
     if (text.length < 5 || text.length > 300) continue;
-    // CONTENT-BASED dedup per element: skip CHỈ KHI element + text giống lần trước.
-    // Khác text → process lại (handle virtualized list reuse).
+    // Layer A: same element + same text → skip.
     if (elementContent.get(el) === text) continue;
 
     // Filter "shared this LIVE" enter notification — không phải chat thật
@@ -138,7 +144,17 @@ function processElement(rootEl) {
     const m = tryMatchChat(text);
     if (!m) continue;
 
-    // Đánh dấu text đã process (cho mọi element-text pair).
+    // Layer B: cross-element text dedup. Catch React re-render → new element +
+    // same content trong window 100ms. KHÔNG drop manual taps (rate >150ms).
+    const lastTextSeen = recentTextHashes.get(text);
+    const nowMs = Date.now();
+    if (lastTextSeen && nowMs - lastTextSeen < TEXT_DEDUP_WINDOW_MS) {
+      elementContent.set(el, text); // mark to skip future scans of this element
+      continue;
+    }
+    recentTextHashes.set(text, nowMs);
+
+    // Đánh dấu text đã process (Layer A persist).
     elementContent.set(el, text);
 
     const avatarUrl = findAvatarUrl(el);
@@ -204,6 +220,7 @@ function scanChatsAndGifts() {
   const r = processElement(document.body);
   pruneMap(seenChats, 2000, 60_000);
   pruneMap(seenGifts, 500, 1500);
+  pruneMap(recentTextHashes, 500, 5_000); // text dedup chỉ giữ 5s
   return r;
 }
 
