@@ -2,6 +2,8 @@ node_modules/
 config/settings.json
 config/gift-master.json
 assets/gift-icons/
+assets/effects/*
+!assets/effects/.gitkeep
 dist/
 *.log
 .DS_Store
