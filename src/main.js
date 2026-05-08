@@ -435,12 +435,13 @@ ipcMain.handle('preFx:pick-file', async () => {
   return { ok: true, filePath, fileUrl, fileName: path.basename(filePath) };
 });
 
-// Mở dialog chọn 1 hoặc nhiều file mp3/mp4/webm/wav rồi copy vào assets/effects.
-// Trả về tên file mới (hoặc null nếu user huỷ).
+// Mở dialog chọn file hiệu ứng. KHÔNG copy vào assets/effects để tránh phình app folder.
+// Trả về list { filePath, fileUrl, fileName } — gift item lưu fileUrl trực tiếp,
+// chạy ở vị trí gốc trên ổ đĩa.
 ipcMain.handle('effects:pick-files', async () => {
   if (!win) return { ok: false };
   const res = await dialog.showOpenDialog(win, {
-    title: 'Chọn file hiệu ứng (mp3/mp4/webm/wav/ogg)',
+    title: 'Chọn file hiệu ứng (mp3/mp4/webm/wav/ogg/gif)',
     properties: ['openFile', 'multiSelections'],
     filters: [
       { name: 'Media', extensions: ['mp4', 'webm', 'mp3', 'wav', 'ogg', 'gif'] },
@@ -448,24 +449,12 @@ ipcMain.handle('effects:pick-files', async () => {
     ],
   });
   if (res.canceled || !res.filePaths.length) return { ok: false, canceled: true };
-  fs.mkdirSync(EFFECTS_DIR, { recursive: true });
-  const copied = [];
-  const skipped = [];
-  for (const src of res.filePaths) {
-    const base = path.basename(src);
-    const dst = path.join(EFFECTS_DIR, base);
-    try {
-      if (path.resolve(src) === path.resolve(dst)) {
-        skipped.push(base);
-        continue;
-      }
-      fs.copyFileSync(src, dst);
-      copied.push(base);
-    } catch (e) {
-      // ignore individual errors but continue
-    }
-  }
-  return { ok: true, copied, skipped };
+  const files = res.filePaths.map(filePath => ({
+    filePath,
+    fileUrl: 'file:///' + filePath.replace(/\\/g, '/').replace(/^\/+/, ''),
+    fileName: path.basename(filePath),
+  }));
+  return { ok: true, files };
 });
 
 // Mở folder assets/effects bằng file explorer
@@ -474,6 +463,87 @@ ipcMain.handle('effects:open-folder', async () => {
   const { shell } = require('electron');
   await shell.openPath(EFFECTS_DIR);
   return { ok: true };
+});
+
+// =================== Config Export / Import ===================
+// Xuất bundle settings + mapping ra 1 JSON file để chuyển sang máy khác.
+ipcMain.handle('config:export', async () => {
+  if (!win) return { ok: false };
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const res = await dialog.showSaveDialog(win, {
+    title: 'Xuất cài đặt BIGO Action',
+    defaultPath: `bigo-action-config-${ts}.json`,
+    filters: [{ name: 'JSON', extensions: ['json'] }, { name: 'All', extensions: ['*'] }],
+  });
+  if (res.canceled || !res.filePath) return { ok: false, canceled: true };
+  // Lấy version từ package.json (best-effort)
+  let appVersion = '0.1.0';
+  try { appVersion = require(path.join(ROOT, 'package.json')).version || appVersion; } catch {}
+  const bundle = {
+    type: 'bigo-action-config',
+    appVersion,
+    exportedAt: new Date().toISOString(),
+    settings: loadJson(CONFIG_PATH, {}),
+    mapping: mapping || loadMapping(),
+  };
+  try {
+    fs.writeFileSync(res.filePath, JSON.stringify(bundle, null, 2), 'utf8');
+    return { ok: true, filePath: res.filePath };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// Nhập bundle - thay thế settings + mapping. Yêu cầu xác nhận từ renderer trước.
+ipcMain.handle('config:import', async () => {
+  if (!win) return { ok: false };
+  const res = await dialog.showOpenDialog(win, {
+    title: 'Chọn file cấu hình BIGO Action (.json)',
+    properties: ['openFile'],
+    filters: [{ name: 'JSON', extensions: ['json'] }, { name: 'All', extensions: ['*'] }],
+  });
+  if (res.canceled || !res.filePaths.length) return { ok: false, canceled: true };
+  const filePath = res.filePaths[0];
+  let bundle;
+  try {
+    bundle = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (e) {
+    return { ok: false, error: 'File JSON không hợp lệ: ' + e.message };
+  }
+  if (!bundle || bundle.type !== 'bigo-action-config') {
+    return { ok: false, error: 'File không phải bundle BIGO Action' };
+  }
+  if (!bundle.mapping || !Array.isArray(bundle.mapping.groups) || !Array.isArray(bundle.mapping.overlays)) {
+    return { ok: false, error: 'Bundle mapping không hợp lệ (thiếu groups hoặc overlays)' };
+  }
+  // Apply
+  try {
+    if (bundle.settings && typeof bundle.settings === 'object') {
+      saveJson(CONFIG_PATH, bundle.settings);
+    }
+    ensureCommonGroup(bundle.mapping);
+    mapping = bundle.mapping;
+    saveJson(MAPPING_PATH, mapping);
+    // Sync OverlayWindow.cfg references
+    if (overlayManager && Array.isArray(mapping.overlays)) {
+      for (const ov of mapping.overlays) {
+        const w = overlayManager.overlays.get(ov.id);
+        if (w) w.cfg = ov;
+      }
+    }
+    return {
+      ok: true,
+      stats: {
+        groups: mapping.groups.length,
+        overlays: mapping.overlays.length,
+        items: mapping.groups.reduce((s, g) => s + (g.items?.length || 0), 0),
+        exportedAt: bundle.exportedAt || null,
+        appVersion: bundle.appVersion || null,
+      },
+    };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 });
 
 // =================== Open API (OAuth) ===================

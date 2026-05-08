@@ -256,6 +256,18 @@
       </div>
 
       <div class="panel">
+        <h2>💾 Xuất / Nhập cấu hình</h2>
+        <div class="row">
+          <button id="btnConfigExport" class="primary" title="Lưu toàn bộ cài đặt + danh sách quà + nhóm + overlay vào file JSON để chuyển máy khác">💾 Xuất cấu hình</button>
+          <button id="btnConfigImport" class="primary" title="Nhập file JSON đã xuất từ máy khác — sẽ ghi đè cài đặt hiện tại">📥 Nhập cấu hình</button>
+        </div>
+        <div class="hint small">
+          <b>Xuất</b>: tạo 1 file <code>.json</code> chứa toàn bộ <b>danh sách quà, nhóm, overlay, cài đặt chung, BGM, pre-effect</b> — KHÔNG bao gồm file media (mp3/mp4). Mang file này sang máy khác rồi <b>Nhập</b> là khôi phục mọi thứ.
+          Đường dẫn file media là path local nên cần copy file media riêng nếu chuyển máy.
+        </div>
+      </div>
+
+      <div class="panel">
         <h2>📂 Quản lý nhóm quà</h2>
         <div class="row" style="margin-bottom:8px">
           <label style="flex:1">Tên nhóm mới

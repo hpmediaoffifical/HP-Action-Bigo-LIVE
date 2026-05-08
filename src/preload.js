@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld('bigo', {
   pickBgmFile: () => ipcRenderer.invoke('bgm:pick-file'),
   pickPreFxFile: () => ipcRenderer.invoke('preFx:pick-file'),
 
+  // Config Export / Import
+  configExport: () => ipcRenderer.invoke('config:export'),
+  configImport: () => ipcRenderer.invoke('config:import'),
+
   // Gift master catalog
   giftsMasterList: () => ipcRenderer.invoke('gifts:master-list'),
   giftsMasterRefresh: () => ipcRenderer.invoke('gifts:master-refresh'),

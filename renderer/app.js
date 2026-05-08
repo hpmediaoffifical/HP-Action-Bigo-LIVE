@@ -372,6 +372,42 @@ document.querySelectorAll('.tab').forEach(t => {
   };
 });
 
+// =================== Config Export / Import ===================
+const btnConfigExport = document.getElementById('btnConfigExport');
+const btnConfigImport = document.getElementById('btnConfigImport');
+if (btnConfigExport) {
+  btnConfigExport.addEventListener('click', async () => {
+    btnConfigExport.disabled = true;
+    try {
+      // Lưu mapping hiện tại trước khi xuất (bảo đảm export là state mới nhất)
+      await persistMapping();
+      const r = await window.bigo.configExport();
+      if (r.canceled) return;
+      if (!r.ok) { alert('Xuất thất bại: ' + (r.error || 'unknown')); return; }
+      alert(`✅ Đã xuất cấu hình vào:\n${r.filePath}\n\nMang file này sang máy khác rồi bấm "Nhập cấu hình" để khôi phục.`);
+    } finally {
+      btnConfigExport.disabled = false;
+    }
+  });
+}
+if (btnConfigImport) {
+  btnConfigImport.addEventListener('click', async () => {
+    if (!confirm('⚠️ Nhập cấu hình sẽ GHI ĐÈ toàn bộ:\n• Danh sách quà\n• Nhóm\n• Overlay\n• Cài đặt chung (BGM, pre-effect, audio device, volume)\n\nNên Xuất cấu hình hiện tại trước để backup. Tiếp tục?')) return;
+    btnConfigImport.disabled = true;
+    try {
+      const r = await window.bigo.configImport();
+      if (r.canceled) return;
+      if (!r.ok) { alert('Nhập thất bại: ' + (r.error || 'unknown')); return; }
+      const s = r.stats || {};
+      alert(`✅ Đã nhập cấu hình:\n• ${s.groups || 0} nhóm\n• ${s.items || 0} quà\n• ${s.overlays || 0} overlay\n${s.exportedAt ? '\nFile xuất từ: ' + s.exportedAt : ''}\n\nApp sẽ reload để áp dụng.`);
+      // Reload để re-fetch mapping + settings từ disk và re-render UI
+      location.reload();
+    } finally {
+      btnConfigImport.disabled = false;
+    }
+  });
+}
+
 // Reset stats button → bộ đếm về 0 (giữ session vẫn chạy)
 if (els.btnResetStats) {
   els.btnResetStats.addEventListener('click', () => {
@@ -528,22 +564,49 @@ els.btnDownloadIcons.onclick = async () => {
   els.iconCacheStatus.textContent = `Hoàn tất: ${r.ok} mới · ${r.skip} bỏ qua · ${r.fail} lỗi · tổng ${r.total}`;
 };
 
+// Display label cho file URL: "📁 filename.mp4" để phân biệt với file legacy trong assets/effects.
+// Với basename thuần (legacy) thì hiển thị raw.
+function fileDisplayLabel(value) {
+  if (!value) return '';
+  if (/^file:\/\//i.test(value) || /^[a-z]:[\\\/]/i.test(value) || value.includes('/') || value.includes('\\')) {
+    // Full URL/path → show only basename with 📁 prefix
+    const base = value.replace(/[\/\\]+$/, '').split(/[\/\\]/).pop() || value;
+    try { return '📁 ' + decodeURIComponent(base); } catch { return '📁 ' + base; }
+  }
+  return value;
+}
+
 async function reloadEffects() {
   effects = await window.bigo.effectsList();
+  // Bao gồm: legacy files trong assets/effects + giữ option hiện tại nếu là URL ngoài.
+  const currentVal = els.dlgFile.value;
   const opts = ['<option value="">— chọn file —</option>',
     ...effects.map(e => `<option value="${escapeHtml(e.file)}">${escapeHtml(e.file)}</option>`)];
+  // Nếu currentVal là full URL/path không có trong list → giữ thêm option
+  if (currentVal && !effects.find(e => e.file === currentVal)) {
+    opts.push(`<option value="${escapeHtml(currentVal)}" selected>${escapeHtml(fileDisplayLabel(currentVal))}</option>`);
+  }
   els.dlgFile.innerHTML = opts.join('');
+  if (currentVal) els.dlgFile.value = currentVal;
 }
 
 els.dlgPickFile.onclick = async () => {
   const r = await window.bigo.effectsPickFiles();
-  if (!r.ok) return;
-  await reloadEffects();
-  if (r.copied && r.copied.length) {
-    // Auto-select file vừa thêm (đầu tiên)
-    els.dlgFile.value = r.copied[0];
-    appendLog(`đã copy ${r.copied.length} file vào assets/effects`);
+  if (!r.ok || !r.files || !r.files.length) return;
+  // KHÔNG copy — lưu fileUrl trực tiếp. Thêm option mới vào dropdown và select.
+  const picked = r.files[0]; // chọn file đầu tiên (hoặc duy nhất nếu user chỉ chọn 1)
+  // Add options cho TẤT CẢ files đã pick
+  for (const f of r.files) {
+    const exists = Array.from(els.dlgFile.options).some(o => o.value === f.fileUrl);
+    if (!exists) {
+      const opt = document.createElement('option');
+      opt.value = f.fileUrl;
+      opt.textContent = '📁 ' + f.fileName;
+      els.dlgFile.appendChild(opt);
+    }
   }
+  els.dlgFile.value = picked.fileUrl;
+  appendLog(`đã chọn ${r.files.length} file (giữ ở vị trí gốc, không copy vào assets/effects)`);
 };
 els.dlgOpenFolder.onclick = () => window.bigo.effectsOpenFolder();
 
@@ -810,8 +873,9 @@ async function groupAction(act, gid, value, itemId) {
       if (found.item.pauseBgm) pauseBgmForEffect();
       // Pre-effect: phát ÂM THANH/VIDEO trước (1 lần) nếu cả gift + setting cùng bật
       maybeDispatchPreEffect(found.item);
+      const payload = resolveMediaPayload(found.item.mediaFile);
       for (let i = 0; i < playTimes; i++) {
-        await window.bigo.overlayPlay({ overlayId: found.item.overlayId, file: found.item.mediaFile });
+        await window.bigo.overlayPlay({ overlayId: found.item.overlayId, ...payload });
       }
       // Manual play cũng counter 🎵 effects để user thấy stats hoạt động khi test
       sessionStats.effects += playTimes;
@@ -987,7 +1051,15 @@ async function openGiftDialog(gift = null, groupId = null) {
     ? mapping.overlays.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('')
     : '<option value="">(chưa có overlay)</option>';
   els.dlgOverlay.value = gift?.overlayId || mapping.overlays[0]?.id || '';
-  els.dlgFile.value = gift?.mediaFile || '';
+  // Nếu mediaFile là full URL/path không có trong dropdown → add option để select được
+  const mf = gift?.mediaFile || '';
+  if (mf && !Array.from(els.dlgFile.options).some(o => o.value === mf)) {
+    const opt = document.createElement('option');
+    opt.value = mf;
+    opt.textContent = fileDisplayLabel(mf);
+    els.dlgFile.appendChild(opt);
+  }
+  els.dlgFile.value = mf;
   if (els.dlgPauseBgm) els.dlgPauseBgm.checked = !!gift?.pauseBgm;
   if (els.dlgPreFx) els.dlgPreFx.checked = !!gift?.preEffect;
   els.giftDialog.dataset.editingId = gift?.id || '';
@@ -1528,8 +1600,9 @@ function renderParsed(ev) {
       if (matched.pauseBgm) pauseBgmForEffect();
       // Pre-effect: phát ÂM THANH/VIDEO trước MỘT LẦN (không lặp theo combo)
       maybeDispatchPreEffect(matched);
+      const payload = resolveMediaPayload(matched.mediaFile);
       for (let i = 0; i < playTimes; i++) {
-        window.bigo.overlayPlay({ overlayId: matched.overlayId, file: matched.mediaFile });
+        window.bigo.overlayPlay({ overlayId: matched.overlayId, ...payload });
       }
       pushQueue(ev, matched, playTimes);
     }
@@ -1592,6 +1665,20 @@ async function saveAppSettings(patch) {
     if ('maxListItems' in patch) s.maxListItems = patch.maxListItems;
   }
   await window.bigo.settingsSave(s);
+}
+
+// Resolve mediaFile thành payload cho overlay:play IPC.
+// - Basename (không có slash, không có file://) → { file } (legacy assets/effects)
+// - Full path / file:// URL → { fileUrl } (file user pick từ ổ đĩa, không copy)
+function resolveMediaPayload(mediaFile) {
+  if (!mediaFile) return null;
+  const isUrl = /^file:\/\//i.test(mediaFile);
+  const isAbsPath = /^[a-z]:[\\\/]/i.test(mediaFile) || /^\//.test(mediaFile);
+  if (isUrl) return { fileUrl: mediaFile };
+  if (isAbsPath) {
+    return { fileUrl: 'file:///' + mediaFile.replace(/\\/g, '/').replace(/^\/+/, '') };
+  }
+  return { file: mediaFile };
 }
 
 // Phát file pre-effect (mp3/mp4/wav/webm) qua overlay.
