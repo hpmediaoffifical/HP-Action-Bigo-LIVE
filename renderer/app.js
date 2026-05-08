@@ -361,6 +361,38 @@ document.querySelectorAll('.tab').forEach(t => {
   };
 });
 
+// Sidebar lock settings button — toggle chế độ Khoá cài đặt (chống chỉnh nhầm khi stream)
+(function wireLockSettings() {
+  const btn = document.getElementById('sidebarLockSettings');
+  if (!btn) return;
+  const KEY = 'hp_app_locked';
+  const apply = (locked) => {
+    document.body.classList.toggle('app-locked', locked);
+    btn.classList.toggle('locked', locked);
+    btn.title = locked
+      ? 'Đang khoá — bấm để mở khoá cài đặt'
+      : 'Khoá cài đặt — chống chỉnh nhầm trong khi stream';
+    btn.textContent = locked ? '🔒' : '🔐';
+  };
+  // Restore from localStorage
+  try { apply(localStorage.getItem(KEY) === '1'); } catch {}
+  btn.addEventListener('click', () => {
+    const next = !document.body.classList.contains('app-locked');
+    apply(next);
+    try { localStorage.setItem(KEY, next ? '1' : '0'); } catch {}
+  });
+})();
+
+// Brand link → mở hpvn.media trong trình duyệt mặc định (không mở trong app)
+(function wireBrandLink() {
+  const link = document.getElementById('brandLink');
+  if (!link) return;
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    try { window.bigo.openExternal('https://hpvn.media'); } catch {}
+  });
+})();
+
 // =================== Init ===================
 // Marquee suffix branding (chữ chạy)
 const LIVE_SUFFIX = ' - Phần mềm Độc quyền thuộc về HP Media | HPVN.MEDIA';
