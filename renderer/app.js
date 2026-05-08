@@ -1392,6 +1392,7 @@ function resetEmbedUi() {
   els.liveChats.innerHTML = '';
   receivedGifts.length = 0;
   renderReceivedGifts();
+  forwardReceivedGiftsSnapshot();
   resetSessionStats();
   // Reset popup nếu đang mở
   if (window.bigo.popupResetGifts) window.bigo.popupResetGifts().catch(() => {});
@@ -1554,6 +1555,7 @@ function addReceivedGift(ev) {
   });
   if (receivedGifts.length > RECEIVED_MAX) receivedGifts.length = RECEIVED_MAX;
   renderReceivedGifts();
+  forwardReceivedGiftsSnapshot();
 }
 
 function renderReceivedGifts() {
@@ -1609,22 +1611,52 @@ function priorityTopReceived(idx) {
   const [item] = receivedGifts.splice(idx, 1);
   receivedGifts.unshift(item);
   renderReceivedGifts();
+  forwardReceivedGiftsSnapshot();
 }
 function moveUpReceived(idx) {
   if (idx <= 0 || idx >= receivedGifts.length) return;
   [receivedGifts[idx], receivedGifts[idx - 1]] = [receivedGifts[idx - 1], receivedGifts[idx]];
   renderReceivedGifts();
+  forwardReceivedGiftsSnapshot();
 }
 function moveDownReceived(idx) {
   if (idx < 0 || idx >= receivedGifts.length - 1) return;
   [receivedGifts[idx], receivedGifts[idx + 1]] = [receivedGifts[idx + 1], receivedGifts[idx]];
   renderReceivedGifts();
+  forwardReceivedGiftsSnapshot();
 }
 function removeReceivedGift(id) {
   const idx = receivedGifts.findIndex(g => g.id === id);
   if (idx === -1) return;
   receivedGifts.splice(idx, 1);
   renderReceivedGifts();
+  forwardReceivedGiftsSnapshot();
+}
+function clearAllReceivedGifts() {
+  receivedGifts.length = 0;
+  renderReceivedGifts();
+  forwardReceivedGiftsSnapshot();
+}
+
+// Forward FULL snapshot of receivedGifts to popup window. Đảm bảo popup luôn mirror
+// chính xác state của main page — kể cả popup mới mở sau khi quà đã đến.
+function forwardReceivedGiftsSnapshot() {
+  if (!window.bigo.popupGiftsSnapshot) return;
+  window.bigo.popupGiftsSnapshot(receivedGifts).catch(() => {});
+}
+
+// IPC từ popup window
+if (window.bigo.onReceivedGiftsRemove) {
+  window.bigo.onReceivedGiftsRemove(id => removeReceivedGift(id));
+}
+if (window.bigo.onReceivedGiftsClearAll) {
+  window.bigo.onReceivedGiftsClearAll(() => {
+    if (confirm('Xoá toàn bộ lịch sử quà (cả ở trang chính và popup)?')) clearAllReceivedGifts();
+  });
+}
+// Popup mới mở → request snapshot
+if (window.bigo.onReceivedGiftsRequestSnapshot) {
+  window.bigo.onReceivedGiftsRequestSnapshot(() => forwardReceivedGiftsSnapshot());
 }
 
 // =================== Embed parsed events ===================

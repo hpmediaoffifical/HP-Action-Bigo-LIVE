@@ -780,6 +780,32 @@ ipcMain.handle('popup:reset-gifts', () => {
   return { ok: true };
 });
 
+// Gửi full receivedGifts snapshot xuống popup-gifts → đồng bộ với main page chính xác.
+ipcMain.handle('popup:gifts-snapshot', (_e, items) => {
+  if (giftsPopup && !giftsPopup.isDestroyed()) {
+    try { giftsPopup.webContents.send('popup:gifts-snapshot', items || []); } catch {}
+  }
+  return { ok: true };
+});
+
+// Popup user bấm X → forward về main app renderer.
+ipcMain.on('popup-gifts:remove', (_e, id) => {
+  if (win && !win.isDestroyed()) {
+    try { win.webContents.send('received-gifts:remove', id); } catch {}
+  }
+});
+ipcMain.on('popup-gifts:clear-all', () => {
+  if (win && !win.isDestroyed()) {
+    try { win.webContents.send('received-gifts:clear-all'); } catch {}
+  }
+});
+// Popup mới mở → request snapshot từ main app
+ipcMain.on('popup-gifts:request-snapshot', () => {
+  if (win && !win.isDestroyed()) {
+    try { win.webContents.send('received-gifts:request-snapshot'); } catch {}
+  }
+});
+
 function forwardToGiftsPopup(ev) {
   if (giftsPopup && !giftsPopup.isDestroyed()) {
     try { giftsPopup.webContents.send('popup:event', ev); } catch {}

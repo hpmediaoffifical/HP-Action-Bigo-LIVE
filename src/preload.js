@@ -32,6 +32,10 @@ contextBridge.exposeInMainWorld('bigo', {
   // Popup gifts window
   popupOpenGifts: () => ipcRenderer.invoke('popup:open-gifts'),
   popupResetGifts: () => ipcRenderer.invoke('popup:reset-gifts'),
+  popupGiftsSnapshot: (items) => ipcRenderer.invoke('popup:gifts-snapshot', items),
+  onReceivedGiftsRemove: (cb) => ipcRenderer.on('received-gifts:remove', (_e, id) => cb(id)),
+  onReceivedGiftsClearAll: (cb) => ipcRenderer.on('received-gifts:clear-all', () => cb()),
+  onReceivedGiftsRequestSnapshot: (cb) => ipcRenderer.on('received-gifts:request-snapshot', () => cb()),
 
   // Popup queue window
   popupOpenQueue: () => ipcRenderer.invoke('popup:open-queue'),

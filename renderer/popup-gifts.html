@@ -6,11 +6,12 @@
   <link rel="icon" type="image/png" href="../logo-hp.png" />
   <link rel="stylesheet" href="style.css" />
   <style>
-    body { padding: 12px; min-width: 320px; }
-    h1 { font-size: 14px; color: #ff8a3d; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; }
+    body { padding: 12px; min-width: 360px; }
+    h1 { font-size: 14px; color: #ff8a3d; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
     .pop-stats { font-size: 11px; color: #8a8f9a; }
     .pop-stats b { color: #ffd166; }
-    #popGifts { background: #0f1117; border-radius: 6px; padding: 8px; max-height: calc(100vh - 80px); overflow-y: auto; }
+    .pop-controls { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; }
+    #popGifts { background: #0f1117; border-radius: 6px; padding: 6px; max-height: calc(100vh - 100px); overflow-y: auto; }
   </style>
 </head>
 <body>
@@ -18,64 +19,98 @@
     🎁 Lịch sử quà
     <span class="pop-stats">💎<b id="popDiamond">0</b> · 🎁<b id="popCount">0</b> · 👤<b id="popUsers">0</b></span>
   </h1>
-  <div id="popGifts" class="gifts"></div>
+  <div class="pop-controls">
+    <button id="popClearAll" class="tiny danger" title="Xoá toàn bộ lịch sử quà (cả ở trang chính)">🗑 Xoá tất cả</button>
+  </div>
+  <div id="popGifts"></div>
   <script>
     const { ipcRenderer } = require('electron');
-
     function escapeHtml(s) {
       return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
-
-    const stats = { diamond: 0, count: 0, users: new Set() };
-
-    function appendEvent(ev) {
-      if (ev.type !== 'gift' && ev.type !== 'gift_overlay') return;
-      const div = document.createElement('div');
-      div.className = 'gift-row';
-      const avatar = ev.user_avatar_url
-        ? `<img class="avatar" src="${escapeHtml(ev.user_avatar_url)}" />`
-        : `<div class="avatar"></div>`;
-      const giftIcon = ev.gift_icon
-        ? `<img class="gift-icon" src="${escapeHtml(ev.gift_icon)}" />`
-        : '';
-      const idText = ev.gift_id != null
-        ? `id <b>${ev.gift_id}</b>${ev.gift_value != null ? ` · 💎 ${ev.gift_value}` : ''}`
-        : '';
-      const totalCount = ev.total_count || (ev.gift_count || 1) * (ev.combo || 1);
-      const totalDiamond = ev.total_diamond != null ? ev.total_diamond : (ev.gift_value != null ? totalCount * ev.gift_value : null);
-      const beans = totalDiamond != null ? `<span class="beans">💎 ${totalDiamond}</span>` : '';
-      const userLine = ev.level != null
-        ? `<span class="lvl">Lv.${ev.level}</span><span class="who">${escapeHtml(ev.user)}</span>`
-        : `<span class="who">${escapeHtml(ev.user)}</span>`;
-      const cntStr = ev.type === 'gift_overlay' && ev.combo > 1
-        ? `×${ev.gift_count} · combo ${ev.combo}` : `×${ev.gift_count}`;
-      div.innerHTML = `${avatar}<div class="body">
-        <div class="row1">${userLine}</div>
-        <div class="row2">${giftIcon}<span class="what">${escapeHtml(ev.gift_name || '?')}</span><span class="gift-id">${idText}</span></div>
-      </div><div class="right"><span class="cnt">${cntStr}</span>${beans}</div>`;
-      document.getElementById('popGifts').prepend(div);
-      while (document.getElementById('popGifts').children.length > 200) {
-        document.getElementById('popGifts').lastChild.remove();
-      }
-      // stats
-      if (ev.type === 'gift') {
-        stats.count += (ev.gift_count || 1) * (ev.combo || 1);
-        stats.diamond += ev.total_diamond || 0;
-        if (ev.user) stats.users.add(ev.user);
-        document.getElementById('popDiamond').textContent = stats.diamond;
-        document.getElementById('popCount').textContent = stats.count;
-        document.getElementById('popUsers').textContent = stats.users.size;
-      }
+    function levelTier(lv) {
+      const n = parseInt(lv, 10);
+      if (!n || n < 1) return 1;
+      if (n <= 15) return 1;
+      if (n <= 30) return 2;
+      if (n <= 45) return 3;
+      if (n <= 60) return 4;
+      if (n <= 90) return 5;
+      return 6;
     }
 
-    ipcRenderer.on('popup:event', (_e, ev) => appendEvent(ev));
-    ipcRenderer.on('popup:reset', () => {
-      document.getElementById('popGifts').innerHTML = '';
+    // Snapshot model: app gửi full receivedGifts array → popup mirror chính xác.
+    let snapshot = [];
+    const stats = { diamond: 0, count: 0, users: new Set() };
+
+    function recomputeStats() {
       stats.diamond = 0; stats.count = 0; stats.users.clear();
-      document.getElementById('popDiamond').textContent = '0';
-      document.getElementById('popCount').textContent = '0';
-      document.getElementById('popUsers').textContent = '0';
+      for (const g of snapshot) {
+        stats.count += g.count || 0;
+        stats.diamond += g.diamond || 0;
+        if (g.user) stats.users.add(g.user);
+      }
+      document.getElementById('popDiamond').textContent = stats.diamond;
+      document.getElementById('popCount').textContent = stats.count;
+      document.getElementById('popUsers').textContent = stats.users.size;
+    }
+
+    function renderRow(g) {
+      const avatar = g.avatar
+        ? `<img class="rcv-avatar" src="${escapeHtml(g.avatar)}" />`
+        : `<div class="rcv-avatar-empty"></div>`;
+      const giftIcon = g.gift_icon
+        ? `<img class="rcv-icon" src="${escapeHtml(g.gift_icon)}" />`
+        : `<div class="rcv-icon-empty"></div>`;
+      const lvlBadge = g.level
+        ? `<span class="lvl tier-${levelTier(g.level)}" style="margin-right:4px">Lv.${g.level}</span>` : '';
+      return `<div class="rcv-row" data-gid="${escapeHtml(g.id)}">
+        ${avatar}
+        ${giftIcon}
+        <div class="rcv-meta">
+          <div class="rcv-who">${lvlBadge}${escapeHtml(g.user || '?')}</div>
+          <div class="rcv-gift">${escapeHtml(g.gift_name || '?')}${g.gift_id != null ? ` <span style="color:#666">#${g.gift_id}</span>` : ''}</div>
+        </div>
+        <span class="rcv-count">×${g.count || 1}</span>
+        <button class="rcv-del" data-del="${escapeHtml(g.id)}" title="Xoá">🗑</button>
+      </div>`;
+    }
+
+    function renderAll() {
+      const cont = document.getElementById('popGifts');
+      if (!snapshot.length) {
+        cont.innerHTML = '<div style="color:#555;text-align:center;padding:20px">Chưa có quà nào</div>';
+        return;
+      }
+      cont.innerHTML = snapshot.map(renderRow).join('');
+      cont.querySelectorAll('[data-del]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          ipcRenderer.send('popup-gifts:remove', btn.dataset.del);
+        };
+      });
+    }
+
+    // Snapshot từ app → replace + render
+    ipcRenderer.on('popup:gifts-snapshot', (_e, items) => {
+      snapshot = Array.isArray(items) ? items : [];
+      renderAll();
+      recomputeStats();
     });
+    // Reset
+    ipcRenderer.on('popup:reset', () => {
+      snapshot = [];
+      renderAll();
+      recomputeStats();
+    });
+
+    document.getElementById('popClearAll').onclick = () => {
+      ipcRenderer.send('popup-gifts:clear-all');
+    };
+
+    renderAll();
+    // Khi popup load xong, request snapshot từ app (đảm bảo sync mọi lúc)
+    ipcRenderer.send('popup-gifts:request-snapshot');
   </script>
 </body>
 </html>
