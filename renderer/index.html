@@ -7,19 +7,23 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo" title="BIGO Action">
+        <img src="../logo-hp.png" alt="logo" />
+      </div>
+      <button class="tab sidebar-tab active" data-tab="embed" title="Web Listener">🌐</button>
+      <button class="tab sidebar-tab" data-tab="queue" title="Hàng đợi hiệu ứng">🎬</button>
+      <button class="tab sidebar-tab" data-tab="gifts" title="Bảng quà">🎁</button>
+      <button class="tab sidebar-tab" data-tab="overlays" title="Overlay">🪟</button>
+      <button class="tab sidebar-tab" data-tab="oauth" title="Open API (OAuth)">🔐</button>
+    </aside>
+
+    <div class="main-content">
   <header>
-    <img src="../logo-hp.png" alt="logo" class="header-logo" />
     <h1>BIGO Action <span class="badge" id="status">disconnected</span></h1>
     <div class="hint">Bigo gift listener · Web Embed (mọi BIGO ID đang live)</div>
   </header>
-
-  <nav class="tabs">
-    <button class="tab active" data-tab="embed">🌐 Web Listener</button>
-    <button class="tab" data-tab="queue">🎬 Hàng đợi</button>
-    <button class="tab" data-tab="gifts">🎁 Bảng quà</button>
-    <button class="tab" data-tab="overlays">🪟 Overlay</button>
-    <button class="tab" data-tab="oauth">🔐 Open API</button>
-  </nav>
 
   <main>
     <!-- =================== TAB: WEB LISTENER =================== -->
@@ -185,6 +189,8 @@
       <pre id="log" class="log"></pre>
     </section>
   </main>
+    </div>
+  </div>
 
   <!-- =================== MODAL: EDIT GIFT =================== -->
   <dialog id="giftDialog" class="modal">
