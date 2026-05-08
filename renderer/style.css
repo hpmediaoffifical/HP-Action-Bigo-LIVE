@@ -108,6 +108,26 @@ header {
   box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 header h1 { margin: 0; font-size: 18px; }
+/* License info ở góc phải header */
+.header-license {
+  margin-left: auto;
+  display: flex; gap: 14px; align-items: center;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.header-license .hl-row { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.header-license .hl-icon { font-size: 14px; opacity: 0.9; }
+.header-license .hl-value { color: #fff; font-weight: 700; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+.header-license .hl-value.expiring-soon { color: #ffd166; }
+.header-license .hl-value.expiring-critical { color: #ff8a3d; animation: pulse-warn 1.5s ease-in-out infinite; }
+.header-license .hl-value.expired { color: #ff6b6b; }
+@keyframes pulse-warn {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
 .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; background: rgba(0,0,0,0.35); font-size: 12px; margin-left: 8px; }
 .badge.on { background: #1e8a4f; }
 /* Đã kết nối — nền xanh dương nổi bật */

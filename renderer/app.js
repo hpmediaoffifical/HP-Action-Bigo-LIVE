@@ -738,6 +738,108 @@ function renderLicenseStatus(data) {
   }
 }
 
+// Update header license info (góc phải header) — show TEN_KH + HAN_SU_DUNG.
+function updateHeaderLicense(info) {
+  const headerEl = document.getElementById('headerLicense');
+  const customerEl = document.getElementById('hlCustomer');
+  const expiryEl = document.getElementById('hlExpiry');
+  if (!headerEl || !customerEl || !expiryEl) return;
+  if (!info || (!info.TEN_KH && !info.HAN_SU_DUNG)) {
+    headerEl.style.display = 'none';
+    return;
+  }
+  headerEl.style.display = 'flex';
+  customerEl.textContent = info.TEN_KH || '—';
+  // Format expiry + color theo days-left
+  const expiry = info.HAN_SU_DUNG;
+  expiryEl.className = 'hl-value';
+  if (!expiry) {
+    expiryEl.textContent = '—';
+    return;
+  }
+  const d = new Date(expiry);
+  if (isNaN(d.getTime())) { expiryEl.textContent = String(expiry); return; }
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yy = d.getFullYear();
+  const daysLeft = Math.ceil((d.getTime() - Date.now()) / 86400000);
+  let display = `${dd}/${mm}/${yy}`;
+  if (daysLeft < 0) {
+    display += ' · HẾT HẠN';
+    expiryEl.classList.add('expired');
+  } else {
+    display += ` (còn ${daysLeft} ngày)`;
+    if (daysLeft <= 7) expiryEl.classList.add('expiring-critical');
+    else if (daysLeft <= 30) expiryEl.classList.add('expiring-soon');
+  }
+  expiryEl.textContent = display;
+}
+
+// Reminder logic theo days-left.
+// >30 ngày: reset flags. ≤30: show 1 lần. ≤15: show 1 lần. ≤7: show MỖI lần khởi động.
+function checkLicenseReminder(info) {
+  if (!info || !info.HAN_SU_DUNG) return;
+  const d = new Date(info.HAN_SU_DUNG);
+  if (isNaN(d.getTime())) return;
+  const daysLeft = Math.ceil((d.getTime() - Date.now()) / 86400000);
+  if (daysLeft < 0) {
+    showLicenseExpiredPopup(info);
+    return;
+  }
+  const KEY30 = 'hp_reminded_30';
+  const KEY15 = 'hp_reminded_15';
+  if (daysLeft > 30) {
+    // Reset flags để khi expiry tới gần lần sau (vd renew + đến hạn lại) báo lại.
+    try { localStorage.removeItem(KEY30); localStorage.removeItem(KEY15); } catch {}
+  } else if (daysLeft <= 7) {
+    // CRITICAL: hiện popup MỖI lần mở app (không skip qua localStorage).
+    showLicenseExpiringPopup(daysLeft, info, true);
+  } else if (daysLeft <= 15) {
+    if (!localStorage.getItem(KEY15)) {
+      showLicenseExpiringPopup(daysLeft, info, false);
+      try { localStorage.setItem(KEY15, '1'); } catch {}
+    }
+  } else if (daysLeft <= 30) {
+    if (!localStorage.getItem(KEY30)) {
+      showLicenseExpiringPopup(daysLeft, info, false);
+      try { localStorage.setItem(KEY30, '1'); } catch {}
+    }
+  }
+}
+
+function showLicenseExpiringPopup(daysLeft, info, critical) {
+  const customer = info.TEN_KH || 'Khách hàng';
+  const expiry = info.HAN_SU_DUNG || '';
+  const header = critical
+    ? '🚨 KEY SẮP HẾT HẠN — CHỈ CÒN ' + daysLeft + ' NGÀY'
+    : '⏰ Lời nhắc gia hạn key bản quyền';
+  alert(
+    `${header}\n\n` +
+    `Khách hàng: ${customer}\n` +
+    `Hạn sử dụng: ${expiry} (còn ${daysLeft} ngày)\n\n` +
+    (critical
+      ? '⚠️ Key sắp hết hạn! Sau khi hết hạn, app sẽ KHÔNG dùng được các tính năng.\n\n'
+      : ''
+    ) +
+    'Liên hệ HP MEDIA để gia hạn:\n' +
+    '🌐 https://hpvn.media\n' +
+    '📘 facebook.com/hpvn.media\n' +
+    '👤 facebook.com/hoangphung.nguyen56553'
+  );
+}
+
+function showLicenseExpiredPopup(info) {
+  alert(
+    `🚫 KEY ĐÃ HẾT HẠN\n\n` +
+    `Khách hàng: ${info.TEN_KH || '?'}\n` +
+    `Hạn cũ: ${info.HAN_SU_DUNG}\n\n` +
+    `App sẽ giới hạn tính năng cho đến khi gia hạn.\n\n` +
+    `Liên hệ HP MEDIA để gia hạn:\n` +
+    `🌐 https://hpvn.media\n` +
+    `📘 facebook.com/hpvn.media`
+  );
+}
+
 async function verifyLicense(key, action = 'verify') {
   const statusEl = document.getElementById('licenseStatus');
   if (!key) {
@@ -773,6 +875,8 @@ async function verifyLicense(key, action = 'verify') {
   // Apps Script có thể wrap { ok: true, data: {...} } hoặc trả thẳng row data
   const info = data?.data || data || {};
   renderLicenseStatus(info);
+  updateHeaderLicense(info);
+  checkLicenseReminder(info);
   // Cache local
   try {
     localStorage.setItem('hp_license_key', key);
@@ -815,10 +919,16 @@ async function verifyLicense(key, action = 'verify') {
   // Auto-load cached info on app start
   try {
     const cached = localStorage.getItem('hp_license_info');
-    if (cached) renderLicenseStatus(JSON.parse(cached));
+    if (cached) {
+      const info = JSON.parse(cached);
+      renderLicenseStatus(info);
+      updateHeaderLicense(info);
+      // Check reminder ngay tu cache (offline-friendly)
+      checkLicenseReminder(info);
+    }
     const cachedKey = localStorage.getItem('hp_license_key');
     if (cachedKey) {
-      // Background re-verify (silent)
+      // Background re-verify (silent) — sau 2s để không block UI startup.
       setTimeout(() => verifyLicense(cachedKey, 'verify').catch(() => {}), 2000);
     }
   } catch {}
