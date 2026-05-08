@@ -697,16 +697,27 @@ function findGiftByEvent(ev) {
   return findGiftByName(ev.gift_name);
 }
 
-// Defensive dedup ở renderer (lớp 2 sau preload). Cùng event trong 3s → drop.
+// Strong normalize: strip invisible Unicode + collapse whitespace
+function normEv(s) {
+  return String(s || '')
+    .replace(/[​-‏‪-‮⁠-⁯﻿]/g, '')
+    .replace(/[︀-️]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+// Defensive dedup ở renderer (lớp 2). Window 1s, hash type-agnostic cho gift.
 const recentEventHashes = new Map();
 function shouldDropDuplicate(ev) {
   if (!ev || (ev.type !== 'chat' && ev.type !== 'gift' && ev.type !== 'gift_overlay')) return false;
+  // Hash gift KHÔNG include combo/type — gift vs gift_overlay cùng quà coi là 1
   const key = ev.type === 'chat'
-    ? `c|${ev.level}|${(ev.user || '').toLowerCase().trim()}|${(ev.content || '').toLowerCase().trim()}`
-    : `g|${ev.level}|${(ev.user || '').toLowerCase().trim()}|${(ev.gift_name || '').toLowerCase().trim()}|${ev.gift_count}|${ev.combo || ''}`;
+    ? `c|${ev.level}|${normEv(ev.user)}|${normEv(ev.content)}`
+    : `g|${normEv(ev.user)}|${normEv(ev.gift_name)}|${ev.gift_count || 1}`;
   const now = Date.now();
   const last = recentEventHashes.get(key);
-  if (last && now - last < 3000) return true;
+  if (last && now - last < 1000) return true; // 1s window
   recentEventHashes.set(key, now);
   if (recentEventHashes.size > 800) {
     const cutoff = now - 30000;
@@ -716,13 +727,22 @@ function shouldDropDuplicate(ev) {
 }
 
 function renderParsed(ev) {
-  if (shouldDropDuplicate(ev)) return;
-  // Debug: log gift events ra console (mở DevTools để xem)
-  if (ev.type === 'gift' || ev.type === 'gift_overlay') {
+  // Bỏ gift_overlay UI render hoàn toàn — đây là duplicate của gift event từ chat
+  // (cùng người tặng cùng quà, chỉ khác source DOM). Skip giữ data sạch.
+  if (ev.type === 'gift_overlay') {
+    // chỉ log debug, không render và không trigger play (gift event đã trigger rồi)
+    console.log('[bigo gift_overlay skipped]', { user: ev.user, gift_name: ev.gift_name, combo: ev.combo });
+    return;
+  }
+  if (shouldDropDuplicate(ev)) {
+    console.log('[bigo dup-dropped]', { type: ev.type, user: ev.user, content: ev.content || ev.gift_name });
+    return;
+  }
+  // Debug: log gift events ra console
+  if (ev.type === 'gift') {
     console.log('[bigo gift]', {
       user: ev.user, gift_name: ev.gift_name, gift_id: ev.gift_id,
-      count: ev.gift_count, combo: ev.combo, total: ev.total_count,
-      icon: ev.gift_icon, raw: ev.raw,
+      count: ev.gift_count, total: ev.total_count, icon: ev.gift_icon, raw: ev.raw,
     });
   }
   if (ev.type === 'chat') {

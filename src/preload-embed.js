@@ -77,8 +77,15 @@ function findAvatarUrl(el) {
   return '';
 }
 
-// Normalize whitespace để dedup chính xác
-function normalize(s) { return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+// Normalize stronger: strip zero-width chars + variation selectors + collapse whitespace
+function normalize(s) {
+  return String(s || '')
+    .replace(/[​-‏‪-‮⁠-⁯﻿]/g, '') // zero-width + invisible directional
+    .replace(/[︀-️]/g, '')                                  // variation selectors (emoji modifiers)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
 
 // WeakSet đánh dấu element đã scan để tránh scan lại trong cùng tick (cũng tránh
 // parent + child cùng match khi text concat của parent vẫn nằm trong giới hạn).
