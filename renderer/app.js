@@ -176,6 +176,7 @@ const els = {
   overlayDialog: $('overlayDialog'), overlayDialogTitle: $('overlayDialogTitle'),
   ovName: $('ovName'), ovBgColor: $('ovBgColor'), ovOpacity: $('ovOpacity'), ovOpacityVal: $('ovOpacityVal'),
   ovW: $('ovW'), ovH: $('ovH'), ovTop: $('ovTop'), ovClickThrough: $('ovClickThrough'),
+  ovAutoHide: $('ovAutoHide'),
   dlgOverlaySave: $('dlgOverlaySave'),
 };
 
@@ -538,6 +539,7 @@ function openOverlayDialog(ov = null) {
   els.ovH.value = ov?.bounds?.height || 960;
   els.ovTop.checked = ov?.alwaysOnTop !== false;
   els.ovClickThrough.checked = !!ov?.clickThrough;
+  els.ovAutoHide.checked = !!ov?.autoHide;
   els.overlayDialog.dataset.editingId = ov?.id || '';
   els.overlayDialog.showModal();
 }
@@ -559,6 +561,7 @@ els.dlgOverlaySave.onclick = async (e) => {
     },
     alwaysOnTop: els.ovTop.checked,
     clickThrough: els.ovClickThrough.checked,
+    autoHide: els.ovAutoHide.checked,
   };
   if (existing) {
     Object.assign(existing, data);
@@ -694,7 +697,34 @@ function findGiftByEvent(ev) {
   return findGiftByName(ev.gift_name);
 }
 
+// Defensive dedup ở renderer (lớp 2 sau preload). Cùng event trong 3s → drop.
+const recentEventHashes = new Map();
+function shouldDropDuplicate(ev) {
+  if (!ev || (ev.type !== 'chat' && ev.type !== 'gift' && ev.type !== 'gift_overlay')) return false;
+  const key = ev.type === 'chat'
+    ? `c|${ev.level}|${(ev.user || '').toLowerCase().trim()}|${(ev.content || '').toLowerCase().trim()}`
+    : `g|${ev.level}|${(ev.user || '').toLowerCase().trim()}|${(ev.gift_name || '').toLowerCase().trim()}|${ev.gift_count}|${ev.combo || ''}`;
+  const now = Date.now();
+  const last = recentEventHashes.get(key);
+  if (last && now - last < 3000) return true;
+  recentEventHashes.set(key, now);
+  if (recentEventHashes.size > 800) {
+    const cutoff = now - 30000;
+    for (const [k, t] of recentEventHashes) if (t < cutoff) recentEventHashes.delete(k);
+  }
+  return false;
+}
+
 function renderParsed(ev) {
+  if (shouldDropDuplicate(ev)) return;
+  // Debug: log gift events ra console (mở DevTools để xem)
+  if (ev.type === 'gift' || ev.type === 'gift_overlay') {
+    console.log('[bigo gift]', {
+      user: ev.user, gift_name: ev.gift_name, gift_id: ev.gift_id,
+      count: ev.gift_count, combo: ev.combo, total: ev.total_count,
+      icon: ev.gift_icon, raw: ev.raw,
+    });
+  }
   if (ev.type === 'chat') {
     const div = document.createElement('div');
     div.className = 'chat-row';

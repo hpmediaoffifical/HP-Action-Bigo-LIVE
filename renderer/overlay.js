@@ -48,6 +48,8 @@ function playNext() {
   if (queue.length === 0) {
     playing = false;
     clearPlayer();
+    // Báo main biết queue rỗng → main có thể auto-hide window nếu config bật
+    try { ipcRenderer.send('overlay:queue-empty'); } catch {}
     return;
   }
   playing = true;

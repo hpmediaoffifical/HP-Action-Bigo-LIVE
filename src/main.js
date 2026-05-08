@@ -591,6 +591,23 @@ ipcMain.handle('overlay:delete', (_e, overlayId) => {
   saveJson(MAPPING_PATH, mapping);
   return { ok: true };
 });
+// overlay queue-empty: từ overlay window khi đã play hết → hide nếu autoHide bật
+ipcMain.on('overlay:queue-empty', (e) => {
+  for (const [id, ov] of overlayManager.overlays.entries()) {
+    if (ov.win && !ov.win.isDestroyed() && ov.win.webContents === e.sender) {
+      if (ov.cfg && ov.cfg.autoHide) {
+        // Delay 1.5s phòng trường hợp gift kế tiếp đến ngay
+        setTimeout(() => {
+          if (ov.win && !ov.win.isDestroyed()) {
+            try { ov.win.hide(); } catch {}
+          }
+        }, 1500);
+      }
+      break;
+    }
+  }
+});
+
 ipcMain.handle('overlay:play', (_e, { overlayId, file }) => {
   const cfg = mapping.overlays.find(o => o.id === overlayId);
   if (!cfg || !file) return { ok: false };
