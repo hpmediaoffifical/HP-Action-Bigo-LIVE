@@ -121,6 +121,30 @@
           "mediaFile": "Tơ nhện.webm",
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": false
+        },
+        {
+          "id": "i_mox8dkm1u58u",
+          "matchKeys": [
+            "504754",
+            "Galaxy Ring"
+          ],
+          "alias": "Galaxy Ring",
+          "mediaFile": "Tơ nhện.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false
+        },
+        {
+          "id": "i_mox8emi1zvkl",
+          "matchKeys": [
+            "5317",
+            "💓Gem ring",
+            "501027",
+            "Gem Ring"
+          ],
+          "alias": "💓Gem ring",
+          "mediaFile": "Tơ nhện.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true
         }
       ]
     }

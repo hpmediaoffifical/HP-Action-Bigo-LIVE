@@ -361,26 +361,25 @@ function renderGiftTable() {
     }
   }
   els.groupsContainer = groupsContainer || $('groupsContainer');
-  if (els.groupsContainer) renderGroupsInto(els.groupsContainer, { subtype: 'gift' });
+  if (els.groupsContainer) renderGroupsInto(els.groupsContainer, {});
   // Render cả container trong tab Tương tác
   if (els.embedGroupsContainer) {
-    const subtype = subtypeByContainer.get(els.embedGroupsContainer) || 'gift';
     const search = els.embedGroupSearch?.value.toLowerCase().trim() || '';
-    renderGroupsInto(els.embedGroupsContainer, { subtype, search });
+    renderGroupsInto(els.embedGroupsContainer, { search });
   }
 }
 
 function renderGroupsInto(container, opts) {
-  const subtype = opts?.subtype || 'gift';
   const search = (opts?.search || '').toLowerCase().trim();
   if (!container) return;
 
   const overlayMap = new Map((mapping.overlays || []).map(o => [o.id, o]));
-  let groups = (mapping.groups || []).filter(g => (g.type || 'gift') === subtype);
+  // Hiển thị tất cả groups (không filter theo type)
+  let groups = mapping.groups || [];
   if (search) groups = groups.filter(g => (g.name || '').toLowerCase().includes(search));
 
   if (groups.length === 0) {
-    container.innerHTML = `<div style="color:#555;text-align:center;padding:24px">Chưa có nhóm ${subtype === 'comment' ? 'comment' : 'quà'} nào</div>`;
+    container.innerHTML = `<div style="color:#555;text-align:center;padding:24px">Chưa có nhóm nào — bấm "+ Nhóm" để tạo</div>`;
     return;
   }
 
@@ -715,12 +714,11 @@ if (els.btnAddGiftEmbed) {
 }
 if (els.btnAddGroupEmbed) {
   els.btnAddGroupEmbed.onclick = async () => {
-    const subtype = subtypeByContainer.get(els.embedGroupsContainer) || 'gift';
-    const name = prompt(`Tên nhóm ${subtype === 'comment' ? 'Comment' : 'Quà tặng'} mới:`);
+    const name = prompt('Tên nhóm mới:');
     if (!name || !name.trim()) return;
     if (!Array.isArray(mapping.groups)) mapping.groups = [];
     mapping.groups.push({
-      id: uid('g_'), name: name.trim(), type: subtype,
+      id: uid('g_'), name: name.trim(), type: 'gift',
       enabled: true, collapsed: false, bigoId: '', items: [],
     });
     await persistMapping();
@@ -734,17 +732,6 @@ if (els.embedGroupSearch) {
     searchTimer = setTimeout(renderGiftTable, 150);
   });
 }
-// Sub-tab Comment/Quà tặng trong tab Tương tác
-document.querySelectorAll('.subtab-btn').forEach(b => {
-  b.onclick = () => {
-    document.querySelectorAll('.subtab-btn').forEach(x => x.classList.remove('active'));
-    b.classList.add('active');
-    if (els.embedGroupsContainer) {
-      subtypeByContainer.set(els.embedGroupsContainer, b.dataset.subtype);
-      renderGiftTable();
-    }
-  };
-});
 
 els.btnTestGift.onclick = async () => {
   const allItems = getAllItems();
