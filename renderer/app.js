@@ -1719,36 +1719,75 @@ function renderSettingsGroupsList() {
     container.innerHTML = '<div class="gls-empty">Chưa có nhóm nào — gõ tên rồi bấm "+ Tạo nhóm"</div>';
     return;
   }
+  // KHÔNG inline onclick (Electron CSP block). KHÔNG attach listener trong render
+  // (race condition khi re-render). Click delegated qua document.body — single
+  // listener bulletproof bên dưới.
   container.innerHTML = groups.map(g => `
     <div class="gls-row" data-gid="${g.id}">
-      <span class="name">${escapeHtml(g.name)}</span>
+      <span class="name">${escapeHtml(g.name)}${g.isCommon ? ' <span style="color:#ffd166">⭐</span>' : ''}</span>
       <span class="count">${(g.items || []).length} mục</span>
-      <button class="tiny" onclick="window.settingsGroupRename('${g.id}')" title="Đổi tên">✏️</button>
-      <button class="tiny danger" onclick="window.settingsGroupDelete('${g.id}')" title="Xoá nhóm">🗑</button>
+      ${g.isCommon ? '' : `<button class="tiny" data-glsact="rename" data-gid="${g.id}" title="Đổi tên">✏️</button>`}
+      ${g.isCommon ? '' : `<button class="tiny danger" data-glsact="del" data-gid="${g.id}" title="Xoá (items về NHÓM CHUNG)">🗑</button>`}
     </div>
   `).join('');
 }
 
-const btnCreateGroup = document.getElementById('btnCreateGroup');
-const newGroupNameInput = document.getElementById('newGroupName');
-if (btnCreateGroup && newGroupNameInput) {
-  const createGroup = async () => {
-    const name = newGroupNameInput.value.trim();
-    if (!name) { alert('Nhập tên nhóm'); return; }
-    const lower = name.toLowerCase();
-    const exists = (mapping.groups || []).find(g => g.name.toLowerCase() === lower);
-    if (exists) {
-      alert(`Đã có nhóm "${exists.name}" - không phân biệt hoa/thường`);
-      return;
+// =================== GLOBAL CLICK DELEGATION ===================
+// Single listener trên document.body — bulletproof, KHÔNG bị mất khi innerHTML
+// re-render. Match qua data attributes. Pattern chuẩn cho dynamic content.
+async function _handleCreateGroup() {
+  const input = document.getElementById('newGroupName');
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) { alert('Nhập tên nhóm'); return; }
+  const lower = name.toLowerCase();
+  const exists = (mapping.groups || []).find(g => (g.name || '').toLowerCase() === lower);
+  if (exists) {
+    alert(`Đã có nhóm "${exists.name}" - không phân biệt hoa/thường`);
+    return;
+  }
+  findOrCreateGroupCI(name, 'gift');
+  await persistMapping();
+  input.value = '';
+  renderSettingsGroupsList();
+  renderGiftTable();
+}
+
+document.body.addEventListener('click', async (e) => {
+  // Settings groups list — nút Sửa
+  const renameBtn = e.target.closest('[data-glsact="rename"]');
+  if (renameBtn) {
+    e.preventDefault();
+    console.log('[delegated] gls rename:', renameBtn.dataset.gid);
+    settingsGroupRename(renameBtn.dataset.gid);
+    return;
+  }
+  // Settings groups list — nút Xoá
+  const delBtn = e.target.closest('[data-glsact="del"]');
+  if (delBtn) {
+    e.preventDefault();
+    console.log('[delegated] gls delete:', delBtn.dataset.gid);
+    settingsGroupDelete(delBtn.dataset.gid);
+    return;
+  }
+  // Nút + Tạo nhóm
+  if (e.target.closest('#btnCreateGroup')) {
+    e.preventDefault();
+    console.log('[delegated] create group');
+    await _handleCreateGroup();
+    return;
+  }
+});
+
+// Enter key trong input newGroupName → trigger tạo nhóm
+const _newGroupInput = document.getElementById('newGroupName');
+if (_newGroupInput) {
+  _newGroupInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      _handleCreateGroup();
     }
-    findOrCreateGroupCI(name, 'gift');
-    await persistMapping();
-    newGroupNameInput.value = '';
-    renderSettingsGroupsList();
-    renderGiftTable();
-  };
-  btnCreateGroup.onclick = createGroup;
-  newGroupNameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') createGroup(); });
+  });
 }
 
 // Pause BGM khi effect play, resume khi overlay queue rỗng (effect xong).

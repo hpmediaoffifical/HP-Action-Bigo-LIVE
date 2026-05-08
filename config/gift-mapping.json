@@ -2,10 +2,33 @@
   "version": 3,
   "groups": [
     {
+      "id": "g_common",
+      "name": "NHÓM CHUNG",
+      "type": "gift",
+      "enabled": true,
+      "collapsed": false,
+      "bigoId": "",
+      "items": [
+        {
+          "id": "i_moxb2tre7cfv",
+          "matchKeys": [
+            "1140",
+            "Kiss"
+          ],
+          "alias": "Kiss",
+          "mediaFile": "09. Phóng Dây Leo.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "priority": 0
+        }
+      ],
+      "isCommon": true
+    },
+    {
       "id": "g_mox8ulzfk04f",
       "name": "NPC",
       "type": "gift",
-      "enabled": true,
+      "enabled": false,
       "collapsed": false,
       "bigoId": "",
       "items": [
@@ -19,7 +42,8 @@
           "alias": "Heart Lock",
           "mediaFile": "Tơ nhện.webm",
           "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false
+          "pauseBgm": false,
+          "priority": 0
         },
         {
           "id": "g_mox4yljml3od",
@@ -28,9 +52,10 @@
             "Blue Flower"
           ],
           "alias": "Blue Flower",
-          "mediaFile": "Tơ nhện.webm",
+          "mediaFile": "02. Bướm Ảo.webm",
           "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": true
+          "pauseBgm": true,
+          "priority": 0
         },
         {
           "id": "g_mox7x2tvggnl",
@@ -43,14 +68,16 @@
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": false
         }
-      ]
+      ],
+      "bgmFile": "file:///G:/MUSIC BG/Đi bộ.mp3",
+      "bgmFileName": "Đi bộ.mp3"
     },
     {
       "id": "g_mox9je2347fw",
       "name": "Peo",
       "type": "gift",
       "enabled": false,
-      "collapsed": true,
+      "collapsed": false,
       "bigoId": "",
       "items": [
         {
@@ -81,7 +108,7 @@
       "name": "Ada",
       "type": "gift",
       "enabled": false,
-      "collapsed": true,
+      "collapsed": false,
       "bigoId": "",
       "items": [
         {
@@ -105,8 +132,8 @@
       "bgColor": "#00ff00",
       "opacity": 0.25,
       "bounds": {
-        "x": 2023,
-        "y": 1197,
+        "x": 1236,
+        "y": 74,
         "width": 457,
         "height": 814
       },
