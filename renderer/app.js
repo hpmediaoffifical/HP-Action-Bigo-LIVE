@@ -352,6 +352,7 @@ function renderQueueCards() {
   el.querySelectorAll('[data-gift-key]').forEach(card => {
     card.onclick = () => queuePromoteGiftGroup(card.dataset.giftKey);
   });
+  syncGameplayCountsFromQueue();
 }
 
 // Layout chuẩn (theo yêu cầu user):
@@ -413,10 +414,22 @@ function renderMiniQueue() {
   el.querySelectorAll('.mini-queue-row').forEach(row => wireQueueContextMenu(row));
 }
 
-function removeQueueItemById(id) {
+async function confirmDeleteOneQueueItem(q) {
+  return appConfirm({
+    title: 'Xoá hành động này?',
+    message: q?.gift_name ? `Xoá "${q.gift_name}" khỏi HÀNH ĐỘNG?` : 'Xoá hành động này khỏi danh sách?',
+    detail: q?.status === 'playing' ? 'Hành động đang phát sẽ dừng ngay.' : 'Thao tác này không thể hoàn tác.',
+    okText: 'Có, xoá',
+    cancelText: 'Không',
+    danger: true,
+  });
+}
+
+async function removeQueueItemById(id) {
   const idx = queueItems.findIndex(q => q.id === id);
   if (idx === -1) return;
   const removed = queueItems[idx];
+  if (!(await confirmDeleteOneQueueItem(removed))) return;
   queueItems.splice(idx, 1);
   // QUAN TRỌNG: Nếu xoá item đang playing → STOP effect ở overlay window (tránh
   // hiệu ứng chạy ẩn dù đã xoá khỏi DSHT). Overlay tự fire 'queue-empty' để
@@ -770,6 +783,12 @@ const els = {
   miniQueueCards: $('miniQueueCards'),
   qCardIcon: $('qCardIcon'), qCardIconVal: $('qCardIconVal'),
   qCardCount: $('qCardCount'), qCardCountVal: $('qCardCountVal'),
+  gameplayGroup: $('gameplayGroup'), gameplayOrientation: $('gameplayOrientation'), gameplayLabelPosition: $('gameplayLabelPosition'),
+  gameplayNameMode: $('gameplayNameMode'), gameplayEnlargeActive: $('gameplayEnlargeActive'), gameplayActiveScale: $('gameplayActiveScale'), gameplayActiveScaleVal: $('gameplayActiveScaleVal'),
+  gameplayCardBg: $('gameplayCardBg'), gameplayCardOpacity: $('gameplayCardOpacity'), gameplayCardOpacityVal: $('gameplayCardOpacityVal'),
+  gameplayTextFont: $('gameplayTextFont'), gameplayTextColor: $('gameplayTextColor'), gameplayUppercase: $('gameplayUppercase'),
+  gameplayCenterLargest: $('gameplayCenterLargest'), gameplayGrayInactive: $('gameplayGrayInactive'), gameplayKeepScore: $('gameplayKeepScore'),
+  gameplayReview: $('gameplayReview'), gameplayItems: $('gameplayItems'), btnGameplaySave: $('btnGameplaySave'), btnGameplayCopyUrl: $('btnGameplayCopyUrl'),
   // Gift dialog extras
   dlgPauseBgm: $('dlgPauseBgm'), dlgPreFx: $('dlgPreFx'),
   effectQueue: $('effectQueue'), btnClearQueue: $('btnClearQueue'),
@@ -1350,6 +1369,7 @@ async function init() {
   renderMiniQueue();
   renderQueueCards();
   renderSettingsGroupsList();
+  renderGameplayUi();
   // Chat font size slider — persist localStorage
   const chatFont = document.getElementById('chatFontSize');
   if (chatFont) {
@@ -1572,6 +1592,7 @@ function renderGiftTable() {
     const search = (document.getElementById('embedGroupSearch')?.value || '').toLowerCase().trim();
     renderGroupsInto(embedContainer, { search });
   }
+  renderGameplayUi();
 }
 
 function renderGroupsInto(container, opts) {
@@ -1611,6 +1632,382 @@ function renderGroupsInto(container, opts) {
     const groupNames = (mapping.groups || []).map(g => g.name).filter(Boolean);
     els.groupList.innerHTML = groupNames.map(g => `<option value="${escapeHtml(g)}"></option>`).join('');
   }
+}
+
+// =================== Gameplay Overlay ===================
+const gameplayReviewState = new Map();
+const gameplayScoreTotals = new Map();
+
+function getGameplayGroups() {
+  return (mapping.groups || []).filter(g => g.type !== 'comment');
+}
+
+function getGameplayItemIconId(item) {
+  for (const k of (item?.matchKeys || [])) {
+    const s = String(k).trim();
+    if (/^\d+$/.test(s)) return s;
+  }
+  return '';
+}
+
+function getGameplayItemIcon(item) {
+  return getGiftIcon(item) || item?.iconUrl || item?.gift_icon || '';
+}
+
+function normalizeGameplayGiftKey(s) {
+  return String(s || '')
+    .replace(/[​-‏‪-‮⁠-⁯﻿]/g, '')
+    .replace(/[︀-️]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function getGameplayMatchKeys(item) {
+  const keys = [...(item?.matchKeys || [])];
+  if (item?.alias) keys.push(item.alias);
+  return [...new Set(keys.map(k => String(k).trim()).filter(Boolean))];
+}
+
+function normalizeGameplaySettings() {
+  if (!appSettings.gameplay) appSettings.gameplay = { groupId: '', orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, order: [], hiddenIds: [] };
+  const groups = getGameplayGroups();
+  if (!groups.length) return null;
+  let group = groups.find(g => g.id === appSettings.gameplay.groupId) || groups[0];
+  appSettings.gameplay.groupId = group.id;
+  appSettings.gameplay.orientation = appSettings.gameplay.orientation === 'vertical' ? 'vertical' : 'horizontal';
+  if (!['top', 'bottom', 'left', 'right'].includes(appSettings.gameplay.labelPosition)) appSettings.gameplay.labelPosition = 'bottom';
+  if (!['normal', 'marquee', 'wrap'].includes(appSettings.gameplay.nameMode)) appSettings.gameplay.nameMode = 'marquee';
+  if (!/^#[0-9a-f]{6}$/i.test(String(appSettings.gameplay.cardBg || ''))) appSettings.gameplay.cardBg = '#8d8d8d';
+  if (!/^#[0-9a-f]{6}$/i.test(String(appSettings.gameplay.textColor || ''))) appSettings.gameplay.textColor = '#ffffff';
+  if (!['Segoe UI', 'Arial', 'Tahoma', 'Impact', 'Consolas'].includes(appSettings.gameplay.textFont)) appSettings.gameplay.textFont = 'Segoe UI';
+  appSettings.gameplay.uppercase = !!appSettings.gameplay.uppercase;
+  appSettings.gameplay.cardOpacity = Math.max(20, Math.min(100, parseInt(appSettings.gameplay.cardOpacity, 10) || 86));
+  appSettings.gameplay.activeScale = Math.max(100, Math.min(200, parseInt(appSettings.gameplay.activeScale, 10) || 140));
+  appSettings.gameplay.enlargeActive = !!appSettings.gameplay.enlargeActive;
+  appSettings.gameplay.centerLargest = !!appSettings.gameplay.centerLargest;
+  appSettings.gameplay.grayInactive = !!appSettings.gameplay.grayInactive;
+  appSettings.gameplay.keepScore = !!appSettings.gameplay.keepScore;
+  const ids = new Set((group.items || []).map(i => i.id));
+  appSettings.gameplay.order = (appSettings.gameplay.order || []).filter(id => ids.has(id));
+  for (const item of (group.items || [])) {
+    if (!appSettings.gameplay.order.includes(item.id)) appSettings.gameplay.order.push(item.id);
+  }
+  appSettings.gameplay.hiddenIds = (appSettings.gameplay.hiddenIds || []).filter(id => ids.has(id));
+  return group;
+}
+
+function getGameplayOrderedItems(group) {
+  const byId = new Map((group?.items || []).map(item => [item.id, item]));
+  return (appSettings.gameplay.order || []).map(id => byId.get(id)).filter(Boolean);
+}
+
+function buildGameplayConfig() {
+  const group = normalizeGameplaySettings();
+  if (!group) return { items: [], orientation: 'horizontal', labelPosition: 'bottom' };
+  const hidden = new Set(appSettings.gameplay.hiddenIds || []);
+  return {
+    orientation: appSettings.gameplay.orientation,
+    labelPosition: appSettings.gameplay.labelPosition,
+    nameMode: appSettings.gameplay.nameMode,
+    cardBg: appSettings.gameplay.cardBg,
+    cardOpacity: appSettings.gameplay.cardOpacity,
+    textFont: appSettings.gameplay.textFont,
+    textColor: appSettings.gameplay.textColor,
+    uppercase: appSettings.gameplay.uppercase,
+    enlargeActive: appSettings.gameplay.enlargeActive,
+    activeScale: appSettings.gameplay.activeScale,
+    centerLargest: appSettings.gameplay.centerLargest,
+    grayInactive: appSettings.gameplay.grayInactive,
+    keepScore: appSettings.gameplay.keepScore,
+    items: getGameplayOrderedItems(group).filter(item => !hidden.has(item.id)).map(item => ({
+      id: item.id,
+      name: item.alias || (item.matchKeys || [])[0] || 'Quà',
+      icon: getGameplayItemIcon(item),
+      iconId: getGameplayItemIconId(item),
+      matchKeys: getGameplayMatchKeys(item),
+    })),
+  };
+}
+
+function itemMatchesGameplayGift(item, ev) {
+  const keys = getGameplayMatchKeys(item);
+  if (ev?.gift_id != null && keys.some(k => k === String(ev.gift_id))) return true;
+  const name = String(ev?.gift_name || '').toLowerCase().trim();
+  const normalizedName = normalizeGameplayGiftKey(ev?.gift_name);
+  if (normalizedName && keys.some(k => normalizeGameplayGiftKey(k) === normalizedName)) return true;
+  const icon = String(ev?.gift_icon || ev?.gift_icon_url || '').trim();
+  const itemIcon = String(getGameplayItemIcon(item) || '').trim();
+  return !!icon && !!itemIcon && icon === itemIcon;
+}
+
+function getGameplayVisibleItems() {
+  const group = normalizeGameplaySettings();
+  if (!group) return [];
+  const hidden = new Set(appSettings.gameplay.hiddenIds || []);
+  return getGameplayOrderedItems(group).filter(item => !hidden.has(item.id));
+}
+
+function getGameplayActiveIdsFromQueue(items = getGameplayVisibleItems()) {
+  const active = new Set();
+  const groups = getQueueGroups();
+  for (const item of items) {
+    for (const g of groups) {
+      if (!g.playing) continue;
+      const idMatch = /^id:(.+)$/.exec(g.key || '');
+      const ev = { gift_id: idMatch ? idMatch[1] : null, gift_name: g.name, gift_icon: g.icon };
+      if (itemMatchesGameplayGift(item, ev)) active.add(item.id);
+    }
+  }
+  return active;
+}
+
+function orderGameplayItemsForDisplay(items) {
+  if (!appSettings.gameplay?.centerLargest || items.length < 3) return items;
+  let maxIdx = -1;
+  let maxCount = 0;
+  items.forEach((item, idx) => {
+    const count = gameplayReviewState.get(item.id)?.count || 0;
+    if (count > maxCount) { maxCount = count; maxIdx = idx; }
+  });
+  if (maxIdx < 0 || maxCount <= 0) return items;
+  const arr = [...items];
+  const [top] = arr.splice(maxIdx, 1);
+  arr.splice(Math.floor(arr.length / 2), 0, top);
+  return arr;
+}
+
+function gameplayNameClass(name) {
+  const mode = appSettings.gameplay?.nameMode || 'marquee';
+  if (mode === 'wrap') return ' wrap';
+  if (mode === 'marquee' && String(name || '').length > 9) return ' marquee';
+  return '';
+}
+
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return { r: 141, g: 141, b: 141 };
+  const n = parseInt(m[1], 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function renderGameplayReview() {
+  if (!els.gameplayReview) return;
+  const baseItems = getGameplayVisibleItems();
+  const activeIds = getGameplayActiveIdsFromQueue(baseItems);
+  const items = orderGameplayItemsForDisplay(baseItems);
+  els.gameplayReview.classList.toggle('vertical', appSettings.gameplay?.orientation === 'vertical');
+  els.gameplayReview.dataset.labelPosition = appSettings.gameplay?.labelPosition || 'bottom';
+  els.gameplayReview.classList.toggle('gray-inactive', !!appSettings.gameplay?.grayInactive);
+  els.gameplayReview.style.setProperty('--gameplay-active-scale', String((appSettings.gameplay?.activeScale || 140) / 100));
+  const bg = hexToRgb(appSettings.gameplay?.cardBg || '#8d8d8d');
+  els.gameplayReview.style.setProperty('--gameplay-card-bg-rgb', `${bg.r}, ${bg.g}, ${bg.b}`);
+  els.gameplayReview.style.setProperty('--gameplay-card-opacity', String((appSettings.gameplay?.cardOpacity || 86) / 100));
+  els.gameplayReview.style.setProperty('--gameplay-text-color', appSettings.gameplay?.textColor || '#ffffff');
+  els.gameplayReview.style.setProperty('--gameplay-text-font', `'${String(appSettings.gameplay?.textFont || 'Segoe UI').replace(/'/g, '')}', sans-serif`);
+  els.gameplayReview.classList.toggle('uppercase', !!appSettings.gameplay?.uppercase);
+  if (!items.length) {
+    els.gameplayReview.innerHTML = '<div class="gameplay-empty">Chưa bật quà nào để hiển thị Review.</div>';
+    return;
+  }
+  els.gameplayReview.innerHTML = items.map(item => {
+    const icon = getGameplayItemIcon(item);
+    const name = item.alias || (item.matchKeys || [])[0] || 'Quà';
+    const st = gameplayReviewState.get(item.id) || { count: 0 };
+    const labelPosition = appSettings.gameplay?.labelPosition || 'bottom';
+    const isActive = activeIds.has(item.id);
+    const classes = [
+      'gameplay-review-card',
+      `label-${labelPosition}`,
+      isActive ? 'active' : '',
+      appSettings.gameplay?.enlargeActive && isActive ? 'enlarged' : '',
+    ].filter(Boolean).join(' ');
+    return `<div class="${escapeHtml(classes)}" data-iid="${escapeHtml(item.id)}">
+      <div class="gameplay-review-icon-wrap">
+        ${icon ? `<img src="${escapeHtml(icon)}" loading="lazy" />` : '<div class="gameplay-review-icon-empty"></div>'}
+        ${st.count ? `<span class="queue-card-count gameplay-review-count">${Number(st.count).toLocaleString('en-US')}</span>` : ''}
+      </div>
+      <div class="gameplay-review-name${gameplayNameClass(name)}"><span>${escapeHtml(name)}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function syncGameplayCountsFromQueue() {
+  if (!appSettings?.gameplay) return;
+  const items = getGameplayVisibleItems();
+  const groups = getQueueGroups();
+  if (!appSettings.gameplay.keepScore) gameplayReviewState.clear();
+  const counts = {};
+  const activeIds = [...getGameplayActiveIdsFromQueue(items)];
+  for (const item of items) {
+    let total = 0;
+    if (appSettings.gameplay.keepScore) {
+      total = gameplayScoreTotals.get(item.id) || 0;
+    } else {
+      for (const g of groups) {
+        const idMatch = /^id:(.+)$/.exec(g.key || '');
+        const ev = { gift_id: idMatch ? idMatch[1] : null, gift_name: g.name, gift_icon: g.icon };
+        if (itemMatchesGameplayGift(item, ev)) total += g.total || 0;
+      }
+    }
+    if (total > 0) {
+      gameplayReviewState.set(item.id, { count: total });
+      counts[item.id] = total;
+    }
+  }
+  renderGameplayReview();
+  if (window.bigo.gameplayCounts) window.bigo.gameplayCounts({ counts, activeIds }).catch(() => {});
+}
+
+function addGameplayScoreForEvent(ev) {
+  if (!appSettings?.gameplay?.keepScore) return;
+  const total = parseInt(ev.total_count, 10) || ((parseInt(ev.gift_count, 10) || 1) * (parseInt(ev.combo, 10) || 1));
+  for (const item of getGameplayVisibleItems()) {
+    if (!itemMatchesGameplayGift(item, ev)) continue;
+    gameplayScoreTotals.set(item.id, (gameplayScoreTotals.get(item.id) || 0) + Math.max(1, total || 1));
+  }
+}
+
+function addGameplayScoreForItem(item, count) {
+  if (!appSettings?.gameplay?.keepScore || !item?.id) return;
+  gameplayScoreTotals.set(item.id, (gameplayScoreTotals.get(item.id) || 0) + Math.max(1, parseInt(count, 10) || 1));
+}
+
+function initializeGameplayScoreFromQueue() {
+  gameplayScoreTotals.clear();
+  const items = getGameplayVisibleItems();
+  const groups = getQueueGroups();
+  for (const item of items) {
+    let total = 0;
+    for (const g of groups) {
+      const idMatch = /^id:(.+)$/.exec(g.key || '');
+      const ev = { gift_id: idMatch ? idMatch[1] : null, gift_name: g.name, gift_icon: g.icon };
+      if (itemMatchesGameplayGift(item, ev)) total += g.total || 0;
+    }
+    if (total > 0) gameplayScoreTotals.set(item.id, total);
+  }
+}
+
+function sendGameplayConfig() {
+  if (!window.bigo.gameplayConfig) return;
+  window.bigo.gameplayConfig(buildGameplayConfig()).catch(() => {});
+}
+
+async function saveGameplayToObs() {
+  normalizeGameplaySettings();
+  await saveAppSettings({ gameplay: appSettings.gameplay });
+  sendGameplayConfig();
+  syncGameplayCountsFromQueue();
+  appendLog('[group dance] đã lưu và cập nhật OBS overlay');
+}
+
+function renderGameplayUi() {
+  if (!els.gameplayGroup || !els.gameplayItems) return;
+  const groups = getGameplayGroups();
+  if (!groups.length) {
+    els.gameplayGroup.innerHTML = '<option value="">Chưa có nhóm</option>';
+    els.gameplayItems.innerHTML = '<div class="gameplay-empty">Chưa có nhóm quà để xuất overlay.</div>';
+    renderGameplayReview();
+    sendGameplayConfig();
+    syncGameplayCountsFromQueue();
+    return;
+  }
+  const group = normalizeGameplaySettings();
+  els.gameplayGroup.innerHTML = groups.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name || 'Nhóm')}</option>`).join('');
+  els.gameplayGroup.value = appSettings.gameplay.groupId;
+  if (els.gameplayOrientation) els.gameplayOrientation.value = appSettings.gameplay.orientation;
+  if (els.gameplayLabelPosition) els.gameplayLabelPosition.value = appSettings.gameplay.labelPosition;
+  if (els.gameplayNameMode) els.gameplayNameMode.value = appSettings.gameplay.nameMode;
+  if (els.gameplayCardBg) els.gameplayCardBg.value = appSettings.gameplay.cardBg;
+  if (els.gameplayCardOpacity) els.gameplayCardOpacity.value = appSettings.gameplay.cardOpacity;
+  if (els.gameplayCardOpacityVal) els.gameplayCardOpacityVal.textContent = `${appSettings.gameplay.cardOpacity}%`;
+  if (els.gameplayTextFont) els.gameplayTextFont.value = appSettings.gameplay.textFont;
+  if (els.gameplayTextColor) els.gameplayTextColor.value = appSettings.gameplay.textColor;
+  if (els.gameplayUppercase) els.gameplayUppercase.checked = !!appSettings.gameplay.uppercase;
+  if (els.gameplayEnlargeActive) els.gameplayEnlargeActive.checked = !!appSettings.gameplay.enlargeActive;
+  if (els.gameplayActiveScale) els.gameplayActiveScale.value = appSettings.gameplay.activeScale;
+  if (els.gameplayActiveScaleVal) els.gameplayActiveScaleVal.textContent = `${appSettings.gameplay.activeScale}%`;
+  if (els.gameplayCenterLargest) els.gameplayCenterLargest.checked = !!appSettings.gameplay.centerLargest;
+  if (els.gameplayGrayInactive) els.gameplayGrayInactive.checked = !!appSettings.gameplay.grayInactive;
+  if (els.gameplayKeepScore) els.gameplayKeepScore.checked = !!appSettings.gameplay.keepScore;
+
+  const hidden = new Set(appSettings.gameplay.hiddenIds || []);
+  const items = getGameplayOrderedItems(group);
+  if (!items.length) {
+    els.gameplayItems.innerHTML = '<div class="gameplay-empty">Nhóm này chưa có quà.</div>';
+    renderGameplayReview();
+    sendGameplayConfig();
+    syncGameplayCountsFromQueue();
+    return;
+  }
+  els.gameplayItems.innerHTML = items.map((item, idx) => {
+    const icon = getGameplayItemIcon(item);
+    const name = item.alias || (item.matchKeys || [])[0] || 'Quà';
+    const off = hidden.has(item.id);
+    return `<div class="gameplay-item ${off ? 'off' : ''}" data-iid="${escapeHtml(item.id)}">
+      <div class="gameplay-drag">☰</div>
+      ${icon ? `<img class="gameplay-icon" src="${escapeHtml(icon)}" loading="lazy" />` : '<div class="gameplay-icon empty"></div>'}
+      <div class="gameplay-meta">
+        <div class="gameplay-name">${escapeHtml(name)}</div>
+        <div class="gameplay-keys">${escapeHtml((item.matchKeys || []).join(', '))}</div>
+      </div>
+      <button class="tiny" data-gpact="up" ${idx === 0 ? 'disabled' : ''}>↑</button>
+      <button class="tiny" data-gpact="down" ${idx === items.length - 1 ? 'disabled' : ''}>↓</button>
+      <button class="tiny ${off ? '' : 'primary'}" data-gpact="toggle">${off ? 'Bật Review/OBS' : 'Tắt Review/OBS'}</button>
+    </div>`;
+  }).join('');
+  wireGameplayDragDrop();
+  renderGameplayReview();
+  sendGameplayConfig();
+  syncGameplayCountsFromQueue();
+}
+
+function wireGameplayDragDrop() {
+  if (!els.gameplayItems) return;
+  let dragId = null;
+  els.gameplayItems.querySelectorAll('.gameplay-item').forEach(row => {
+    row.draggable = true;
+    row.ondragstart = (e) => {
+      dragId = row.dataset.iid;
+      e.dataTransfer.effectAllowed = 'move';
+      row.classList.add('dragging');
+    };
+    row.ondragend = () => {
+      row.classList.remove('dragging');
+      els.gameplayItems.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+    };
+    row.ondragover = (e) => {
+      e.preventDefault();
+      row.classList.add('drop-target');
+    };
+    row.ondragleave = () => row.classList.remove('drop-target');
+    row.ondrop = (e) => {
+      e.preventDefault();
+      row.classList.remove('drop-target');
+      const targetId = row.dataset.iid;
+      if (!dragId || !targetId || dragId === targetId) return;
+      normalizeGameplaySettings();
+      const order = [...(appSettings.gameplay.order || [])];
+      const from = order.indexOf(dragId);
+      const to = order.indexOf(targetId);
+      if (from === -1 || to === -1) return;
+      const [moved] = order.splice(from, 1);
+      order.splice(to, 0, moved);
+      saveGameplaySettings({ order });
+    };
+  });
+}
+
+async function saveGameplaySettings(patch) {
+  appSettings.gameplay = { ...appSettings.gameplay, ...patch };
+  await saveAppSettings({ gameplay: appSettings.gameplay });
+  renderGameplayUi();
+}
+
+function forwardGameplayGiftEvent(ev) {
+  if (!ev || ev.type !== 'gift') return;
+  addGameplayScoreForEvent(ev);
+  syncGameplayCountsFromQueue();
 }
 
 function isSpecialTriggerItem(item) {
@@ -1698,9 +2095,12 @@ function renderGroupCard(grp, overlayMap) {
     const specialBadge = isSpecialTriggerItem(item) ? '<span class="gift-state-badge special-badge" title="Quà này đang dùng làm trigger Hiệu Ứng Đặc Biệt">🎯</span>' : '';
     // Hiển thị tên file rút gọn (basename) nếu là full path/URL
     const fileDisplay = displayEffectName(item.mediaFile);
+    const actionBadges = item.mediaFile
+      ? `${priorityBadge}${pauseBgmBadge}${preEffectBadge}${targetBadge}${specialBadge}`
+      : `${missingBadge}${targetBadge}${specialBadge}`;
     const fileLine = item.mediaFile
-      ? `<div class="grow-sub"><code>${escapeHtml(fileDisplay)}</code><span class="gift-state-badges">${priorityBadge}${pauseBgmBadge}${preEffectBadge}${targetBadge}${specialBadge}</span></div>`
-      : `<div class="grow-sub"><span style="color:#ff6b6b">— chưa có file hiệu ứng —</span><span class="gift-state-badges">${missingBadge}${targetBadge}${specialBadge}</span></div>`;
+      ? `<div class="grow-sub"><code>${escapeHtml(fileDisplay)}</code></div>`
+      : `<div class="grow-sub"><span style="color:#ff6b6b">— chưa có file hiệu ứng —</span></div>`;
     return `<div class="group-item" data-iid="${item.id}" data-gid="${grp.id}">
       ${iconCell}
       <div class="grow-meta">
@@ -1708,6 +2108,7 @@ function renderGroupCard(grp, overlayMap) {
         ${fileLine}
       </div>
       <div class="grow-actions">
+        <span class="gift-state-badges action-badges">${actionBadges}</span>
         <input type="number" class="play-count" min="1" max="50" value="1" data-iid="${item.id}" title="Số lượng phát" onclick="event.stopPropagation()" />
         <button class="tiny" data-act="play" data-iid="${item.id}" title="Phát N lần">▶</button>
         <button class="tiny" data-act="edit-item" data-iid="${item.id}">✏️</button>
@@ -1726,18 +2127,15 @@ function renderGroupCard(grp, overlayMap) {
        </label>`;
   const editBtn = isCommon ? '' :
     `<button class="tiny" data-act="edit-group" data-gid="${grp.id}" title="Sửa nhóm">✏️</button>`;
-  const delBtn = isCommon ? '' :
-    `<button class="tiny danger" data-act="del-group" data-gid="${grp.id}" title="Xoá nhóm (items chuyển về NHÓM CHUNG)">🗑</button>`;
 
   return `<div class="group-card ${enabled ? 'on' : 'off'} ${collapsed ? 'collapsed' : ''} ${isCommon ? 'common' : ''}" data-gid="${grp.id}">
     <div class="group-head">
       <span class="group-name">${escapeHtml(grp.name)}</span>
       <span class="group-badge">${(grp.items || []).length} mục</span>
-      ${toggleHtml}
       <button class="tiny" data-act="add-item" data-gid="${grp.id}" title="Thêm quà vào nhóm">+ Thêm quà</button>
       ${editBtn}
-      ${delBtn}
       <button class="tiny" data-act="collapse" data-gid="${grp.id}" title="Thu gọn/Mở">${collapsed ? '▶' : '▼'}</button>
+      ${toggleHtml}
     </div>
     ${collapsed ? '' : `<div class="group-items">${itemsHtml}</div>`}
   </div>`;
@@ -1775,10 +2173,15 @@ async function groupAction(act, gid, value, itemId) {
     if (!grp) return;
     if (grp.isCommon) { alert('Không thể xoá NHÓM CHUNG'); return; }
     const itemCount = (grp.items || []).length;
-    const msg = itemCount > 0
-      ? `Xoá nhóm "${grp.name}"?\n${itemCount} quà bên trong sẽ tự động chuyển về NHÓM CHUNG (KHÔNG mất).`
-      : `Xoá nhóm "${grp.name}"?`;
-    if (!confirm(msg)) return;
+    const ok = await appConfirm({
+      title: 'Xoá nhóm?',
+      message: `Xoá nhóm "${grp.name}"?`,
+      detail: itemCount > 0 ? `${itemCount} quà bên trong sẽ tự động chuyển về NHÓM CHUNG, không mất cấu hình quà.` : 'Thao tác này không thể hoàn tác.',
+      okText: 'Có, xoá nhóm',
+      cancelText: 'Không',
+      danger: true,
+    });
+    if (!ok) return;
     // Auto-move items về NHÓM CHUNG để KHÔNG mất data
     if (itemCount > 0) {
       const common = getCommonGroup();
@@ -1809,11 +2212,21 @@ async function groupAction(act, gid, value, itemId) {
       sessionStats.effects += playTimes;
       updateConnectStats();
       // Chia tách thành playTimes entries (đếm lùi giảm dần)
+      addGameplayScoreForItem(found.item, playTimes);
       pushPlayBatch(found.item, null, playTimes);
     } else if (act === 'edit-item') {
       openGiftDialog(found.item, found.group.id);
     } else if (act === 'del-item') {
-      if (!confirm(`Xoá "${found.item.alias || found.item.matchKeys.join(',')}"?`)) return;
+      const name = found.item.alias || found.item.matchKeys.join(',') || 'quà này';
+      const ok = await appConfirm({
+        title: 'Xoá quà khỏi nhóm?',
+        message: `Xoá "${name}" khỏi nhóm "${found.group.name}"?`,
+        detail: 'Thao tác này sẽ xoá cấu hình quà này khỏi nhóm hiện tại.',
+        okText: 'Có, xoá',
+        cancelText: 'Không',
+        danger: true,
+      });
+      if (!ok) return;
       found.group.items = found.group.items.filter(i => i.id !== itemId);
       await persistMapping();
       renderGiftTable();
@@ -2147,13 +2560,21 @@ async function overlayAction(act, id) {
   } else if (act === 'edit') {
     openOverlayDialog(o);
   } else if (act === 'del') {
-    const usingGifts = mapping.gifts.filter(g => g.overlayId === id);
-    let msg = `Xoá overlay "${o.name}"?`;
-    if (usingGifts.length) msg += `\n${usingGifts.length} quà đang dùng overlay này sẽ bị unmap.`;
-    if (!confirm(msg)) return;
+    const usingGifts = getAllItems().filter(g => g.overlayId === id);
+    const ok = await appConfirm({
+      title: 'Xoá overlay?',
+      message: `Xoá overlay "${o.name}"?`,
+      detail: usingGifts.length ? `${usingGifts.length} quà đang dùng overlay này sẽ bị bỏ liên kết overlay.` : 'Thao tác này không thể hoàn tác.',
+      okText: 'Có, xoá overlay',
+      cancelText: 'Không',
+      danger: true,
+    });
+    if (!ok) return;
     await window.bigo.overlayDelete(id);
     mapping.overlays = mapping.overlays.filter(x => x.id !== id);
-    mapping.gifts.forEach(g => { if (g.overlayId === id) g.overlayId = mapping.overlays[0]?.id || ''; });
+    for (const grp of (mapping.groups || [])) {
+      for (const item of (grp.items || [])) if (item.overlayId === id) item.overlayId = mapping.overlays[0]?.id || '';
+    }
     await persistMapping();
     renderOverlayTable();
     renderGiftTable();
@@ -2675,6 +3096,8 @@ function renderParsed(ev) {
       updateConnectStats();
       // Push vào received gifts list (right panel) — layout mới gọn
       addReceivedGift(ev);
+      // Gameplay overlay chỉ nhận bản sao event, không tác động queue/effect pipeline.
+      forwardGameplayGiftEvent(ev);
     }
     if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
       // Mỗi quà/combo tương ứng 1 hàng hành động. Ví dụ Bell x10 → 10 hàng.
@@ -2735,6 +3158,7 @@ function renderEmbedEvent(ev) {
 let appSettings = {
   bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
+  gameplay: { groupId: '', orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, order: [], hiddenIds: [] },
   // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
   specialEffects: {
     clearQueue:      { enabled: false, typeid: null, giftName: '', iconUrl: '' },
@@ -2756,6 +3180,7 @@ async function saveAppSettings(patch) {
   if (patch) {
     if (patch.bgm) s.bgm = { ...(s.bgm || {}), ...patch.bgm };
     if (patch.preFx) s.preFx = { ...(s.preFx || {}), ...patch.preFx };
+    if (patch.gameplay) s.gameplay = { ...(s.gameplay || {}), ...patch.gameplay };
     if (patch.specialEffects) {
       s.specialEffects = s.specialEffects || {};
       for (const [k, v] of Object.entries(patch.specialEffects)) {
@@ -2835,6 +3260,7 @@ async function applyBgmSinkId() {
 async function initAppSettings(s) {
   appSettings.bgm = { ...appSettings.bgm, ...(s.bgm || {}) };
   appSettings.preFx = { ...appSettings.preFx, ...(s.preFx || {}) };
+  appSettings.gameplay = { ...appSettings.gameplay, ...(s.gameplay || {}) };
   // Migrate old clearGift → specialEffects.clearQueue (backward compat)
   if (s.clearGift && !s.specialEffects?.clearQueue) {
     appSettings.specialEffects.clearQueue = {
@@ -2911,6 +3337,15 @@ if (els.btnTestPreFx) {
 }
 if (els.btnClearPreFx) {
   els.btnClearPreFx.onclick = async () => {
+    const ok = await appConfirm({
+      title: 'Xoá âm thanh phát trước?',
+      message: 'Xoá file âm thanh/video phát trước hiệu ứng?',
+      detail: 'Chỉ xoá liên kết trong app, không xoá file gốc trên máy.',
+      okText: 'Có, xoá',
+      cancelText: 'Không',
+      danger: true,
+    });
+    if (!ok) return;
     appSettings.preFx.file = null;
     appSettings.preFx.fileName = '';
     if (els.preFxFileLabel) els.preFxFileLabel.value = '';
@@ -3432,6 +3867,15 @@ if (els.btnStopBgm) {
 }
 if (els.btnClearBgm) {
   els.btnClearBgm.onclick = async () => {
+    const ok = await appConfirm({
+      title: 'Xoá nhạc nền?',
+      message: 'Xoá file nhạc nền đang chọn?',
+      detail: 'Chỉ xoá liên kết trong app, không xoá file gốc trên máy.',
+      okText: 'Có, xoá',
+      cancelText: 'Không',
+      danger: true,
+    });
+    if (!ok) return;
     els.bgmAudio.pause();
     els.bgmAudio.removeAttribute('src');
     els.bgmAudio.load();
@@ -3472,6 +3916,123 @@ if (els.maxListItems) {
   els.maxListItems.addEventListener('change', () => {
     appSettings.maxListItems = parseInt(els.maxListItems.value, 10) || 200;
     saveAppSettings({ maxListItems: appSettings.maxListItems });
+  });
+}
+if (els.gameplayGroup) {
+  els.gameplayGroup.addEventListener('change', () => {
+    gameplayReviewState.clear();
+    saveGameplaySettings({ groupId: els.gameplayGroup.value, order: [], hiddenIds: [] });
+  });
+}
+if (els.gameplayOrientation) {
+  els.gameplayOrientation.addEventListener('change', () => {
+    saveGameplaySettings({ orientation: els.gameplayOrientation.value === 'vertical' ? 'vertical' : 'horizontal' });
+  });
+}
+if (els.gameplayLabelPosition) {
+  els.gameplayLabelPosition.addEventListener('change', () => {
+    const v = els.gameplayLabelPosition.value;
+    saveGameplaySettings({ labelPosition: ['top', 'bottom', 'left', 'right'].includes(v) ? v : 'bottom' });
+  });
+}
+if (els.gameplayNameMode) {
+  els.gameplayNameMode.addEventListener('change', () => {
+    const v = els.gameplayNameMode.value;
+    saveGameplaySettings({ nameMode: ['normal', 'marquee', 'wrap'].includes(v) ? v : 'marquee' });
+  });
+}
+if (els.gameplayCardBg) {
+  els.gameplayCardBg.addEventListener('input', () => {
+    appSettings.gameplay.cardBg = els.gameplayCardBg.value;
+    renderGameplayReview();
+    sendGameplayConfig();
+  });
+  els.gameplayCardBg.addEventListener('change', () => saveGameplaySettings({ cardBg: els.gameplayCardBg.value }));
+}
+if (els.gameplayCardOpacity) {
+  els.gameplayCardOpacity.addEventListener('input', () => {
+    const cardOpacity = Math.max(20, Math.min(100, parseInt(els.gameplayCardOpacity.value, 10) || 86));
+    if (els.gameplayCardOpacityVal) els.gameplayCardOpacityVal.textContent = `${cardOpacity}%`;
+    appSettings.gameplay.cardOpacity = cardOpacity;
+    renderGameplayReview();
+    sendGameplayConfig();
+  });
+  els.gameplayCardOpacity.addEventListener('change', () => saveGameplaySettings({ cardOpacity: Math.max(20, Math.min(100, parseInt(els.gameplayCardOpacity.value, 10) || 86)) }));
+}
+if (els.gameplayTextFont) {
+  els.gameplayTextFont.addEventListener('change', () => saveGameplaySettings({ textFont: els.gameplayTextFont.value }));
+}
+if (els.gameplayTextColor) {
+  els.gameplayTextColor.addEventListener('input', () => {
+    appSettings.gameplay.textColor = els.gameplayTextColor.value;
+    renderGameplayReview();
+    sendGameplayConfig();
+  });
+  els.gameplayTextColor.addEventListener('change', () => saveGameplaySettings({ textColor: els.gameplayTextColor.value }));
+}
+if (els.gameplayUppercase) {
+  els.gameplayUppercase.addEventListener('change', () => saveGameplaySettings({ uppercase: els.gameplayUppercase.checked }));
+}
+if (els.gameplayEnlargeActive) {
+  els.gameplayEnlargeActive.addEventListener('change', () => saveGameplaySettings({ enlargeActive: els.gameplayEnlargeActive.checked }));
+}
+if (els.gameplayActiveScale) {
+  els.gameplayActiveScale.addEventListener('input', () => {
+    const activeScale = Math.max(100, Math.min(200, parseInt(els.gameplayActiveScale.value, 10) || 140));
+    if (els.gameplayActiveScaleVal) els.gameplayActiveScaleVal.textContent = `${activeScale}%`;
+    appSettings.gameplay.activeScale = activeScale;
+    renderGameplayReview();
+    sendGameplayConfig();
+  });
+  els.gameplayActiveScale.addEventListener('change', () => saveGameplaySettings({ activeScale: Math.max(100, Math.min(200, parseInt(els.gameplayActiveScale.value, 10) || 140)) }));
+}
+if (els.gameplayCenterLargest) {
+  els.gameplayCenterLargest.addEventListener('change', () => saveGameplaySettings({ centerLargest: els.gameplayCenterLargest.checked }));
+}
+if (els.gameplayGrayInactive) {
+  els.gameplayGrayInactive.addEventListener('change', () => saveGameplaySettings({ grayInactive: els.gameplayGrayInactive.checked }));
+}
+if (els.gameplayKeepScore) {
+  els.gameplayKeepScore.addEventListener('change', () => {
+    if (els.gameplayKeepScore.checked) initializeGameplayScoreFromQueue();
+    else gameplayScoreTotals.clear();
+    saveGameplaySettings({ keepScore: els.gameplayKeepScore.checked });
+  });
+}
+if (els.btnGameplayCopyUrl) {
+  els.btnGameplayCopyUrl.onclick = async () => {
+    sendGameplayConfig();
+    syncGameplayCountsFromQueue();
+    const r = await window.bigo.gameplayCopyUrl().catch(e => ({ ok: false, error: e.message }));
+    if (r?.ok) appendLog('[gameplay] đã copy link OBS: ' + r.url);
+    else alert(r?.error || 'Không copy được link Gameplay Overlay');
+  };
+}
+if (els.btnGameplaySave) {
+  els.btnGameplaySave.onclick = () => saveGameplayToObs().catch(e => alert('Lỗi lưu GROUP DANCE: ' + e.message));
+}
+if (els.gameplayItems) {
+  els.gameplayItems.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-gpact]');
+    if (!btn) return;
+    const row = btn.closest('.gameplay-item');
+    const iid = row?.dataset?.iid;
+    if (!iid) return;
+    normalizeGameplaySettings();
+    const order = [...(appSettings.gameplay.order || [])];
+    const idx = order.indexOf(iid);
+    if (idx === -1) return;
+    if (btn.dataset.gpact === 'up' && idx > 0) {
+      [order[idx - 1], order[idx]] = [order[idx], order[idx - 1]];
+      saveGameplaySettings({ order });
+    } else if (btn.dataset.gpact === 'down' && idx < order.length - 1) {
+      [order[idx], order[idx + 1]] = [order[idx + 1], order[idx]];
+      saveGameplaySettings({ order });
+    } else if (btn.dataset.gpact === 'toggle') {
+      const hidden = new Set(appSettings.gameplay.hiddenIds || []);
+      if (hidden.has(iid)) hidden.delete(iid); else hidden.add(iid);
+      saveGameplaySettings({ hiddenIds: [...hidden] });
+    }
   });
 }
 
@@ -3545,10 +4106,15 @@ async function settingsGroupDelete(gid) {
   if (!g) return;
   if (g.isCommon) { alert('Không thể xoá NHÓM CHUNG'); return; }
   const itemCount = (g.items || []).length;
-  const msg = itemCount > 0
-    ? `Xoá nhóm "${g.name}"?\n${itemCount} quà bên trong sẽ tự động chuyển về NHÓM CHUNG (KHÔNG mất).`
-    : `Xoá nhóm "${g.name}"?`;
-  if (!confirm(msg)) return;
+  const ok = await appConfirm({
+    title: 'Xoá nhóm?',
+    message: `Xoá nhóm "${g.name}"?`,
+    detail: itemCount > 0 ? `${itemCount} quà bên trong sẽ tự động chuyển về NHÓM CHUNG, không mất cấu hình quà.` : 'Thao tác này không thể hoàn tác.',
+    okText: 'Có, xoá nhóm',
+    cancelText: 'Không',
+    danger: true,
+  });
+  if (!ok) return;
   if (itemCount > 0) {
     const common = getCommonGroup();
     common.items.push(...(g.items || []));

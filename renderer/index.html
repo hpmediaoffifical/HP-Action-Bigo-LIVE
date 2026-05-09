@@ -15,6 +15,7 @@
       <button class="tab sidebar-tab active" data-tab="embed" title="Tương tác (chat + quà nhận)">💬</button>
       <button class="tab sidebar-tab" data-tab="queue" title="Hàng đợi hiệu ứng">🎬</button>
       <button class="tab sidebar-tab" data-tab="gifts" title="Bảng quà">🎁</button>
+      <button class="tab sidebar-tab" data-tab="gameplay" title="GROUP DANCE">👯</button>
       <button class="tab sidebar-tab" data-tab="overlays" title="Overlay">🪟</button>
       <button class="tab sidebar-tab" data-tab="special" title="Hiệu Ứng Đặc Biệt">✨</button>
       <div class="sidebar-spacer"></div>
@@ -188,6 +189,67 @@
         <div class="hint small">
           <b>Match keys</b>: tên quà mà Bigo render trong chat (vd <code>お面</code>, <code>Rose</code>) — cách nhau bằng dấu phẩy. Có thể nhập nhiều cái cho 1 hiệu ứng.
         </div>
+      </div>
+    </section>
+
+    <!-- =================== TAB: GAMEPLAY OVERLAY =================== -->
+    <section class="tab-panel" data-tab="gameplay">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>👯 GROUP DANCE</h2>
+          <div style="display:flex;gap:8px">
+            <button id="btnGameplaySave" class="primary">💾 LƯU</button>
+            <button id="btnGameplayCopyUrl" class="primary">🔗 Copy link OBS</button>
+          </div>
+        </div>
+        <div class="hint small" style="margin-bottom:10px">
+          Chọn một nhóm quà để tạo bảng Review cho MC và xuất chính bảng này sang OBS. Quà bật hiển thị sẽ hiện icon theo thứ tự bạn sắp xếp; khi LIVE lên quà, số nhỏ hiện dưới icon.
+        </div>
+        <h3 class="gameplay-section-title">Review xem trực tiếp</h3>
+        <div id="gameplayReview" class="gameplay-review"></div>
+        <h3 class="gameplay-section-title">Chỉnh sửa</h3>
+        <div class="row">
+          <label>Nhóm quà
+            <select id="gameplayGroup"></select>
+          </label>
+          <label>Hướng hiển thị
+            <select id="gameplayOrientation">
+              <option value="horizontal">Ngang</option>
+              <option value="vertical">Dọc</option>
+            </select>
+          </label>
+          <label>Vị trí chữ theo icon
+            <select id="gameplayLabelPosition">
+              <option value="bottom">Dưới icon</option>
+              <option value="top">Trên icon</option>
+              <option value="left">Bên trái icon</option>
+              <option value="right">Bên phải icon</option>
+            </select>
+          </label>
+        </div>
+        <div class="gameplay-options">
+          <div class="gameplay-option-group">
+            <div class="gameplay-option-title">Giao diện quà</div>
+            <label>Màu nền quà<input id="gameplayCardBg" type="color" value="#8d8d8d" /></label>
+            <label>Độ trong suốt <span id="gameplayCardOpacityVal">86%</span><input id="gameplayCardOpacity" type="range" min="20" max="100" value="86" /></label>
+            <label>Kiểu tên quà<select id="gameplayNameMode"><option value="normal">Bình thường</option><option value="marquee">Chạy khi chữ dài</option><option value="wrap">Xuống dòng 2 hàng</option></select></label>
+            <label>Font chữ<select id="gameplayTextFont"><option value="Segoe UI">Segoe UI</option><option value="Arial">Arial</option><option value="Tahoma">Tahoma</option><option value="Impact">Impact</option><option value="Consolas">Consolas</option></select></label>
+            <label>Màu chữ<input id="gameplayTextColor" type="color" value="#ffffff" /></label>
+            <label class="gameplay-switch"><span>In hoa tên quà</span><input id="gameplayUppercase" type="checkbox" /></label>
+          </div>
+          <div class="gameplay-option-group">
+            <div class="gameplay-option-title">Hiệu ứng nổi bật</div>
+            <label class="gameplay-switch"><span>Phóng to quà khi chạy</span><input id="gameplayEnlargeActive" type="checkbox" /></label>
+            <label>Kích cỡ phóng to <span id="gameplayActiveScaleVal">140%</span><input id="gameplayActiveScale" type="range" min="100" max="200" value="140" /></label>
+            <label class="gameplay-switch"><span>Làm xám quà không chạy</span><input id="gameplayGrayInactive" type="checkbox" /></label>
+          </div>
+          <div class="gameplay-option-group">
+            <div class="gameplay-option-title">Sắp xếp & điểm</div>
+            <label class="gameplay-switch"><span>Xếp quà lớn nhất ở giữa</span><input id="gameplayCenterLargest" type="checkbox" /></label>
+            <label class="gameplay-switch"><span>Giữ điểm đã tặng</span><input id="gameplayKeepScore" type="checkbox" /></label>
+          </div>
+        </div>
+        <div id="gameplayItems" class="gameplay-items"></div>
       </div>
     </section>
 

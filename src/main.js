@@ -1303,3 +1303,21 @@ ipcMain.handle('obs-overlay:copy-url', (_e, overlayId) => {
   clipboard.writeText(url);
   return { ok: true, url, connected: obsOverlayServer.hasClients(overlayId) };
 });
+ipcMain.handle('gameplay:copy-url', () => {
+  if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
+  const url = obsOverlayServer.getGameplayUrl();
+  clipboard.writeText(url);
+  return { ok: true, url };
+});
+ipcMain.handle('gameplay:config', (_e, cfg) => {
+  if (obsOverlayServer) obsOverlayServer.setGameplayConfig(cfg);
+  return { ok: true };
+});
+ipcMain.handle('gameplay:counts', (_e, counts) => {
+  if (obsOverlayServer) obsOverlayServer.sendGameplayCounts(counts);
+  return { ok: true };
+});
+ipcMain.handle('gameplay:event', (_e, ev) => {
+  if (obsOverlayServer) obsOverlayServer.sendGameplayEvent(ev);
+  return { ok: true };
+});

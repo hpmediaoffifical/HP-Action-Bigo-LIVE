@@ -84,6 +84,10 @@ contextBridge.exposeInMainWorld('bigo', {
   overlaySetSpeed: (rate) => ipcRenderer.invoke('overlay:set-speed', rate),
   obsOverlayGetUrl: (overlayId) => ipcRenderer.invoke('obs-overlay:get-url', overlayId),
   obsOverlayCopyUrl: (overlayId) => ipcRenderer.invoke('obs-overlay:copy-url', overlayId),
+  gameplayCopyUrl: () => ipcRenderer.invoke('gameplay:copy-url'),
+  gameplayConfig: (cfg) => ipcRenderer.invoke('gameplay:config', cfg),
+  gameplayCounts: (counts) => ipcRenderer.invoke('gameplay:counts', counts),
+  gameplayEvent: (ev) => ipcRenderer.invoke('gameplay:event', ev),
 
   // Popup chats (Tương tác)
   popupOpenChats: () => ipcRenderer.invoke('popup:open-chats'),

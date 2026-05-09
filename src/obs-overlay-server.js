@@ -18,6 +18,9 @@ class ObsOverlayServer {
     this.onLog = onLog || (() => {});
     this.server = null;
     this.clients = new Map(); // overlayId -> Set(res)
+    this.gameplayClients = new Set();
+    this.gameplayConfig = { items: [], orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false };
+    this.gameplayCounts = {};
     this.media = new Map();   // mediaId -> absolute file path
   }
 
@@ -36,12 +39,32 @@ class ObsOverlayServer {
       for (const res of set) { try { res.end(); } catch {} }
     }
     this.clients.clear();
+    for (const res of this.gameplayClients) { try { res.end(); } catch {} }
+    this.gameplayClients.clear();
     if (this.server) { try { this.server.close(); } catch {} }
     this.server = null;
   }
 
   getUrl(overlayId) {
     return `http://127.0.0.1:${this.port}/overlay/${encodeURIComponent(overlayId)}?token=${encodeURIComponent(this.token)}`;
+  }
+
+  getGameplayUrl() {
+    return `http://127.0.0.1:${this.port}/gameplay?token=${encodeURIComponent(this.token)}`;
+  }
+
+  setGameplayConfig(cfg) {
+    this.gameplayConfig = cfg || { items: [], orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false };
+    this._sendGameplay('config', this.gameplayConfig);
+  }
+
+  sendGameplayEvent(ev) {
+    this._sendGameplay('gift', ev || {});
+  }
+
+  sendGameplayCounts(counts) {
+    this.gameplayCounts = counts || {};
+    this._sendGameplay('counts', counts || {});
   }
 
   hasClients(overlayId) {
@@ -75,6 +98,11 @@ class ObsOverlayServer {
     for (const res of set) { try { res.write(body); } catch {} }
   }
 
+  _sendGameplay(event, data) {
+    const body = `event: ${event}\ndata: ${JSON.stringify(data || {})}\n\n`;
+    for (const res of this.gameplayClients) { try { res.write(body); } catch {} }
+  }
+
   _okToken(reqUrl) {
     return reqUrl.searchParams.get('token') === this.token;
   }
@@ -89,10 +117,14 @@ class ObsOverlayServer {
     const remote = req.socket.remoteAddress || '';
     if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remote)) return this._reject(res, 403, 'localhost only');
     if (req.method === 'GET' && reqUrl.pathname === '/obs-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'obs-overlay.js'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/gameplay-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'gameplay-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'overlay.css'), res);
     if (!this._okToken(reqUrl)) return this._reject(res, 401, 'bad token');
 
     if (req.method === 'GET' && reqUrl.pathname.startsWith('/overlay/')) return this._serveOverlay(reqUrl, res);
+    if (req.method === 'GET' && reqUrl.pathname === '/gameplay') return this._serveFile(path.join(this.root, 'renderer', 'gameplay-overlay.html'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/gameplay-events') return this._serveGameplayEvents(req, res);
+    if (req.method === 'GET' && reqUrl.pathname.startsWith('/gift-icon/')) return this._serveGiftIcon(reqUrl, res);
     if (req.method === 'GET' && reqUrl.pathname.startsWith('/events/')) return this._serveEvents(reqUrl, req, res);
     if (req.method === 'GET' && reqUrl.pathname.startsWith('/media/')) return this._serveMedia(reqUrl, req, res);
     if (req.method === 'POST' && reqUrl.pathname.startsWith('/api/overlay/')) return this._handleEvent(reqUrl, req, res);
@@ -113,6 +145,17 @@ class ObsOverlayServer {
     if (!this.clients.has(overlayId)) this.clients.set(overlayId, new Set());
     this.clients.get(overlayId).add(res);
     req.on('close', () => this.clients.get(overlayId)?.delete(res));
+  }
+
+  _serveGameplayEvents(req, res) {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(`event: config\ndata: ${JSON.stringify(this.gameplayConfig)}\n\n`);
+    res.write(`event: counts\ndata: ${JSON.stringify(this.gameplayCounts || {})}\n\n`);
+    this.gameplayClients.add(res);
+    req.on('close', () => this.gameplayClients.delete(res));
   }
 
   _serveFile(filePath, res) {
@@ -137,6 +180,12 @@ class ObsOverlayServer {
     }
     res.writeHead(200, { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Length': stat.size, 'Cache-Control': 'no-store' });
     fs.createReadStream(filePath).pipe(res);
+  }
+
+  _serveGiftIcon(reqUrl, res) {
+    const typeid = decodeURIComponent(reqUrl.pathname.split('/')[2] || '');
+    if (!/^\d+$/.test(typeid)) return this._reject(res, 404, 'icon not found');
+    this._serveFile(path.join(this.root, 'assets', 'gift-icons', `${typeid}.png`), res);
   }
 
   _handleEvent(reqUrl, req, res) {
