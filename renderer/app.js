@@ -1662,6 +1662,7 @@ function renderGroupCard(grp, overlayMap) {
       : '<div class="grow-icon-empty"></div>';
     const displayName = item.alias || (item.matchKeys || [])[0] || '?';
     const priorityBadge = item.priority > 0 ? `<span class="prio-badge" title="Ưu tiên: chèn vào hàng ${item.priority} trong queue">⚡ Ưu tiên #${item.priority}</span>` : '';
+    const pauseBgmBadge = item.pauseBgm ? '<span class="pause-bgm-badge" title="Tạm dừng nhạc nền khi hiệu ứng này phát">🔇 Tắt BGM</span>' : '';
     // Hiển thị tên file rút gọn (basename) nếu là full path/URL
     const fileDisplay = item.mediaFile
       ? (item.mediaFile.includes('/') || item.mediaFile.includes('\\')
@@ -1669,7 +1670,7 @@ function renderGroupCard(grp, overlayMap) {
         : item.mediaFile)
       : '';
     const fileLine = item.mediaFile
-      ? `<div class="grow-sub"><code>${escapeHtml(fileDisplay)}</code>${priorityBadge}</div>`
+      ? `<div class="grow-sub"><code>${escapeHtml(fileDisplay)}</code>${priorityBadge}${pauseBgmBadge}</div>`
       : '<div class="grow-sub" style="color:#ff6b6b">— chưa có file hiệu ứng —</div>';
     return `<div class="group-item" data-iid="${item.id}" data-gid="${grp.id}">
       ${iconCell}

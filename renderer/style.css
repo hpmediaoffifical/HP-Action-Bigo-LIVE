@@ -899,6 +899,19 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   box-shadow: 0 2px 6px rgba(254, 44, 85, 0.4);
   letter-spacing: 0.3px;
 }
+.pause-bgm-badge {
+  background: linear-gradient(135deg, #3a4050, #1c1f28);
+  color: #c9d6ff;
+  padding: 2px 8px;
+  border: 1px solid #4a5163;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 8px;
+  display: inline-block;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  letter-spacing: 0.2px;
+}
 
 /* Switch toggle */
 .switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
