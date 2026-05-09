@@ -58,17 +58,22 @@ function orderedItemsForDisplay() {
 function orderedSlotsForDisplay() {
   const slots = Array.isArray(cfg.slots) ? [...cfg.slots] : [];
   if (!slots.length) return orderedItemsForDisplay();
-  if (!cfg.centerLargest || slots.length < 3) return slots;
-  let maxIdx = -1;
+  const itemPositions = slots.map((slot, idx) => ({ slot, idx })).filter(x => (x.slot.itemId || x.slot.id) && x.slot.visible !== false);
+  if (!cfg.centerLargest || itemPositions.length < 3) return slots;
+  let maxPos = -1;
   let maxCount = 0;
-  slots.forEach((slot, idx) => {
-    const count = slot.itemId ? (state.get(slot.itemId)?.count || 0) : 0;
-    if (count > maxCount) { maxCount = count; maxIdx = idx; }
+  itemPositions.forEach(({ slot }, pos) => {
+    const itemId = slot.itemId || slot.id;
+    const count = state.get(itemId)?.count || 0;
+    if (count > maxCount) { maxCount = count; maxPos = pos; }
   });
-  if (maxIdx < 0 || maxCount <= 0) return slots;
-  const [top] = slots.splice(maxIdx, 1);
-  slots.splice(Math.floor(slots.length / 2), 0, top);
-  return slots;
+  if (maxPos < 0 || maxCount <= 0) return slots;
+  const orderedItems = itemPositions.map(x => x.slot);
+  const [top] = orderedItems.splice(maxPos, 1);
+  orderedItems.splice(Math.floor((itemPositions.length - 1) / 2), 0, top);
+  const next = [...slots];
+  itemPositions.forEach(({ idx }, pos) => { next[idx] = orderedItems[pos]; });
+  return next;
 }
 function nameClass(name) {
   const mode = cfg.nameMode || 'marquee';
@@ -81,7 +86,8 @@ function render() {
   wrap.classList.toggle('gray-inactive', !!cfg.grayInactive);
   wrap.classList.toggle('grid-mode', Array.isArray(cfg.slots) && cfg.slots.length > 0);
   wrap.style.setProperty('--grid-cols', parseInt(cfg.gridCols, 10) || 10);
-  wrap.style.setProperty('--active-scale', String((parseInt(cfg.activeScale, 10) || 140) / 100));
+  const activeScale = (parseInt(cfg.activeScale, 10) || 140) / 100;
+  wrap.style.setProperty('--active-scale', String(activeScale));
   const bg = hexToRgb(cfg.cardBg || '#8d8d8d');
   wrap.style.setProperty('--card-bg-rgb', `${bg.r}, ${bg.g}, ${bg.b}`);
   wrap.style.setProperty('--card-opacity', String((parseInt(cfg.cardOpacity, 10) || 86) / 100));
@@ -93,7 +99,9 @@ function render() {
   wrap.style.setProperty('--icon-size', `${iconSize}px`);
   wrap.style.setProperty('--icon-lift', `${Math.round(iconSize / 2)}px`);
   wrap.style.setProperty('--item-gap', `${itemGap}px`);
+  wrap.style.setProperty('--top-safe', `${12 + (cfg.enlargeActive ? Math.ceil(iconSize * Math.max(0, activeScale - 1)) : 0)}px`);
   wrap.classList.toggle('uppercase', !!cfg.uppercase);
+  wrap.classList.toggle('hide-name', cfg.showName === false);
   wrap.innerHTML = orderedSlotsForDisplay().map((item, idx) => {
     if (item.visible === false || (!item.itemId && !item.id)) {
       return `<div class="gift empty" data-slot="${idx}"></div>`;
@@ -113,9 +121,9 @@ function render() {
     return `<div class="${classes}" data-id="${escapeHtml(itemId)}">
       <div class="icon-wrap">
         ${icon ? `<img src="${escapeHtml(icon)}" />` : '<div style="width:50px;height:50px"></div>'}
-        ${st.count ? `<div class="count">${Number(st.count).toLocaleString('en-US')}</div>` : ''}
+        ${cfg.showCount !== false && st.count ? `<div class="count">${Number(st.count).toLocaleString('en-US')}</div>` : ''}
       </div>
-      <div class="name${nameClass(name)}"><span>${escapeHtml(name)}</span></div>
+      ${cfg.showName === false ? '' : `<div class="name${nameClass(name)}"><span>${escapeHtml(name)}</span></div>`}
     </div>`;
   }).join('');
 }

@@ -786,7 +786,7 @@ const els = {
   gameplayGroup: $('gameplayGroup'), gameplayOrientation: $('gameplayOrientation'), gameplayLabelPosition: $('gameplayLabelPosition'),
   gameplayNameMode: $('gameplayNameMode'), gameplayIconSize: $('gameplayIconSize'), gameplayIconSizeVal: $('gameplayIconSizeVal'), gameplayItemGap: $('gameplayItemGap'), gameplayItemGapVal: $('gameplayItemGapVal'), gameplayEnlargeActive: $('gameplayEnlargeActive'), gameplayActiveScale: $('gameplayActiveScale'), gameplayActiveScaleVal: $('gameplayActiveScaleVal'),
   gameplayCardBg: $('gameplayCardBg'), gameplayCardOpacity: $('gameplayCardOpacity'), gameplayCardOpacityVal: $('gameplayCardOpacityVal'),
-  gameplayTextFont: $('gameplayTextFont'), gameplayTextColor: $('gameplayTextColor'), gameplayUppercase: $('gameplayUppercase'),
+  gameplayTextFont: $('gameplayTextFont'), gameplayTextColor: $('gameplayTextColor'), gameplayUppercase: $('gameplayUppercase'), gameplayShowName: $('gameplayShowName'), gameplayShowCount: $('gameplayShowCount'),
   gameplayCenterLargest: $('gameplayCenterLargest'), gameplayGrayInactive: $('gameplayGrayInactive'), gameplayKeepScore: $('gameplayKeepScore'),
   gameplayReview: $('gameplayReview'), gameplayGridEditor: $('gameplayGridEditor'), gameplayItems: $('gameplayItems'), btnGameplayAddCol: $('btnGameplayAddCol'), btnGameplayAddRow: $('btnGameplayAddRow'), btnGameplayDelCol: $('btnGameplayDelCol'), btnGameplayDelRow: $('btnGameplayDelRow'), btnGameplaySave: $('btnGameplaySave'), btnGameplayCopyUrl: $('btnGameplayCopyUrl'),
   // Gift dialog extras
@@ -1670,7 +1670,7 @@ function getGameplayMatchKeys(item) {
 }
 
 function normalizeGameplaySettings() {
-  if (!appSettings.gameplay) appSettings.gameplay = { groupId: '', orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] };
+  if (!appSettings.gameplay) appSettings.gameplay = { groupId: '', orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, showName: true, showCount: true, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] };
   const groups = getGameplayGroups();
   if (!groups.length) return null;
   let group = groups.find(g => g.id === appSettings.gameplay.groupId) || groups[0];
@@ -1682,6 +1682,8 @@ function normalizeGameplaySettings() {
   if (!/^#[0-9a-f]{6}$/i.test(String(appSettings.gameplay.textColor || ''))) appSettings.gameplay.textColor = '#ffffff';
   if (!['Segoe UI', 'Arial', 'Tahoma', 'Impact', 'Consolas'].includes(appSettings.gameplay.textFont)) appSettings.gameplay.textFont = 'Segoe UI';
   appSettings.gameplay.uppercase = !!appSettings.gameplay.uppercase;
+  appSettings.gameplay.showName = appSettings.gameplay.showName !== false;
+  appSettings.gameplay.showCount = appSettings.gameplay.showCount !== false;
   appSettings.gameplay.cardOpacity = Math.max(20, Math.min(100, parseInt(appSettings.gameplay.cardOpacity, 10) || 86));
   appSettings.gameplay.iconSize = Math.max(28, Math.min(120, parseInt(appSettings.gameplay.iconSize, 10) || 54));
   appSettings.gameplay.itemGap = Math.max(0, Math.min(60, Number.isFinite(parseInt(appSettings.gameplay.itemGap, 10)) ? parseInt(appSettings.gameplay.itemGap, 10) : 10));
@@ -1731,9 +1733,10 @@ function getGameplayItemName(item) {
 
 function buildGameplaySlots() {
   const slots = appSettings.gameplay.gridSlots || [];
+  const hidden = new Set(appSettings.gameplay.hiddenIds || []);
   return slots.map((slot, idx) => {
     const item = getGameplayItemById(slot.itemId);
-    const visible = slot.visible !== false;
+    const visible = slot.visible !== false && (!item || !hidden.has(item.id));
     if (!item) return { index: idx, itemId: '', text: slot.text || '', visible };
     const name = slot.text || getGameplayItemName(item);
     return {
@@ -1763,6 +1766,8 @@ function buildGameplayConfig() {
     textFont: appSettings.gameplay.textFont,
     textColor: appSettings.gameplay.textColor,
     uppercase: appSettings.gameplay.uppercase,
+    showName: appSettings.gameplay.showName,
+    showCount: appSettings.gameplay.showCount,
     iconSize: appSettings.gameplay.iconSize,
     itemGap: appSettings.gameplay.itemGap,
     enlargeActive: appSettings.gameplay.enlargeActive,
@@ -1832,18 +1837,21 @@ function orderGameplayItemsForDisplay(items) {
 
 function getGameplayDisplaySlots() {
   const slots = buildGameplaySlots();
-  if (!appSettings.gameplay?.centerLargest || slots.length < 3) return slots;
-  let maxIdx = -1;
+  const itemPositions = slots.map((slot, idx) => ({ slot, idx })).filter(x => x.slot.itemId && x.slot.visible !== false);
+  if (!appSettings.gameplay?.centerLargest || itemPositions.length < 3) return slots;
+  let maxPos = -1;
   let maxCount = 0;
-  slots.forEach((slot, idx) => {
-    const count = slot.itemId ? (gameplayReviewState.get(slot.itemId)?.count || 0) : 0;
-    if (count > maxCount) { maxCount = count; maxIdx = idx; }
+  itemPositions.forEach(({ slot }, pos) => {
+    const count = gameplayReviewState.get(slot.itemId)?.count || 0;
+    if (count > maxCount) { maxCount = count; maxPos = pos; }
   });
-  if (maxIdx < 0 || maxCount <= 0) return slots;
-  const arr = [...slots];
-  const [top] = arr.splice(maxIdx, 1);
-  arr.splice(Math.floor(arr.length / 2), 0, top);
-  return arr.map((slot, idx) => ({ ...slot, index: idx }));
+  if (maxPos < 0 || maxCount <= 0) return slots;
+  const orderedItems = itemPositions.map(x => x.slot);
+  const [top] = orderedItems.splice(maxPos, 1);
+  orderedItems.splice(Math.floor((itemPositions.length - 1) / 2), 0, top);
+  const next = [...slots];
+  itemPositions.forEach(({ idx }, pos) => { next[idx] = { ...orderedItems[pos], index: idx }; });
+  return next.map((slot, idx) => ({ ...slot, index: idx }));
 }
 
 function gameplayNameClass(name) {
@@ -1884,6 +1892,7 @@ function renderGameplayReview() {
   els.gameplayReview.style.setProperty('--gameplay-icon-lift', `${Math.round(iconSize / 2)}px`);
   els.gameplayReview.style.setProperty('--gameplay-item-gap', `${itemGap}px`);
   els.gameplayReview.classList.toggle('uppercase', !!appSettings.gameplay?.uppercase);
+  els.gameplayReview.classList.toggle('hide-name', appSettings.gameplay?.showName === false);
   if (!slots.length) {
     els.gameplayReview.innerHTML = '<div class="gameplay-empty">Chưa bật quà nào để hiển thị Review.</div>';
     return;
@@ -1907,9 +1916,9 @@ function renderGameplayReview() {
     return `<div class="${escapeHtml(classes)}" data-iid="${escapeHtml(slot.itemId)}" data-slot="${slot.index}">
       <div class="gameplay-review-icon-wrap">
         ${icon ? `<img src="${escapeHtml(icon)}" loading="lazy" />` : '<div class="gameplay-review-icon-empty"></div>'}
-        ${st.count ? `<span class="queue-card-count gameplay-review-count">${Number(st.count).toLocaleString('en-US')}</span>` : ''}
+        ${appSettings.gameplay?.showCount !== false && st.count ? `<span class="queue-card-count gameplay-review-count">${Number(st.count).toLocaleString('en-US')}</span>` : ''}
       </div>
-      <div class="gameplay-review-name${gameplayNameClass(name)}"><span>${escapeHtml(name)}</span></div>
+      ${appSettings.gameplay?.showName === false ? '' : `<div class="gameplay-review-name${gameplayNameClass(name)}"><span>${escapeHtml(name)}</span></div>`}
     </div>`;
   }).join('');
 }
@@ -2116,6 +2125,8 @@ function renderGameplayUi() {
   if (els.gameplayTextFont) els.gameplayTextFont.value = appSettings.gameplay.textFont;
   if (els.gameplayTextColor) els.gameplayTextColor.value = appSettings.gameplay.textColor;
   if (els.gameplayUppercase) els.gameplayUppercase.checked = !!appSettings.gameplay.uppercase;
+  if (els.gameplayShowName) els.gameplayShowName.checked = appSettings.gameplay.showName !== false;
+  if (els.gameplayShowCount) els.gameplayShowCount.checked = appSettings.gameplay.showCount !== false;
   if (els.gameplayIconSize) els.gameplayIconSize.value = appSettings.gameplay.iconSize;
   if (els.gameplayIconSizeVal) els.gameplayIconSizeVal.textContent = `${appSettings.gameplay.iconSize}px`;
   if (els.gameplayItemGap) els.gameplayItemGap.value = appSettings.gameplay.itemGap;
@@ -3340,7 +3351,7 @@ function renderEmbedEvent(ev) {
 let appSettings = {
   bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
-  gameplay: { groupId: '', orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] },
+  gameplay: { groupId: '', orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, showName: true, showCount: true, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] },
   // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
   specialEffects: {
     clearQueue:      { enabled: false, typeid: null, giftName: '', iconUrl: '' },
@@ -4154,6 +4165,12 @@ if (els.gameplayTextColor) {
 }
 if (els.gameplayUppercase) {
   els.gameplayUppercase.addEventListener('change', () => saveGameplaySettings({ uppercase: els.gameplayUppercase.checked }));
+}
+if (els.gameplayShowName) {
+  els.gameplayShowName.addEventListener('change', () => saveGameplaySettings({ showName: els.gameplayShowName.checked }));
+}
+if (els.gameplayShowCount) {
+  els.gameplayShowCount.addEventListener('change', () => saveGameplaySettings({ showCount: els.gameplayShowCount.checked }));
 }
 if (els.gameplayIconSize) {
   els.gameplayIconSize.addEventListener('input', () => {
