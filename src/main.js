@@ -408,13 +408,17 @@ app.whenReady().then(async () => {
     root: ROOT,
     port: obsCfg.port || 18181,
     token: obsCfg.token,
-    onEffectEnded: () => {
-      if (win && !win.isDestroyed()) {
+    onEffectEnded: ({ overlayId }) => {
+      const cfg = mapping?.overlays?.find(o => o.id === overlayId);
+      const target = cfg?.target || 'native';
+      if (target === 'obs' && win && !win.isDestroyed()) {
         try { win.webContents.send('overlay:effect-ended'); } catch {}
       }
     },
-    onQueueEmpty: () => {
-      if (win && !win.isDestroyed()) {
+    onQueueEmpty: ({ overlayId }) => {
+      const cfg = mapping?.overlays?.find(o => o.id === overlayId);
+      const target = cfg?.target || 'native';
+      if (target === 'obs' && win && !win.isDestroyed()) {
         try { win.webContents.send('overlay:queue-empty'); } catch {}
       }
     },
@@ -1252,9 +1256,11 @@ ipcMain.handle('overlay:set-speed', (_e, opts) => {
 
 // Stop hiệu ứng đang playing trên overlay (user xoá item khỏi DSHT)
 ipcMain.handle('overlay:stop-effect', (_e, overlayId) => {
-  if (obsOverlayServer) obsOverlayServer.stopOverlay(overlayId);
+  const cfg = mapping?.overlays?.find(o => o.id === overlayId);
+  const target = cfg?.target || 'native';
+  if (obsOverlayServer && (target === 'obs' || target === 'both')) obsOverlayServer.stopOverlay(overlayId);
   const ov = overlayManager?.overlays?.get(overlayId);
-  if (ov && ov.win && !ov.win.isDestroyed()) {
+  if ((target === 'native' || target === 'both') && ov && ov.win && !ov.win.isDestroyed()) {
     try { ov.win.webContents.send('overlay:stop'); } catch {}
   }
   return { ok: true };
@@ -1271,8 +1277,19 @@ ipcMain.handle('overlay:play', (_e, { overlayId, file, fileUrl: rawUrl }) => {
     return { ok: false, error: 'thiếu file' };
   }
   if (!fs.existsSync(fullPath)) return { ok: false, error: 'file không tồn tại' };
-  const sentToObs = obsOverlayServer ? obsOverlayServer.play(overlayId, fullPath) : false;
-  if (!sentToObs) overlayManager.play(cfg, fileUrl(fullPath));
+  const target = cfg.target || 'native';
+  if (target === 'native') {
+    overlayManager.play(cfg, fileUrl(fullPath));
+  } else if (target === 'obs') {
+    const sentToObs = obsOverlayServer ? obsOverlayServer.play(overlayId, fullPath) : false;
+    if (!sentToObs && win && !win.isDestroyed()) {
+      try { win.webContents.send('bigo:log', `[obs-overlay] ${cfg.name || overlayId}: chưa có OBS Browser Source kết nối, bỏ qua 1 hiệu ứng`); } catch {}
+      setTimeout(() => { try { win.webContents.send('overlay:effect-ended'); } catch {} }, 50);
+    }
+  } else if (target === 'both') {
+    overlayManager.play(cfg, fileUrl(fullPath));
+    if (obsOverlayServer) obsOverlayServer.play(overlayId, fullPath);
+  }
   return { ok: true };
 });
 

@@ -207,6 +207,7 @@
                 <th>Độ đặc</th>
                 <th>Kích thước</th>
                 <th>Vị trí</th>
+                <th>Đích phát</th>
                 <th>Always-top</th>
                 <th>Click-through</th>
                 <th class="actions-col">Thao tác</th>
@@ -670,6 +671,15 @@
         </label>
         <label>Height
           <input type="number" id="ovH" min="100" max="3840" value="960" />
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Đích phát hiệu ứng
+          <select id="ovTarget">
+            <option value="native">Cửa sổ trên máy tính</option>
+            <option value="obs">Link localhost cho OBS</option>
+            <option value="both">Chạy cả 2</option>
+          </select>
         </label>
       </div>
       <div class="form-row">

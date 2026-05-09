@@ -793,7 +793,7 @@ const els = {
   ovName: $('ovName'), ovBgColor: $('ovBgColor'), ovOpacity: $('ovOpacity'), ovOpacityVal: $('ovOpacityVal'),
   ovW: $('ovW'), ovH: $('ovH'), ovTop: $('ovTop'), ovClickThrough: $('ovClickThrough'),
   ovAutoHide: $('ovAutoHide'), ovLockRatio: $('ovLockRatio'),
-  ovAutoOpen: $('ovAutoOpen'), ovAutoFocus: $('ovAutoFocus'),
+  ovAutoOpen: $('ovAutoOpen'), ovAutoFocus: $('ovAutoFocus'), ovTarget: $('ovTarget'),
   dlgOverlaySave: $('dlgOverlaySave'),
 };
 
@@ -2053,10 +2053,12 @@ els.btnTestGift.onclick = async () => {
 // =================== Overlay Table ===================
 function renderOverlayTable() {
   if (mapping.overlays.length === 0) {
-    els.overlayTableBody.innerHTML = '<tr><td colspan="8" style="color:#555;text-align:center;padding:20px">Chưa có overlay — bấm "+ Thêm overlay"</td></tr>';
+    els.overlayTableBody.innerHTML = '<tr><td colspan="9" style="color:#555;text-align:center;padding:20px">Chưa có overlay — bấm "+ Thêm overlay"</td></tr>';
   } else {
     els.overlayTableBody.innerHTML = mapping.overlays.map(o => {
       const b = o.bounds || {};
+      const target = o.target || 'native';
+      const targetText = target === 'obs' ? '🔗 OBS' : target === 'both' ? '🖥 + 🔗' : '🖥 Máy tính';
       const lockBtn = o.clickThrough
         ? `<button class="tiny" data-act="unlock" data-id="${o.id}" title="Đang khoá - bấm để mở khoá">🔓</button>`
         : `<button class="tiny" data-act="lock" data-id="${o.id}" title="Bật click-through OBS mode">🔒</button>`;
@@ -2066,6 +2068,7 @@ function renderOverlayTable() {
         <td>${Math.round((o.opacity ?? 1) * 100)}%</td>
         <td>${b.width || '?'} × ${b.height || '?'}</td>
         <td>${b.x != null ? `${Math.round(b.x)}, ${Math.round(b.y)}` : 'auto'}</td>
+        <td>${targetText}</td>
         <td>${o.alwaysOnTop ? '✓' : '—'}</td>
         <td>${o.clickThrough ? '🔒 Có' : '—'}</td>
         <td class="actions-col">
@@ -2130,6 +2133,7 @@ function openOverlayDialog(ov = null) {
   els.ovH.value = ov?.bounds?.height || 960;
   els.ovTop.checked = ov?.alwaysOnTop !== false;
   els.ovClickThrough.checked = !!ov?.clickThrough;
+  if (els.ovTarget) els.ovTarget.value = ov?.target || 'native';
   els.ovAutoHide.checked = !!ov?.autoHide;
   if (els.ovLockRatio) els.ovLockRatio.checked = ov?.lockRatio !== false;
   if (els.ovAutoOpen) els.ovAutoOpen.checked = !!ov?.autoOpen;
@@ -2155,6 +2159,7 @@ els.dlgOverlaySave.onclick = async (e) => {
     },
     alwaysOnTop: els.ovTop.checked,
     clickThrough: els.ovClickThrough.checked,
+    target: els.ovTarget ? els.ovTarget.value : 'native',
     autoHide: els.ovAutoHide.checked,
     lockRatio: els.ovLockRatio ? els.ovLockRatio.checked : true,
     autoOpen: els.ovAutoOpen ? els.ovAutoOpen.checked : false,
