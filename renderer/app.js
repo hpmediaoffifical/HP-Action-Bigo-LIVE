@@ -166,6 +166,7 @@ function pushPlayBatch(item, ev, playTimes) {
       count: 1, step: i + 1, total: playTimes,
       diamond: baseDiamond,
       mediaFile, overlayId,
+      pauseBgm: !!item?.pauseBgm,
       itemId: item?.id || null,
       status: 'queued', // tất cả queued — processor sẽ pick first
       playTimes: 1,
@@ -211,6 +212,7 @@ function insertBatchByQueuePriority(batch, priority) {
 
 async function playQueueItem(q) {
   if (!q || !q.overlayId || !q.mediaFile || !window.bigo.overlayPlay) return;
+  if (q.pauseBgm) pauseBgmForEffect();
   if (window.bigo.effectsExists) {
     let exists = true;
     try { exists = await window.bigo.effectsExists(q.mediaFile); } catch { exists = false; }
@@ -276,6 +278,7 @@ if (window.bigo.onOverlayEffectEnded) {
       if (queueItems.length > 0 && !queueItems.some(q => q.status === 'playing')) {
         markNextQueueItemPlaying();
       }
+      syncBgmAfterQueueChange();
       // Decrement 🎵 counter khi item end naturally
       sessionStats.effects = Math.max(0, sessionStats.effects - 1);
       updateConnectStats();
@@ -425,6 +428,7 @@ function removeQueueItemById(id) {
   if (removed.status === 'playing' && queueItems.length > 0) {
     markNextQueueItemPlaying(removed.overlayId ? 550 : 0);
   }
+  syncBgmAfterQueueChange();
   // Decrement counter 🎵 effects
   sessionStats.effects = Math.max(0, sessionStats.effects - 1);
   updateConnectStats();
@@ -446,6 +450,7 @@ function clearAllQueue() {
   sessionStats.effects = Math.max(0, sessionStats.effects - queueItems.length);
   updateConnectStats();
   queueItems.length = 0;
+  syncBgmAfterQueueChange();
   renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats();
   forwardQueueSnapshot();
   if (window.bigo.popupResetQueue) window.bigo.popupResetQueue().catch(() => {});
@@ -656,6 +661,7 @@ function queueStopById(id) {
   }
   q.status = 'queued';
   q.stoppedAt = Date.now();
+  syncBgmAfterQueueChange();
   renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
 }
 
@@ -1766,7 +1772,7 @@ async function groupAction(act, gid, value, itemId) {
       // Lấy số lượng từ input cùng row
       const countInput = document.querySelector(`.play-count[data-iid="${itemId}"]`);
       const playTimes = Math.max(1, Math.min(1000, parseInt(countInput?.value || '1', 10) || 1));
-      if (found.item.pauseBgm) pauseBgmForEffect();
+      // BGM pause/resume chạy theo item đang phát trong playQueueItem().
       // Pre-effect: phát ÂM THANH/VIDEO trước (1 lần) nếu cả gift + setting cùng bật
       maybeDispatchPreEffect(found.item);
       // Manual play cũng counter 🎵 effects để user thấy stats hoạt động khi test
@@ -2639,8 +2645,7 @@ function renderParsed(ev) {
     }
     if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
       // Mỗi quà/combo tương ứng 1 hàng hành động. Ví dụ Bell x10 → 10 hàng.
-      // Tạm dừng nhạc nền nếu gift cấu hình "không chạy chung"
-      if (matched.pauseBgm) pauseBgmForEffect();
+      // BGM pause/resume chạy theo item đang phát trong playQueueItem().
       // Pre-effect: phát ÂM THANH/VIDEO trước MỘT LẦN (không lặp theo combo)
       maybeDispatchPreEffect(matched);
       pushQueue(ev, matched, playTimes);
@@ -3607,10 +3612,12 @@ if (_newGroupInput) {
 // KHÔNG reset currentTime — pause/play giữ vị trí gốc (nhạc tiếp tục từ chỗ ngắt).
 let bgmPausedForEffect = false;
 let bgmResumeTimer = null;
+let bgmResumeAt = 0;
 function pauseBgmForEffect() {
   if (!els.bgmAudio || !els.bgmAudio.src) return;
   // Chỉ pause nếu đang phát (nếu đã pause thủ công thì không can thiệp)
   if (!els.bgmAudio.paused) {
+    bgmResumeAt = els.bgmAudio.currentTime || 0;
     els.bgmAudio.pause();
     bgmPausedForEffect = true;
   }
@@ -3623,14 +3630,21 @@ function resumeBgmAfterEffect() {
   if (!bgmPausedForEffect) return;
   bgmPausedForEffect = false;
   if (els.bgmAudio && els.bgmAudio.src) {
-    // play() resume từ currentTime hiện tại — không reset về 0
+    // Giữ vị trí cũ nếu browser/audio device reset currentTime khi pause/resume.
+    if (bgmResumeAt > 0 && (els.bgmAudio.currentTime || 0) < 0.25) {
+      try { els.bgmAudio.currentTime = bgmResumeAt; } catch {}
+    }
     els.bgmAudio.play().catch(() => {});
   }
+}
+function syncBgmAfterQueueChange() {
+  const shouldStayPaused = queueItems.some(q => q.status === 'playing' && q.pauseBgm);
+  if (!shouldStayPaused) resumeBgmAfterEffect();
 }
 // Hook IPC overlay:queue-empty từ main process
 if (window.bigo.onOverlayQueueEmpty) {
   window.bigo.onOverlayQueueEmpty(() => {
-    resumeBgmAfterEffect();
+    syncBgmAfterQueueChange();
   });
 }
 
