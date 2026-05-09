@@ -207,18 +207,31 @@
         </div>
         <h3 class="gameplay-section-title">Review xem trực tiếp</h3>
         <div id="gameplayReview" class="gameplay-review"></div>
+        <div class="gameplay-grid-head">
+          <div>
+            <h3 class="gameplay-section-title">Bố cục lưới</h3>
+            <div class="gameplay-section-subtitle">Bấm ô để chọn quà, kéo thả để đổi vị trí, tích để bật/tắt trên Review và OBS.</div>
+          </div>
+          <div class="gameplay-grid-actions">
+            <button id="btnGameplayAddCol" class="tiny">+ Cột</button>
+            <button id="btnGameplayAddRow" class="tiny">+ Hàng</button>
+            <button id="btnGameplayDelCol" class="tiny danger">- Cột</button>
+            <button id="btnGameplayDelRow" class="tiny danger">- Hàng</button>
+          </div>
+        </div>
+        <div id="gameplayGridEditor" class="gameplay-grid-editor"></div>
         <h3 class="gameplay-section-title">Chỉnh sửa</h3>
-        <div class="row">
-          <label>Nhóm quà
+        <div class="gameplay-edit-panel">
+          <label class="gameplay-field">Nhóm quà
             <select id="gameplayGroup"></select>
           </label>
-          <label>Hướng hiển thị
+          <label class="gameplay-field">Hướng hiển thị
             <select id="gameplayOrientation">
               <option value="horizontal">Ngang</option>
               <option value="vertical">Dọc</option>
             </select>
           </label>
-          <label>Vị trí chữ theo icon
+          <label class="gameplay-field">Vị trí chữ theo icon
             <select id="gameplayLabelPosition">
               <option value="bottom">Dưới icon</option>
               <option value="top">Trên icon</option>
@@ -236,6 +249,8 @@
             <label>Font chữ<select id="gameplayTextFont"><option value="Segoe UI">Segoe UI</option><option value="Arial">Arial</option><option value="Tahoma">Tahoma</option><option value="Impact">Impact</option><option value="Consolas">Consolas</option></select></label>
             <label>Màu chữ<input id="gameplayTextColor" type="color" value="#ffffff" /></label>
             <label class="gameplay-switch"><span>In hoa tên quà</span><input id="gameplayUppercase" type="checkbox" /></label>
+            <label>Kích thước icon <span id="gameplayIconSizeVal">54px</span><input id="gameplayIconSize" type="range" min="28" max="120" value="54" /></label>
+            <label>Khoảng cách ngang <span id="gameplayItemGapVal">10px</span><input id="gameplayItemGap" type="range" min="0" max="60" value="10" /></label>
           </div>
           <div class="gameplay-option-group">
             <div class="gameplay-option-title">Hiệu ứng nổi bật</div>

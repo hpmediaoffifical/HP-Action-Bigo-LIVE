@@ -784,11 +784,11 @@ const els = {
   qCardIcon: $('qCardIcon'), qCardIconVal: $('qCardIconVal'),
   qCardCount: $('qCardCount'), qCardCountVal: $('qCardCountVal'),
   gameplayGroup: $('gameplayGroup'), gameplayOrientation: $('gameplayOrientation'), gameplayLabelPosition: $('gameplayLabelPosition'),
-  gameplayNameMode: $('gameplayNameMode'), gameplayEnlargeActive: $('gameplayEnlargeActive'), gameplayActiveScale: $('gameplayActiveScale'), gameplayActiveScaleVal: $('gameplayActiveScaleVal'),
+  gameplayNameMode: $('gameplayNameMode'), gameplayIconSize: $('gameplayIconSize'), gameplayIconSizeVal: $('gameplayIconSizeVal'), gameplayItemGap: $('gameplayItemGap'), gameplayItemGapVal: $('gameplayItemGapVal'), gameplayEnlargeActive: $('gameplayEnlargeActive'), gameplayActiveScale: $('gameplayActiveScale'), gameplayActiveScaleVal: $('gameplayActiveScaleVal'),
   gameplayCardBg: $('gameplayCardBg'), gameplayCardOpacity: $('gameplayCardOpacity'), gameplayCardOpacityVal: $('gameplayCardOpacityVal'),
   gameplayTextFont: $('gameplayTextFont'), gameplayTextColor: $('gameplayTextColor'), gameplayUppercase: $('gameplayUppercase'),
   gameplayCenterLargest: $('gameplayCenterLargest'), gameplayGrayInactive: $('gameplayGrayInactive'), gameplayKeepScore: $('gameplayKeepScore'),
-  gameplayReview: $('gameplayReview'), gameplayItems: $('gameplayItems'), btnGameplaySave: $('btnGameplaySave'), btnGameplayCopyUrl: $('btnGameplayCopyUrl'),
+  gameplayReview: $('gameplayReview'), gameplayGridEditor: $('gameplayGridEditor'), gameplayItems: $('gameplayItems'), btnGameplayAddCol: $('btnGameplayAddCol'), btnGameplayAddRow: $('btnGameplayAddRow'), btnGameplayDelCol: $('btnGameplayDelCol'), btnGameplayDelRow: $('btnGameplayDelRow'), btnGameplaySave: $('btnGameplaySave'), btnGameplayCopyUrl: $('btnGameplayCopyUrl'),
   // Gift dialog extras
   dlgPauseBgm: $('dlgPauseBgm'), dlgPreFx: $('dlgPreFx'),
   effectQueue: $('effectQueue'), btnClearQueue: $('btnClearQueue'),
@@ -1670,7 +1670,7 @@ function getGameplayMatchKeys(item) {
 }
 
 function normalizeGameplaySettings() {
-  if (!appSettings.gameplay) appSettings.gameplay = { groupId: '', orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, order: [], hiddenIds: [] };
+  if (!appSettings.gameplay) appSettings.gameplay = { groupId: '', orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] };
   const groups = getGameplayGroups();
   if (!groups.length) return null;
   let group = groups.find(g => g.id === appSettings.gameplay.groupId) || groups[0];
@@ -1683,23 +1683,71 @@ function normalizeGameplaySettings() {
   if (!['Segoe UI', 'Arial', 'Tahoma', 'Impact', 'Consolas'].includes(appSettings.gameplay.textFont)) appSettings.gameplay.textFont = 'Segoe UI';
   appSettings.gameplay.uppercase = !!appSettings.gameplay.uppercase;
   appSettings.gameplay.cardOpacity = Math.max(20, Math.min(100, parseInt(appSettings.gameplay.cardOpacity, 10) || 86));
+  appSettings.gameplay.iconSize = Math.max(28, Math.min(120, parseInt(appSettings.gameplay.iconSize, 10) || 54));
+  appSettings.gameplay.itemGap = Math.max(0, Math.min(60, Number.isFinite(parseInt(appSettings.gameplay.itemGap, 10)) ? parseInt(appSettings.gameplay.itemGap, 10) : 10));
   appSettings.gameplay.activeScale = Math.max(100, Math.min(200, parseInt(appSettings.gameplay.activeScale, 10) || 140));
   appSettings.gameplay.enlargeActive = !!appSettings.gameplay.enlargeActive;
   appSettings.gameplay.centerLargest = !!appSettings.gameplay.centerLargest;
   appSettings.gameplay.grayInactive = !!appSettings.gameplay.grayInactive;
   appSettings.gameplay.keepScore = !!appSettings.gameplay.keepScore;
+  appSettings.gameplay.gridCols = Math.max(1, Math.min(40, parseInt(appSettings.gameplay.gridCols, 10) || 5));
+  appSettings.gameplay.gridRows = Math.max(1, Math.min(40, parseInt(appSettings.gameplay.gridRows, 10) || 1));
   const ids = new Set((group.items || []).map(i => i.id));
   appSettings.gameplay.order = (appSettings.gameplay.order || []).filter(id => ids.has(id));
   for (const item of (group.items || [])) {
     if (!appSettings.gameplay.order.includes(item.id)) appSettings.gameplay.order.push(item.id);
   }
   appSettings.gameplay.hiddenIds = (appSettings.gameplay.hiddenIds || []).filter(id => ids.has(id));
+  appSettings.gameplay.gridRows = Math.max(appSettings.gameplay.gridRows, Math.ceil(appSettings.gameplay.order.length / appSettings.gameplay.gridCols) || 1);
+  const slotCount = appSettings.gameplay.gridCols * appSettings.gameplay.gridRows;
+  const currentSlots = Array.isArray(appSettings.gameplay.gridSlots) ? appSettings.gameplay.gridSlots : [];
+  appSettings.gameplay.gridSlots = Array.from({ length: slotCount }, (_, idx) => {
+    const slot = currentSlots[idx] || {};
+    const itemId = ids.has(slot.itemId) ? slot.itemId : '';
+    return { itemId, text: String(slot.text || ''), visible: slot.visible !== false };
+  });
+  let fillIdx = 0;
+  for (const itemId of appSettings.gameplay.order) {
+    if (appSettings.gameplay.gridSlots.some(s => s.itemId === itemId)) continue;
+    while (fillIdx < slotCount && appSettings.gameplay.gridSlots[fillIdx].itemId) fillIdx++;
+    if (fillIdx >= slotCount) break;
+    appSettings.gameplay.gridSlots[fillIdx].itemId = itemId;
+  }
   return group;
 }
 
 function getGameplayOrderedItems(group) {
   const byId = new Map((group?.items || []).map(item => [item.id, item]));
   return (appSettings.gameplay.order || []).map(id => byId.get(id)).filter(Boolean);
+}
+
+function getGameplayItemById(itemId) {
+  return findItemById(itemId)?.item || null;
+}
+
+function getGameplayItemName(item) {
+  return item?.alias || (item?.matchKeys || [])[0] || 'Quà';
+}
+
+function buildGameplaySlots() {
+  const slots = appSettings.gameplay.gridSlots || [];
+  return slots.map((slot, idx) => {
+    const item = getGameplayItemById(slot.itemId);
+    const visible = slot.visible !== false;
+    if (!item) return { index: idx, itemId: '', text: slot.text || '', visible };
+    const name = slot.text || getGameplayItemName(item);
+    return {
+      index: idx,
+      itemId: item.id,
+      id: item.id,
+      name,
+      text: slot.text || '',
+      visible,
+      icon: getGameplayItemIcon(item),
+      iconId: getGameplayItemIconId(item),
+      matchKeys: getGameplayMatchKeys(item),
+    };
+  });
 }
 
 function buildGameplayConfig() {
@@ -1715,11 +1763,16 @@ function buildGameplayConfig() {
     textFont: appSettings.gameplay.textFont,
     textColor: appSettings.gameplay.textColor,
     uppercase: appSettings.gameplay.uppercase,
+    iconSize: appSettings.gameplay.iconSize,
+    itemGap: appSettings.gameplay.itemGap,
     enlargeActive: appSettings.gameplay.enlargeActive,
     activeScale: appSettings.gameplay.activeScale,
     centerLargest: appSettings.gameplay.centerLargest,
     grayInactive: appSettings.gameplay.grayInactive,
     keepScore: appSettings.gameplay.keepScore,
+    gridCols: appSettings.gameplay.gridCols,
+    gridRows: appSettings.gameplay.gridRows,
+    slots: buildGameplaySlots(),
     items: getGameplayOrderedItems(group).filter(item => !hidden.has(item.id)).map(item => ({
       id: item.id,
       name: item.alias || (item.matchKeys || [])[0] || 'Quà',
@@ -1777,6 +1830,22 @@ function orderGameplayItemsForDisplay(items) {
   return arr;
 }
 
+function getGameplayDisplaySlots() {
+  const slots = buildGameplaySlots();
+  if (!appSettings.gameplay?.centerLargest || slots.length < 3) return slots;
+  let maxIdx = -1;
+  let maxCount = 0;
+  slots.forEach((slot, idx) => {
+    const count = slot.itemId ? (gameplayReviewState.get(slot.itemId)?.count || 0) : 0;
+    if (count > maxCount) { maxCount = count; maxIdx = idx; }
+  });
+  if (maxIdx < 0 || maxCount <= 0) return slots;
+  const arr = [...slots];
+  const [top] = arr.splice(maxIdx, 1);
+  arr.splice(Math.floor(arr.length / 2), 0, top);
+  return arr.map((slot, idx) => ({ ...slot, index: idx }));
+}
+
 function gameplayNameClass(name) {
   const mode = appSettings.gameplay?.nameMode || 'marquee';
   if (mode === 'wrap') return ' wrap';
@@ -1795,9 +1864,12 @@ function renderGameplayReview() {
   if (!els.gameplayReview) return;
   const baseItems = getGameplayVisibleItems();
   const activeIds = getGameplayActiveIdsFromQueue(baseItems);
-  const items = orderGameplayItemsForDisplay(baseItems);
+  const slots = getGameplayDisplaySlots();
+  const hidden = new Set(appSettings.gameplay?.hiddenIds || []);
   els.gameplayReview.classList.toggle('vertical', appSettings.gameplay?.orientation === 'vertical');
+  els.gameplayReview.classList.add('grid-mode');
   els.gameplayReview.dataset.labelPosition = appSettings.gameplay?.labelPosition || 'bottom';
+  els.gameplayReview.style.setProperty('--gameplay-grid-cols', appSettings.gameplay?.gridCols || 10);
   els.gameplayReview.classList.toggle('gray-inactive', !!appSettings.gameplay?.grayInactive);
   els.gameplayReview.style.setProperty('--gameplay-active-scale', String((appSettings.gameplay?.activeScale || 140) / 100));
   const bg = hexToRgb(appSettings.gameplay?.cardBg || '#8d8d8d');
@@ -1805,24 +1877,34 @@ function renderGameplayReview() {
   els.gameplayReview.style.setProperty('--gameplay-card-opacity', String((appSettings.gameplay?.cardOpacity || 86) / 100));
   els.gameplayReview.style.setProperty('--gameplay-text-color', appSettings.gameplay?.textColor || '#ffffff');
   els.gameplayReview.style.setProperty('--gameplay-text-font', `'${String(appSettings.gameplay?.textFont || 'Segoe UI').replace(/'/g, '')}', sans-serif`);
+  const iconSize = Math.max(28, Math.min(120, parseInt(appSettings.gameplay?.iconSize, 10) || 54));
+  const parsedItemGap = parseInt(appSettings.gameplay?.itemGap, 10);
+  const itemGap = Math.max(0, Math.min(60, Number.isFinite(parsedItemGap) ? parsedItemGap : 10));
+  els.gameplayReview.style.setProperty('--gameplay-icon-size', `${iconSize}px`);
+  els.gameplayReview.style.setProperty('--gameplay-icon-lift', `${Math.round(iconSize / 2)}px`);
+  els.gameplayReview.style.setProperty('--gameplay-item-gap', `${itemGap}px`);
   els.gameplayReview.classList.toggle('uppercase', !!appSettings.gameplay?.uppercase);
-  if (!items.length) {
+  if (!slots.length) {
     els.gameplayReview.innerHTML = '<div class="gameplay-empty">Chưa bật quà nào để hiển thị Review.</div>';
     return;
   }
-  els.gameplayReview.innerHTML = items.map(item => {
-    const icon = getGameplayItemIcon(item);
-    const name = item.alias || (item.matchKeys || [])[0] || 'Quà';
-    const st = gameplayReviewState.get(item.id) || { count: 0 };
+  els.gameplayReview.innerHTML = slots.map(slot => {
+    if (!slot.itemId || slot.visible === false || hidden.has(slot.itemId)) {
+      return `<div class="gameplay-review-cell empty" data-slot="${slot.index}"></div>`;
+    }
+    const icon = slot.icon || '';
+    const name = slot.name || 'Quà';
+    const st = gameplayReviewState.get(slot.itemId) || { count: 0 };
     const labelPosition = appSettings.gameplay?.labelPosition || 'bottom';
-    const isActive = activeIds.has(item.id);
+    const isActive = activeIds.has(slot.itemId);
     const classes = [
+      'gameplay-review-cell',
       'gameplay-review-card',
       `label-${labelPosition}`,
       isActive ? 'active' : '',
       appSettings.gameplay?.enlargeActive && isActive ? 'enlarged' : '',
     ].filter(Boolean).join(' ');
-    return `<div class="${escapeHtml(classes)}" data-iid="${escapeHtml(item.id)}">
+    return `<div class="${escapeHtml(classes)}" data-iid="${escapeHtml(slot.itemId)}" data-slot="${slot.index}">
       <div class="gameplay-review-icon-wrap">
         ${icon ? `<img src="${escapeHtml(icon)}" loading="lazy" />` : '<div class="gameplay-review-icon-empty"></div>'}
         ${st.count ? `<span class="queue-card-count gameplay-review-count">${Number(st.count).toLocaleString('en-US')}</span>` : ''}
@@ -1901,12 +1983,122 @@ async function saveGameplayToObs() {
   appendLog('[group dance] đã lưu và cập nhật OBS overlay');
 }
 
+function renderGameplayGridEditor(group) {
+  if (!els.gameplayGridEditor) return;
+  normalizeGameplaySettings();
+  const items = getGameplayOrderedItems(group || findGroupById(appSettings.gameplay.groupId));
+  els.gameplayGridEditor.style.setProperty('--gameplay-grid-cols', appSettings.gameplay.gridCols || 10);
+  els.gameplayGridEditor.innerHTML = (appSettings.gameplay.gridSlots || []).map((slot, idx) => {
+    const item = getGameplayItemById(slot.itemId);
+    const icon = item ? getGameplayItemIcon(item) : '';
+    const name = item ? getGameplayItemName(item) : 'Chọn quà';
+    const visible = slot.visible !== false;
+    const pickerItems = items.map(pickerItem => {
+      const pickerIcon = getGameplayItemIcon(pickerItem);
+      const pickerName = getGameplayItemName(pickerItem);
+      return `<button type="button" class="slot-picker-item" data-slot-pick="${idx}" data-item-id="${escapeHtml(pickerItem.id)}">${pickerIcon ? `<img src="${escapeHtml(pickerIcon)}" loading="lazy" />` : '<span class="slot-picker-empty"></span>'}<span>${escapeHtml(pickerName)}</span></button>`;
+    }).join('');
+    return `<div class="gameplay-grid-slot ${visible ? '' : 'slot-hidden'}" draggable="true" data-slot="${idx}">
+      <div class="slot-topline">
+        <span class="slot-index">#${idx + 1}</span>
+        <span class="slot-drag" title="Kéo để đổi vị trí">☰</span>
+        <button type="button" class="slot-check ${visible ? 'on' : ''}" data-slot-visible="${idx}" title="${visible ? 'Đang hiển thị trên Review/OBS' : 'Đang ẩn khỏi Review/OBS'}">${visible ? '✓' : ''}</button>
+      </div>
+      <button type="button" class="slot-thumb" data-slot-open="${idx}" title="Chọn quà">${icon ? `<img src="${escapeHtml(icon)}" loading="lazy" />` : '<span>+</span>'}</button>
+      <div class="slot-info-row">
+        <span class="slot-current-name">${escapeHtml(name)}</span>
+        <button type="button" class="tiny" data-slot-open="${idx}">Đổi</button>
+      </div>
+      <input data-slot-text="${idx}" value="${escapeHtml(slot.text || '')}" placeholder="Tên hiển thị" />
+      <div class="slot-picker" hidden>
+        <button type="button" class="slot-picker-item muted" data-slot-clear="${idx}"><span>+</span><span>Ô trống</span></button>
+        ${pickerItems}
+      </div>
+    </div>`;
+  }).join('');
+  wireGameplayGridEditorDrag();
+}
+
+function wireGameplayGridEditorDrag() {
+  if (!els.gameplayGridEditor) return;
+  let dragIdx = null;
+  els.gameplayGridEditor.querySelectorAll('.gameplay-grid-slot').forEach(cell => {
+    cell.ondragstart = () => { dragIdx = parseInt(cell.dataset.slot, 10); cell.classList.add('dragging'); };
+    cell.ondragend = () => { cell.classList.remove('dragging'); els.gameplayGridEditor.querySelectorAll('.drop-target').forEach(x => x.classList.remove('drop-target')); };
+    cell.ondragover = (e) => { e.preventDefault(); cell.classList.add('drop-target'); };
+    cell.ondragleave = () => cell.classList.remove('drop-target');
+    cell.ondrop = (e) => {
+      e.preventDefault();
+      const targetIdx = parseInt(cell.dataset.slot, 10);
+      if (!Number.isFinite(dragIdx) || !Number.isFinite(targetIdx) || dragIdx === targetIdx) return;
+      const slots = [...(appSettings.gameplay.gridSlots || [])];
+      [slots[dragIdx], slots[targetIdx]] = [slots[targetIdx], slots[dragIdx]];
+      saveGameplaySettings({ gridSlots: slots });
+    };
+  });
+}
+
+function resizeGameplayGrid(cols, rows) {
+  normalizeGameplaySettings();
+  cols = Math.max(1, Math.min(40, parseInt(cols, 10) || 5));
+  rows = Math.max(1, Math.min(40, parseInt(rows, 10) || 1));
+  const oldCols = appSettings.gameplay.gridCols;
+  const oldRows = appSettings.gameplay.gridRows;
+  const oldSlots = appSettings.gameplay.gridSlots || [];
+  const nextSlots = Array.from({ length: cols * rows }, () => ({ itemId: '', text: '', visible: true }));
+  for (let r = 0; r < Math.min(oldRows, rows); r++) {
+    for (let c = 0; c < Math.min(oldCols, cols); c++) {
+      nextSlots[r * cols + c] = oldSlots[r * oldCols + c] || { itemId: '', text: '' };
+    }
+  }
+  saveGameplaySettings({ gridCols: cols, gridRows: rows, gridSlots: nextSlots });
+}
+
+function slotHasContent(slot) {
+  return !!(slot?.itemId || String(slot?.text || '').trim());
+}
+
+async function deleteGameplayGridColumn() {
+  normalizeGameplaySettings();
+  const cols = appSettings.gameplay.gridCols || 5;
+  const rows = appSettings.gameplay.gridRows || 1;
+  if (cols <= 1) return;
+  const slots = appSettings.gameplay.gridSlots || [];
+  const removed = [];
+  for (let r = 0; r < rows; r++) removed.push(slots[r * cols + cols - 1]);
+  if (removed.some(slotHasContent)) {
+    const ok = await appConfirm({ title: 'Xoá cột cuối?', message: 'Cột cuối đang có quà hoặc chữ.', detail: 'Chọn Có để xoá cột và các ô trong cột này.', okText: 'Có, xoá cột', cancelText: 'Không', danger: true });
+    if (!ok) return;
+  }
+  const nextSlots = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols - 1; c++) nextSlots.push(slots[r * cols + c] || { itemId: '', text: '', visible: true });
+  }
+  saveGameplaySettings({ gridCols: cols - 1, gridRows: rows, gridSlots: nextSlots });
+}
+
+async function deleteGameplayGridRow() {
+  normalizeGameplaySettings();
+  const cols = appSettings.gameplay.gridCols || 5;
+  const rows = appSettings.gameplay.gridRows || 1;
+  if (rows <= 1) return;
+  const slots = appSettings.gameplay.gridSlots || [];
+  const start = (rows - 1) * cols;
+  const removed = slots.slice(start, start + cols);
+  if (removed.some(slotHasContent)) {
+    const ok = await appConfirm({ title: 'Xoá hàng cuối?', message: 'Hàng cuối đang có quà hoặc chữ.', detail: 'Chọn Có để xoá hàng và các ô trong hàng này.', okText: 'Có, xoá hàng', cancelText: 'Không', danger: true });
+    if (!ok) return;
+  }
+  saveGameplaySettings({ gridCols: cols, gridRows: rows - 1, gridSlots: slots.slice(0, start) });
+}
+
 function renderGameplayUi() {
   if (!els.gameplayGroup || !els.gameplayItems) return;
   const groups = getGameplayGroups();
   if (!groups.length) {
     els.gameplayGroup.innerHTML = '<option value="">Chưa có nhóm</option>';
-    els.gameplayItems.innerHTML = '<div class="gameplay-empty">Chưa có nhóm quà để xuất overlay.</div>';
+    els.gameplayItems.innerHTML = '';
+    if (els.gameplayGridEditor) els.gameplayGridEditor.innerHTML = '';
     renderGameplayReview();
     sendGameplayConfig();
     syncGameplayCountsFromQueue();
@@ -1924,6 +2116,10 @@ function renderGameplayUi() {
   if (els.gameplayTextFont) els.gameplayTextFont.value = appSettings.gameplay.textFont;
   if (els.gameplayTextColor) els.gameplayTextColor.value = appSettings.gameplay.textColor;
   if (els.gameplayUppercase) els.gameplayUppercase.checked = !!appSettings.gameplay.uppercase;
+  if (els.gameplayIconSize) els.gameplayIconSize.value = appSettings.gameplay.iconSize;
+  if (els.gameplayIconSizeVal) els.gameplayIconSizeVal.textContent = `${appSettings.gameplay.iconSize}px`;
+  if (els.gameplayItemGap) els.gameplayItemGap.value = appSettings.gameplay.itemGap;
+  if (els.gameplayItemGapVal) els.gameplayItemGapVal.textContent = `${appSettings.gameplay.itemGap}px`;
   if (els.gameplayEnlargeActive) els.gameplayEnlargeActive.checked = !!appSettings.gameplay.enlargeActive;
   if (els.gameplayActiveScale) els.gameplayActiveScale.value = appSettings.gameplay.activeScale;
   if (els.gameplayActiveScaleVal) els.gameplayActiveScaleVal.textContent = `${appSettings.gameplay.activeScale}%`;
@@ -1931,32 +2127,17 @@ function renderGameplayUi() {
   if (els.gameplayGrayInactive) els.gameplayGrayInactive.checked = !!appSettings.gameplay.grayInactive;
   if (els.gameplayKeepScore) els.gameplayKeepScore.checked = !!appSettings.gameplay.keepScore;
 
-  const hidden = new Set(appSettings.gameplay.hiddenIds || []);
   const items = getGameplayOrderedItems(group);
   if (!items.length) {
-    els.gameplayItems.innerHTML = '<div class="gameplay-empty">Nhóm này chưa có quà.</div>';
+    els.gameplayItems.innerHTML = '';
+    renderGameplayGridEditor(group);
     renderGameplayReview();
     sendGameplayConfig();
     syncGameplayCountsFromQueue();
     return;
   }
-  els.gameplayItems.innerHTML = items.map((item, idx) => {
-    const icon = getGameplayItemIcon(item);
-    const name = item.alias || (item.matchKeys || [])[0] || 'Quà';
-    const off = hidden.has(item.id);
-    return `<div class="gameplay-item ${off ? 'off' : ''}" data-iid="${escapeHtml(item.id)}">
-      <div class="gameplay-drag">☰</div>
-      ${icon ? `<img class="gameplay-icon" src="${escapeHtml(icon)}" loading="lazy" />` : '<div class="gameplay-icon empty"></div>'}
-      <div class="gameplay-meta">
-        <div class="gameplay-name">${escapeHtml(name)}</div>
-        <div class="gameplay-keys">${escapeHtml((item.matchKeys || []).join(', '))}</div>
-      </div>
-      <button class="tiny" data-gpact="up" ${idx === 0 ? 'disabled' : ''}>↑</button>
-      <button class="tiny" data-gpact="down" ${idx === items.length - 1 ? 'disabled' : ''}>↓</button>
-      <button class="tiny ${off ? '' : 'primary'}" data-gpact="toggle">${off ? 'Bật Review/OBS' : 'Tắt Review/OBS'}</button>
-    </div>`;
-  }).join('');
-  wireGameplayDragDrop();
+  els.gameplayItems.innerHTML = '';
+  renderGameplayGridEditor(group);
   renderGameplayReview();
   sendGameplayConfig();
   syncGameplayCountsFromQueue();
@@ -2078,8 +2259,8 @@ async function moveItem(srcIid, srcGid, dstIid, dstGid) {
 
 function renderGroupCard(grp, overlayMap) {
   const isCommon = !!grp.isCommon;
-  const enabled = isCommon ? true : grp.enabled !== false;
-  const collapsed = !!grp.collapsed;
+    const enabled = isCommon ? true : grp.enabled !== false;
+    const collapsed = !!grp.collapsed;
   const itemsHtml = (grp.items || []).map(item => {
     const iconUrl = getGiftIcon(item);
     const iconCell = iconUrl
@@ -2131,6 +2312,7 @@ function renderGroupCard(grp, overlayMap) {
   return `<div class="group-card ${enabled ? 'on' : 'off'} ${collapsed ? 'collapsed' : ''} ${isCommon ? 'common' : ''}" data-gid="${grp.id}">
     <div class="group-head">
       <span class="group-name">${escapeHtml(grp.name)}</span>
+      <span class="group-head-spacer"></span>
       <span class="group-badge">${(grp.items || []).length} mục</span>
       <button class="tiny" data-act="add-item" data-gid="${grp.id}" title="Thêm quà vào nhóm">+ Thêm quà</button>
       ${editBtn}
@@ -3158,7 +3340,7 @@ function renderEmbedEvent(ev) {
 let appSettings = {
   bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
-  gameplay: { groupId: '', orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, order: [], hiddenIds: [] },
+  gameplay: { groupId: '', orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] },
   // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
   specialEffects: {
     clearQueue:      { enabled: false, typeid: null, giftName: '', iconUrl: '' },
@@ -3973,6 +4155,30 @@ if (els.gameplayTextColor) {
 if (els.gameplayUppercase) {
   els.gameplayUppercase.addEventListener('change', () => saveGameplaySettings({ uppercase: els.gameplayUppercase.checked }));
 }
+if (els.gameplayIconSize) {
+  els.gameplayIconSize.addEventListener('input', () => {
+    const iconSize = Math.max(28, Math.min(120, parseInt(els.gameplayIconSize.value, 10) || 54));
+    if (els.gameplayIconSizeVal) els.gameplayIconSizeVal.textContent = `${iconSize}px`;
+    appSettings.gameplay.iconSize = iconSize;
+    renderGameplayReview();
+    sendGameplayConfig();
+  });
+  els.gameplayIconSize.addEventListener('change', () => saveGameplaySettings({ iconSize: Math.max(28, Math.min(120, parseInt(els.gameplayIconSize.value, 10) || 54)) }));
+}
+if (els.gameplayItemGap) {
+  els.gameplayItemGap.addEventListener('input', () => {
+    const parsedItemGap = parseInt(els.gameplayItemGap.value, 10);
+    const itemGap = Math.max(0, Math.min(60, Number.isFinite(parsedItemGap) ? parsedItemGap : 10));
+    if (els.gameplayItemGapVal) els.gameplayItemGapVal.textContent = `${itemGap}px`;
+    appSettings.gameplay.itemGap = itemGap;
+    renderGameplayReview();
+    sendGameplayConfig();
+  });
+  els.gameplayItemGap.addEventListener('change', () => {
+    const parsedItemGap = parseInt(els.gameplayItemGap.value, 10);
+    saveGameplaySettings({ itemGap: Math.max(0, Math.min(60, Number.isFinite(parsedItemGap) ? parsedItemGap : 10)) });
+  });
+}
 if (els.gameplayEnlargeActive) {
   els.gameplayEnlargeActive.addEventListener('change', () => saveGameplaySettings({ enlargeActive: els.gameplayEnlargeActive.checked }));
 }
@@ -4034,6 +4240,74 @@ if (els.gameplayItems) {
       saveGameplaySettings({ hiddenIds: [...hidden] });
     }
   });
+}
+if (els.gameplayGridEditor) {
+  els.gameplayGridEditor.addEventListener('click', (e) => {
+    const open = e.target.closest('[data-slot-open]');
+    if (open) {
+      const cell = open.closest('.gameplay-grid-slot');
+      const picker = cell?.querySelector('.slot-picker');
+      if (!picker) return;
+      els.gameplayGridEditor.querySelectorAll('.slot-picker').forEach(el => { if (el !== picker) el.hidden = true; });
+      picker.hidden = !picker.hidden;
+      return;
+    }
+    const pick = e.target.closest('[data-slot-pick]');
+    if (pick) {
+      const idx = parseInt(pick.dataset.slotPick, 10);
+      const item = getGameplayItemById(pick.dataset.itemId);
+      if (!item) return;
+      const slots = [...(appSettings.gameplay.gridSlots || [])];
+      slots[idx] = { ...(slots[idx] || {}), itemId: item.id, text: getGameplayItemName(item), visible: true };
+      saveGameplaySettings({ gridSlots: slots });
+      return;
+    }
+    const clear = e.target.closest('[data-slot-clear]');
+    if (clear) {
+      const idx = parseInt(clear.dataset.slotClear, 10);
+      const slots = [...(appSettings.gameplay.gridSlots || [])];
+      slots[idx] = { itemId: '', text: '', visible: true };
+      saveGameplaySettings({ gridSlots: slots });
+      return;
+    }
+    const visible = e.target.closest('[data-slot-visible]');
+    if (visible) {
+      const idx = parseInt(visible.dataset.slotVisible, 10);
+      const slots = [...(appSettings.gameplay.gridSlots || [])];
+      const slot = { ...(slots[idx] || {}) };
+      slot.visible = slot.visible === false;
+      slots[idx] = slot;
+      saveGameplaySettings({ gridSlots: slots });
+      return;
+    }
+  });
+  els.gameplayGridEditor.addEventListener('input', (e) => {
+    const input = e.target.closest('[data-slot-text]');
+    if (!input) return;
+    const idx = parseInt(input.dataset.slotText, 10);
+    const slots = [...(appSettings.gameplay.gridSlots || [])];
+    slots[idx] = { ...(slots[idx] || {}), text: input.value };
+    appSettings.gameplay.gridSlots = slots;
+    renderGameplayReview();
+    sendGameplayConfig();
+  });
+  els.gameplayGridEditor.addEventListener('focusout', (e) => {
+    const input = e.target.closest('[data-slot-text]');
+    if (!input) return;
+    saveAppSettings({ gameplay: appSettings.gameplay }).catch(() => {});
+  });
+}
+if (els.btnGameplayAddCol) {
+  els.btnGameplayAddCol.onclick = () => resizeGameplayGrid((appSettings.gameplay?.gridCols || 5) + 1, appSettings.gameplay?.gridRows || 1);
+}
+if (els.btnGameplayAddRow) {
+  els.btnGameplayAddRow.onclick = () => resizeGameplayGrid(appSettings.gameplay?.gridCols || 5, (appSettings.gameplay?.gridRows || 1) + 1);
+}
+if (els.btnGameplayDelCol) {
+  els.btnGameplayDelCol.onclick = () => deleteGameplayGridColumn().catch(e => alert('Lỗi xoá cột: ' + e.message));
+}
+if (els.btnGameplayDelRow) {
+  els.btnGameplayDelRow.onclick = () => deleteGameplayGridRow().catch(e => alert('Lỗi xoá hàng: ' + e.message));
 }
 
 // =================== Group Edit Dialog ===================

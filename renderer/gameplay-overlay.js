@@ -55,6 +55,21 @@ function orderedItemsForDisplay() {
   items.splice(Math.floor(items.length / 2), 0, top);
   return items;
 }
+function orderedSlotsForDisplay() {
+  const slots = Array.isArray(cfg.slots) ? [...cfg.slots] : [];
+  if (!slots.length) return orderedItemsForDisplay();
+  if (!cfg.centerLargest || slots.length < 3) return slots;
+  let maxIdx = -1;
+  let maxCount = 0;
+  slots.forEach((slot, idx) => {
+    const count = slot.itemId ? (state.get(slot.itemId)?.count || 0) : 0;
+    if (count > maxCount) { maxCount = count; maxIdx = idx; }
+  });
+  if (maxIdx < 0 || maxCount <= 0) return slots;
+  const [top] = slots.splice(maxIdx, 1);
+  slots.splice(Math.floor(slots.length / 2), 0, top);
+  return slots;
+}
 function nameClass(name) {
   const mode = cfg.nameMode || 'marquee';
   if (mode === 'wrap') return ' wrap';
@@ -64,26 +79,38 @@ function nameClass(name) {
 function render() {
   wrap.className = cfg.orientation === 'vertical' ? 'vertical' : '';
   wrap.classList.toggle('gray-inactive', !!cfg.grayInactive);
+  wrap.classList.toggle('grid-mode', Array.isArray(cfg.slots) && cfg.slots.length > 0);
+  wrap.style.setProperty('--grid-cols', parseInt(cfg.gridCols, 10) || 10);
   wrap.style.setProperty('--active-scale', String((parseInt(cfg.activeScale, 10) || 140) / 100));
   const bg = hexToRgb(cfg.cardBg || '#8d8d8d');
   wrap.style.setProperty('--card-bg-rgb', `${bg.r}, ${bg.g}, ${bg.b}`);
   wrap.style.setProperty('--card-opacity', String((parseInt(cfg.cardOpacity, 10) || 86) / 100));
   wrap.style.setProperty('--text-color', cfg.textColor || '#ffffff');
   wrap.style.setProperty('--text-font', `'${String(cfg.textFont || 'Segoe UI').replace(/'/g, '')}', sans-serif`);
+  const iconSize = Math.max(28, Math.min(120, parseInt(cfg.iconSize, 10) || 54));
+  const parsedItemGap = parseInt(cfg.itemGap, 10);
+  const itemGap = Math.max(0, Math.min(60, Number.isFinite(parsedItemGap) ? parsedItemGap : 10));
+  wrap.style.setProperty('--icon-size', `${iconSize}px`);
+  wrap.style.setProperty('--icon-lift', `${Math.round(iconSize / 2)}px`);
+  wrap.style.setProperty('--item-gap', `${itemGap}px`);
   wrap.classList.toggle('uppercase', !!cfg.uppercase);
-  wrap.innerHTML = orderedItemsForDisplay().map(item => {
-    const st = state.get(item.id) || { count: 0 };
+  wrap.innerHTML = orderedSlotsForDisplay().map((item, idx) => {
+    if (item.visible === false || (!item.itemId && !item.id)) {
+      return `<div class="gift empty" data-slot="${idx}"></div>`;
+    }
+    const itemId = item.itemId || item.id;
+    const st = state.get(itemId) || { count: 0 };
     const icon = iconSrc(item);
     const labelPosition = ['top', 'bottom', 'left', 'right'].includes(cfg.labelPosition) ? cfg.labelPosition : 'bottom';
     const name = item.name || '';
-    const isActive = activeIds.has(item.id);
+    const isActive = activeIds.has(itemId);
     const classes = [
       'gift',
       `label-${labelPosition}`,
       isActive ? 'active' : '',
       cfg.enlargeActive && isActive ? 'enlarged' : '',
     ].filter(Boolean).join(' ');
-    return `<div class="${classes}" data-id="${escapeHtml(item.id)}">
+    return `<div class="${classes}" data-id="${escapeHtml(itemId)}">
       <div class="icon-wrap">
         ${icon ? `<img src="${escapeHtml(icon)}" />` : '<div style="width:50px;height:50px"></div>'}
         ${st.count ? `<div class="count">${Number(st.count).toLocaleString('en-US')}</div>` : ''}
