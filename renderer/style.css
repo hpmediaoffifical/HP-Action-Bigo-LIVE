@@ -890,7 +890,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .prio-badge {
   background: linear-gradient(135deg, #fe2c55, #ff8a3d);
   color: #fff;
-  padding: 2px 9px;
+  padding: 2px 8px;
   border-radius: 10px;
   font-size: 11px;
   font-weight: 700;
@@ -902,7 +902,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .pause-bgm-badge {
   background: linear-gradient(135deg, #3a4050, #1c1f28);
   color: #c9d6ff;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border: 1px solid #4a5163;
   border-radius: 10px;
   font-size: 11px;
