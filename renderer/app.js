@@ -819,6 +819,12 @@ function displayEffectName(mediaFile) {
   }
   return name.replace(/\.(webm|mp4|mp3|wav|ogg|gif)$/i, '');
 }
+function isAudioEffectFile(mediaFile) {
+  return /\.(mp3|wav|ogg)(\?|#|$)/i.test(String(mediaFile || ''));
+}
+function autoEnablePauseBgmForAudio(mediaFile) {
+  if (els.dlgPauseBgm && isAudioEffectFile(mediaFile)) els.dlgPauseBgm.checked = true;
+}
 function appendLog(msg) {
   // Log panel đã được bỏ. Giữ console.log để debug qua DevTools.
   if (!els.log) { console.log('[bigo]', msg); return; }
@@ -1495,6 +1501,7 @@ els.dlgPickFile.onclick = async () => {
     }
   }
   els.dlgFile.value = picked.fileUrl;
+  autoEnablePauseBgmForAudio(picked.fileUrl || picked.fileName);
   await autoSaveOpenGiftFields();
   appendLog(`đã chọn ${r.files.length} file (giữ ở vị trí gốc, không copy vào assets/effects)`);
 };
@@ -1921,7 +1928,10 @@ els.dlgMasterFilter.addEventListener('input', scheduleRenderMaster);
 els.dlgMasterSort.addEventListener('change', renderMasterTable);
 if (els.dlgMasterVnOnly) els.dlgMasterVnOnly.addEventListener('change', renderMasterTable);
 if (els.dlgMasterFavOnly) els.dlgMasterFavOnly.addEventListener('change', renderMasterTable);
-if (els.dlgFile) els.dlgFile.addEventListener('change', () => autoSaveOpenGiftFields());
+if (els.dlgFile) els.dlgFile.addEventListener('change', () => {
+  autoEnablePauseBgmForAudio(els.dlgFile.value);
+  autoSaveOpenGiftFields();
+});
 if (els.dlgOverlay) els.dlgOverlay.addEventListener('change', () => autoSaveOpenGiftFields());
 if (els.dlgPriority) els.dlgPriority.addEventListener('change', () => autoSaveOpenGiftFields());
 if (els.dlgPriority) els.dlgPriority.addEventListener('input', () => autoSaveOpenGiftFields());
