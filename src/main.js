@@ -246,13 +246,7 @@ function enrichGiftEvent(ev) {
 }
 
 // =================== App ===================
-function loadSettings() {
-  const s = loadJson(CONFIG_PATH, { env: 'prod', accessToken: '', gameId: '', openid: '', bigoId: '', windowBounds: {} });
-  if (!s.openApi) {
-    s.openApi = { enabled: false, env: s.env || 'prod', accessToken: s.accessToken || '', gameId: s.gameId || '', openid: s.openid || '', clientId: '', privateKey: '', clientVersion: '', gameDuration: 3600 };
-  }
-  return s;
-}
+function loadSettings() { return loadJson(CONFIG_PATH, { env: 'prod', accessToken: '', gameId: '', openid: '', bigoId: '', windowBounds: {} }); }
 function saveSettings(s) { saveJson(CONFIG_PATH, s); }
 function saveWindowBounds(key, bounds) {
   const s = loadSettings();
@@ -706,8 +700,6 @@ ipcMain.handle('bigo:start', async (_e, opts) => {
   if (client) await client.stop().catch(() => {});
   client = new BigoClient({
     env: opts.env, accessToken: opts.accessToken, gameId: opts.gameId, openid: opts.openid,
-    clientId: opts.clientId, privateKey: opts.privateKey, clientVersion: opts.clientVersion,
-    gameDuration: opts.gameDuration,
     onEvent: (ev) => { if (win && !win.isDestroyed()) win.webContents.send('bigo:event', ev); },
     onLog: (msg) => { if (win && !win.isDestroyed()) win.webContents.send('bigo:log', msg); },
   });

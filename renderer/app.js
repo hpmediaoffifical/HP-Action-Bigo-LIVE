@@ -743,7 +743,6 @@ const els = {
   status: $('status'), log: $('log'),
   // Embed tab
   embedBigoId: $('embedBigoId'),
-  liveSource: $('liveSource'),
   btnConnect: $('btnConnect'), btnEmbedShow: $('btnEmbedShow'),
   liveInfo: $('liveInfo'),
   metaPanel: $('metaPanel'), metaInfo: $('metaInfo'),
@@ -762,9 +761,6 @@ const els = {
   bgmVol: $('bgmVol'), bgmVolVal: $('bgmVolVal'),
   fxVol: $('fxVol'), fxVolVal: $('fxVolVal'),
   maxListItems: $('maxListItems'),
-  openApiEnabled: $('openApiEnabled'), openApiEnv: $('openApiEnv'),
-  openApiAccessToken: $('openApiAccessToken'), openApiGameId: $('openApiGameId'), openApiOpenid: $('openApiOpenid'),
-  openApiClientId: $('openApiClientId'), openApiPrivateKey: $('openApiPrivateKey'), openApiGameDuration: $('openApiGameDuration'),
   miniQueueCards: $('miniQueueCards'),
   qCardIcon: $('qCardIcon'), qCardIconVal: $('qCardIconVal'),
   qCardCount: $('qCardCount'), qCardCountVal: $('qCardCountVal'),
@@ -2230,7 +2226,6 @@ function setConnectedUi(yes) {
 async function disconnect() {
   stopLiveViewerRefresh();
   await window.bigo.embedStop();
-  await window.bigo.stop().catch(() => {});
   els.status.textContent = 'disconnected';
   els.status.classList.remove('on');
   els.status.classList.remove('connected');
@@ -2257,7 +2252,6 @@ els.btnConnect.onclick = async () => {
   // 1. Stop session cũ + clear UI (đề phòng)
   stopLiveViewerRefresh();
   await window.bigo.embedStop();
-  await window.bigo.stop().catch(() => {});
   resetEmbedUi();
 
   // 2. Check live
@@ -2284,39 +2278,20 @@ els.btnConnect.onclick = async () => {
   s.bigoId = id;
   await window.bigo.settingsSave(s);
 
-  const source = els.liveSource?.value || 'dom';
-  await saveOpenApiSettingsFromUi().catch(() => {});
-
-  // 4. Start selected listener
+  // 4. Start embed listener
   els.status.textContent = 'connecting...';
-  let res;
-  if (source === 'openapi') {
-    const cfg = readOpenApiSettingsUi();
-    if (!cfg.enabled) {
-      els.btnConnect.disabled = false;
-      alert('OpenAPI đang tắt trong Cài đặt chung. Bật "Official BIGO OpenAPI thử nghiệm" trước.');
-      return;
-    }
-    if (!cfg.accessToken || !cfg.gameId || !cfg.openid) {
-      els.btnConnect.disabled = false;
-      alert('OpenAPI thiếu Access token, Game ID hoặc Streamer openid.');
-      return;
-    }
-    res = await window.bigo.start(cfg);
-  } else {
-    res = await window.bigo.embedStart({ bigoId: id, visible: false });
-  }
+  const res = await window.bigo.embedStart({ bigoId: id, visible: false });
   els.btnConnect.disabled = false;
   if (!res.ok) {
-    appendLog(`${source} failed: ${res.error}`);
+    appendLog(`embed failed: ${res.error}`);
     alert(`Lỗi: ${res.error}`);
     return;
   }
-  els.status.textContent = `Đã kết nối · ${id} · ${source === 'openapi' ? 'OpenAPI' : 'DOM'}`;
+  els.status.textContent = `Đã kết nối · ${id}`;
   els.status.classList.add('on');
   els.status.classList.add('connected');
   setConnectedUi(true);
-  appendLog(`connected to ${id} via ${source}`);
+  appendLog(`connected to ${id}`);
   startLiveViewerRefresh(id);
   // Auto-play BGM khi kết nối thành công (theo nhóm active hoặc Cài đặt chung)
   applyActiveBgm();
@@ -2724,7 +2699,6 @@ let appSettings = {
     // TÁP TIM: KPI hearts. Khi đạt target → phát media (mp3/mp4).
     heartGoal:       { enabled: false, target: 100, mediaFile: '', overlayId: '', currentCount: 0 },
   },
-  openApi: { enabled: false, env: 'prod', accessToken: '', gameId: '', openid: '', clientId: '', privateKey: '', clientVersion: '', gameDuration: 3600 },
   fxVolume: 100,
   maxListItems: 200,
 };
@@ -2740,7 +2714,6 @@ async function saveAppSettings(patch) {
         s.specialEffects[k] = { ...(s.specialEffects[k] || {}), ...v };
       }
     }
-    if (patch.openApi) s.openApi = { ...(s.openApi || {}), ...patch.openApi };
     if ('fxVolume' in patch) s.fxVolume = patch.fxVolume;
     if ('maxListItems' in patch) s.maxListItems = patch.maxListItems;
   }
@@ -2814,7 +2787,6 @@ async function applyBgmSinkId() {
 async function initAppSettings(s) {
   appSettings.bgm = { ...appSettings.bgm, ...(s.bgm || {}) };
   appSettings.preFx = { ...appSettings.preFx, ...(s.preFx || {}) };
-  appSettings.openApi = { ...appSettings.openApi, ...(s.openApi || {}) };
   // Migrate old clearGift → specialEffects.clearQueue (backward compat)
   if (s.clearGift && !s.specialEffects?.clearQueue) {
     appSettings.specialEffects.clearQueue = {
@@ -2858,7 +2830,6 @@ async function initAppSettings(s) {
   if (els.bgmVol) { els.bgmVol.value = appSettings.bgm.volume || 80; els.bgmVolVal.textContent = els.bgmVol.value; }
   if (els.fxVol) { els.fxVol.value = appSettings.fxVolume; els.fxVolVal.textContent = appSettings.fxVolume; }
   if (els.maxListItems) els.maxListItems.value = appSettings.maxListItems;
-  applyOpenApiSettingsUi();
   // Devices
   await refreshAudioDevices();
   await applyBgmSinkId();
@@ -3455,10 +3426,6 @@ if (els.maxListItems) {
     saveAppSettings({ maxListItems: appSettings.maxListItems });
   });
 }
-for (const el of [els.liveSource, els.openApiEnabled, els.openApiEnv, els.openApiAccessToken, els.openApiGameId, els.openApiOpenid, els.openApiClientId, els.openApiPrivateKey, els.openApiGameDuration]) {
-  if (!el) continue;
-  el.addEventListener('change', saveOpenApiSettingsFromUi);
-}
 
 // =================== Group Edit Dialog ===================
 const groupEditDialog = document.getElementById('groupEditDialog');
@@ -3523,40 +3490,6 @@ async function settingsGroupRename(gid) {
   if (!g) { alert('Nhóm không tồn tại (gid=' + gid + ')'); return; }
   if (g.isCommon) { alert('Không thể đổi tên NHÓM CHUNG'); return; }
   openGroupEditDialog(g);
-}
-
-function applyOpenApiSettingsUi() {
-  const cfg = appSettings.openApi || {};
-  if (els.liveSource) {
-    els.liveSource.value = cfg.enabled ? (cfg.source || 'dom') : 'dom';
-  }
-  if (els.openApiEnabled) els.openApiEnabled.checked = !!cfg.enabled;
-  if (els.openApiEnv) els.openApiEnv.value = cfg.env || 'prod';
-  if (els.openApiAccessToken) els.openApiAccessToken.value = cfg.accessToken || '';
-  if (els.openApiGameId) els.openApiGameId.value = cfg.gameId || '';
-  if (els.openApiOpenid) els.openApiOpenid.value = cfg.openid || '';
-  if (els.openApiClientId) els.openApiClientId.value = cfg.clientId || '';
-  if (els.openApiPrivateKey) els.openApiPrivateKey.value = cfg.privateKey || '';
-  if (els.openApiGameDuration) els.openApiGameDuration.value = cfg.gameDuration || 3600;
-}
-
-function readOpenApiSettingsUi() {
-  return {
-    enabled: !!els.openApiEnabled?.checked,
-    source: els.liveSource?.value || 'dom',
-    env: els.openApiEnv?.value || 'prod',
-    accessToken: els.openApiAccessToken?.value.trim() || '',
-    gameId: els.openApiGameId?.value.trim() || '',
-    openid: els.openApiOpenid?.value.trim() || '',
-    clientId: els.openApiClientId?.value.trim() || '',
-    privateKey: els.openApiPrivateKey?.value.trim() || '',
-    gameDuration: Math.max(60, Math.min(86400, parseInt(els.openApiGameDuration?.value, 10) || 3600)),
-  };
-}
-
-async function saveOpenApiSettingsFromUi() {
-  appSettings.openApi = { ...appSettings.openApi, ...readOpenApiSettingsUi() };
-  await saveAppSettings({ openApi: appSettings.openApi });
 }
 
 async function settingsGroupDelete(gid) {
@@ -3762,9 +3695,6 @@ if (sidebarBgmBtn) {
 
 // =================== Wire up ===================
 window.bigo.onLog(appendLog);
-window.bigo.onEvent((ev) => {
-  if (ev && ev._source === 'official-openapi') renderEmbedEvent(ev);
-});
 window.bigo.onEmbedEvent(renderEmbedEvent);
 
 init();

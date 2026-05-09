@@ -47,10 +47,6 @@
         <div class="connect-row">
           <label class="bigo-id-label" for="embedBigoId">BIGO ID:</label>
           <input id="embedBigoId" placeholder="vd: 1066691535" class="connect-input" />
-          <select id="liveSource" title="Nguồn nhận dữ liệu LIVE" style="max-width:170px">
-            <option value="dom" selected>DOM listener</option>
-            <option value="openapi">Official OpenAPI thử nghiệm</option>
-          </select>
           <button id="btnConnect" class="primary">KẾT NỐI</button>
           <button id="btnEmbedShow" disabled>👁 VIEW</button>
           <span id="liveInfo" class="live-info-inline">Nhập ID rồi bấm Kết nối</span>
@@ -414,47 +410,6 @@
         <div class="hint small">
           Nhạc nền sẽ phát loop, có thể chọn output device (loa ngoài hoặc cable virtual cho OBS).
           Khi gift bật <b>"Tạm dừng nhạc nền khi phát"</b>, nhạc nền tự pause trong lúc effect chạy rồi resume.
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>🧪 Official BIGO OpenAPI thử nghiệm</h2>
-        <div class="row">
-          <label class="checkbox-row"><input type="checkbox" id="openApiEnabled" /> Bật nguồn Official OpenAPI trong menu kết nối</label>
-          <label>Môi trường
-            <select id="openApiEnv">
-              <option value="prod">prod</option>
-              <option value="gray">gray</option>
-              <option value="test">test</option>
-            </select>
-          </label>
-        </div>
-        <div class="row">
-          <label>Access token
-            <input id="openApiAccessToken" type="password" placeholder="Bearer token từ BIGO OAuth" />
-          </label>
-          <label>Game ID
-            <input id="openApiGameId" placeholder="game_id do BIGO cấp" />
-          </label>
-          <label>Streamer openid
-            <input id="openApiOpenid" placeholder="openid của chủ LIVE" />
-          </label>
-        </div>
-        <div class="row">
-          <label>Client ID cho signed ping
-            <input id="openApiClientId" placeholder="client_id do BIGO cấp" />
-          </label>
-          <label>Thời lượng game/session (giây)
-            <input id="openApiGameDuration" type="number" min="60" max="86400" value="3600" />
-          </label>
-        </div>
-        <div class="row">
-          <label>RSA private key cho <code>/broom/ping</code>
-            <textarea id="openApiPrivateKey" rows="4" placeholder="-----BEGIN PRIVATE KEY----- ..."></textarea>
-          </label>
-        </div>
-        <div class="hint small">
-          OpenAPI dùng <code>enable_danmu</code>, <code>pull_data</code>, <code>gift/get_list</code>. <code>ping</code> cần chữ ký RSA-SHA256 theo tài liệu BIGO; nếu chưa nhập private key, app vẫn thử chạy nhưng session có thể hết hạn sau khoảng 2 phút.
         </div>
       </div>
 

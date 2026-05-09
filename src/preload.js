@@ -67,8 +67,6 @@ contextBridge.exposeInMainWorld('bigo', {
   stop: () => ipcRenderer.invoke('bigo:stop'),
   testEvent: (type) => ipcRenderer.invoke('bigo:test-event', type),
   checkLive: (bigoId) => ipcRenderer.invoke('bigo:check-live', bigoId),
-  onOpenApiEvent: (cb) => ipcRenderer.on('bigo:event', (_e, ev) => cb(ev)),
-  onOpenApiLog: (cb) => ipcRenderer.on('bigo:log', (_e, msg) => cb(msg)),
 
   // Web Embed listener
   embedStart: (opts) => ipcRenderer.invoke('embed:start', opts),
