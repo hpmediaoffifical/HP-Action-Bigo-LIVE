@@ -810,6 +810,15 @@ function escapeHtml(s) {
 function beanIconHtml(cls = '') {
   return `<span class="bean-icon ${cls}" aria-label="BIGO bean"></span>`;
 }
+function displayEffectName(mediaFile) {
+  if (!mediaFile) return '';
+  let name = mediaFile;
+  if (name.includes('/') || name.includes('\\')) {
+    try { name = decodeURIComponent(name.split(/[\\\/]/).pop() || name); }
+    catch { name = name.split(/[\\\/]/).pop() || name; }
+  }
+  return name.replace(/\.(webm|mp4|mp3|wav|ogg|gif)$/i, '');
+}
 function appendLog(msg) {
   // Log panel đã được bỏ. Giữ console.log để debug qua DevTools.
   if (!els.log) { console.log('[bigo]', msg); return; }
@@ -1664,11 +1673,7 @@ function renderGroupCard(grp, overlayMap) {
     const priorityBadge = item.priority > 0 ? `<span class="prio-badge" title="Ưu tiên: chèn vào hàng ${item.priority} trong queue">⚡ #${item.priority}</span>` : '';
     const pauseBgmBadge = item.pauseBgm ? '<span class="pause-bgm-badge" title="Tạm dừng nhạc nền khi hiệu ứng này phát">🔇</span>' : '';
     // Hiển thị tên file rút gọn (basename) nếu là full path/URL
-    const fileDisplay = item.mediaFile
-      ? (item.mediaFile.includes('/') || item.mediaFile.includes('\\')
-        ? (() => { try { return decodeURIComponent(item.mediaFile.split(/[\\\/]/).pop() || item.mediaFile); } catch { return item.mediaFile.split(/[\\\/]/).pop() || item.mediaFile; } })()
-        : item.mediaFile)
-      : '';
+    const fileDisplay = displayEffectName(item.mediaFile);
     const fileLine = item.mediaFile
       ? `<div class="grow-sub"><code>${escapeHtml(fileDisplay)}</code>${priorityBadge}${pauseBgmBadge}</div>`
       : '<div class="grow-sub" style="color:#ff6b6b">— chưa có file hiệu ứng —</div>';
