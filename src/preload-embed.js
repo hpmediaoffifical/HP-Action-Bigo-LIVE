@@ -444,11 +444,14 @@ function parseViewerCountFromRoomText(text) {
   const nums = (afterId.match(/\b\d{1,7}\b/g) || []).map(n => parseInt(n, 10)).filter(n => n >= 0);
   // Header BIGO web shows beans first, viewer count second/last:
   // "BIGO ID:H2083 432074 553" → viewerCount = 553.
-  return nums.length ? nums[nums.length - 1] : 0;
+  // Require at least two numbers after BIGO ID to avoid treating room/bean-only
+  // fragments or unrelated app counters as the viewer count.
+  return nums.length >= 2 ? nums[nums.length - 1] : 0;
 }
 
 function scanRoomMeta() {
   const meta = {};
+  const viewerCandidates = [];
   if (!document.body) return meta;
   for (const el of walkAllElements(document.body)) {
     if (el.nodeType !== 1) continue;
@@ -457,7 +460,20 @@ function scanRoomMeta() {
     const m = t.match(/BIGO\s*ID\s*[:：]\s*(\S+)/i);
     if (m && !meta.bigoId) meta.bigoId = m[1];
     const viewerCount = parseViewerCountFromRoomText(t);
-    if (viewerCount > 0 && !meta.viewerCount) meta.viewerCount = viewerCount;
+    if (viewerCount > 0) {
+      let score = t.length;
+      try {
+        const r = el.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) score += 1000;
+        score += Math.max(0, Math.round(r.top));
+      } catch {}
+      viewerCandidates.push({ viewerCount, score, text: t });
+    }
+  }
+  if (viewerCandidates.length) {
+    viewerCandidates.sort((a, b) => a.score - b.score);
+    meta.viewerCount = viewerCandidates[0].viewerCount;
+    meta.viewerSource = viewerCandidates[0].text;
   }
   if (document.title) meta.title = document.title;
   return meta;

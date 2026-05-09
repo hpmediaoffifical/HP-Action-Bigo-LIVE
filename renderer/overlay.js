@@ -110,14 +110,16 @@ audio.addEventListener('ended', () => {
 });
 player.addEventListener('error', () => {
   clearPlayer();
+  try { ipcRenderer.send('overlay:effect-ended'); } catch {}
   // Sau error, vẫn tiếp tục queue (defensive) — nhưng nếu queue trống thì noop.
   if (queue.length > 0) playNext();
   else { playing = false; try { ipcRenderer.send('overlay:queue-empty'); } catch {} }
 });
 audio.addEventListener('error', () => {
   clearAudio();
+  try { ipcRenderer.send('overlay:effect-ended'); } catch {}
   if (queue.length > 0) playNext();
-  else playing = false;
+  else { playing = false; try { ipcRenderer.send('overlay:queue-empty'); } catch {} }
 });
 
 ipcRenderer.on('overlay:config', (_e, cfg) => applyConfig(cfg));

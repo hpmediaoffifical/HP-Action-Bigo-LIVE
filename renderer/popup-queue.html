@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <title>DANH SÁCH HIỆU ỨNG — HP Action - BIGO LIVE</title>
+  <title>HÀNH ĐỘNG — HP Action - BIGO LIVE</title>
   <link rel="icon" type="image/png" href="../logo-hp.png" />
   <link rel="stylesheet" href="style.css" />
   <style>
@@ -10,12 +10,12 @@
     h1 { font-size: 14px; color: #ff8a3d; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
     .pop-stats { font-size: 11px; color: #8a8f9a; }
     .pop-stats b { color: #ffd166; }
-    .pop-controls { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; font-size: 11px; color: #8a8f9a; flex-wrap: wrap; }
-    #popQueue { background: #0f1117; border-radius: 6px; padding: 5px; max-height: calc(100vh - 132px); overflow-y: auto;
+    .pop-controls { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; font-size: 11px; color: #8a8f9a; flex-wrap: wrap; }
+    #popQueue { background: #0f1117; border-radius: 6px; padding: 5px; max-height: calc(100vh - 150px); overflow-y: auto;
                 --queue-font: 14px; --queue-icon: 40px; }
     #popQueue .queue-row {
       display: grid;
-      grid-template-columns: var(--queue-icon, 40px) minmax(0, 1fr) 30px;
+      grid-template-columns: var(--queue-icon, 40px) minmax(0, 1fr) auto;
       align-items: center;
       gap: 9px;
       min-height: calc(var(--queue-icon, 40px) + 10px);
@@ -57,8 +57,9 @@
     }
     #popQueue .qrow-effect b { color: #fff; }
     #popQueue .cnt-inline { color: #ff3b6f; font-weight: 800; margin-left: 6px; }
-    #popQueue .beans-inline { color: #8ad6ff; font-weight: 700; margin-left: 6px; }
-    #popQueue .qrow-del {
+    #popQueue .beans-inline { color: #8ad6ff; font-weight: 700; margin-left: 6px; display:inline-flex; align-items:center; gap:2px; }
+    #popQueue .qrow-actions { display: flex; gap: 4px; justify-self: end; }
+    #popQueue .qrow-toggle, #popQueue .qrow-del {
       position: static;
       width: 28px;
       height: 28px;
@@ -75,20 +76,38 @@
     .pop-del { background: transparent; border: 1px solid #3a3f4b; color: #8a8f9a; cursor: pointer;
                padding: 2px 7px; border-radius: 4px; font-size: 13px; margin-left: 4px; }
     .pop-del:hover { background: #d23046; color: #fff; border-color: #d23046; }
+    .pop-settings { display: none; gap: 8px; margin: -2px 0 8px; padding: 7px 8px; background:#0f1117; border:1px solid #262a35; border-radius:8px; flex-wrap:nowrap; overflow-x:auto; align-items:center; }
+    .pop-settings.open { display:flex; }
+    .pop-settings label { min-width:0; flex:1 0 118px; display:grid; grid-template-columns:auto auto 1fr; align-items:center; gap:5px; color:#8a8f9a; font-size:11px; }
+    .pop-settings label input[type="range"] { min-width:70px; }
   </style>
 </head>
 <body>
   <h1>
-    📋 DANH SÁCH HIỆU ỨNG
-    <span class="pop-stats">🎁<b id="popQGifts">0</b> · 💎<b id="popQDiamond">0</b> · 👤<b id="popQUsers">0</b></span>
+    📋 HÀNH ĐỘNG
+    <span class="pop-stats">🎁<b id="popQGifts">0</b> · <span class="bean-icon small"></span><b id="popQDiamond">0</b> · 👤<b id="popQUsers">0</b></span>
   </h1>
   <div class="pop-controls">
-    Cỡ chữ <input type="range" id="popQFont" min="11" max="100" value="14" />
-    <span id="popQFontVal">14</span>
-    Cỡ icon <input type="range" id="popQIcon" min="24" max="80" value="40" />
-    <span id="popQIconVal">40</span>
+    <button id="popQToggle" class="tiny" title="Phát/Tạm dừng hiệu ứng">▶/⏸</button>
+    <button id="popQShuffle" class="tiny" title="Trộn ngẫu nhiên danh sách đang chờ">🎲</button>
+    <button id="popQSettingsBtn" class="tiny" title="Cài đặt kích thước popup">⚙</button>
     <button id="popQClear" class="tiny danger" title="Xoá tất cả hiệu ứng đang chờ">🗑 Xoá tất cả</button>
   </div>
+  <div id="popQSettings" class="pop-settings">
+    <label>Cỡ chữ <span id="popQFontVal">14</span>px
+      <input type="range" id="popQFont" min="11" max="100" value="14" />
+    </label>
+    <label>Cỡ icon dòng <span id="popQIconVal">40</span>px
+      <input type="range" id="popQIcon" min="24" max="80" value="40" />
+    </label>
+    <label>Icon card <span id="popQCardIconVal">34</span>px
+      <input type="range" id="popQCardIcon" min="24" max="80" value="34" />
+    </label>
+    <label>Số trong card <span id="popQCardCountVal">11</span>px
+      <input type="range" id="popQCardCount" min="8" max="24" value="11" />
+    </label>
+  </div>
+  <div id="popQueueCards" class="queue-cards"></div>
   <div id="popQueue"></div>
   <script>
     const { ipcRenderer } = require('electron');
@@ -99,17 +118,75 @@
     let snapshot = [];
     const stats = { gifts: 0, diamond: 0, users: new Set() };
 
+    function buildQueueGiftKey(q) {
+      if (q?.gift_key) return q.gift_key;
+      if (q?.gift_id != null && String(q.gift_id).trim()) return 'id:' + String(q.gift_id).trim();
+      const name = String(q?.gift_name || '').trim().toLowerCase();
+      if (name) return 'name:' + name;
+      const icon = String(q?.gift_icon || '').trim();
+      return icon ? 'icon:' + icon : 'unknown';
+    }
+
+    function getQueueGroups() {
+      const groups = new Map();
+      for (const q of snapshot) {
+        const key = buildQueueGiftKey(q);
+        let g = groups.get(key);
+        if (!g) {
+          g = { key, name: q.gift_name || '?', icon: q.gift_icon || '', total: 0, playing: null };
+          groups.set(key, g);
+        }
+        g.total += 1;
+        if (q.status === 'playing' && !g.playing) g.playing = q;
+      }
+      return [...groups.values()];
+    }
+
+    function renderCards() {
+      const el = document.getElementById('popQueueCards');
+      const groups = getQueueGroups();
+      if (!groups.length) { el.innerHTML = ''; return; }
+      el.innerHTML = groups.map(g => {
+        const icon = g.icon
+          ? `<img class="queue-card-icon" src="${escapeHtml(g.icon)}" />`
+          : '<div class="queue-card-icon empty"></div>';
+        return `<button class="queue-card ${g.playing ? 'playing' : ''}" data-gift-key="${escapeHtml(g.key)}" title="Ưu tiên tất cả ${escapeHtml(g.name)} lên đầu hàng chờ">
+          ${icon}<span class="queue-card-count">${g.total.toLocaleString('en-US')}</span>
+        </button>`;
+      }).join('');
+      el.querySelectorAll('[data-gift-key]').forEach(card => {
+        card.onclick = () => ipcRenderer.send('popup-queue:action', { type: 'promote-group', giftKey: card.dataset.giftKey });
+      });
+    }
+
     function applySize() {
       const f = document.getElementById('popQFont').value;
       const i = document.getElementById('popQIcon').value;
+      const ci = document.getElementById('popQCardIcon').value;
+      const cc = document.getElementById('popQCardCount').value;
       const q = document.getElementById('popQueue');
+      const cards = document.getElementById('popQueueCards');
       q.style.setProperty('--queue-font', f + 'px');
       q.style.setProperty('--queue-icon', i + 'px');
+      cards.style.setProperty('--queue-card-icon', ci + 'px');
+      cards.style.setProperty('--queue-card-count', cc + 'px');
       document.getElementById('popQFontVal').textContent = f;
       document.getElementById('popQIconVal').textContent = i;
+      document.getElementById('popQCardIconVal').textContent = ci;
+      document.getElementById('popQCardCountVal').textContent = cc;
+      localStorage.setItem('popupQueueSettings', JSON.stringify({ font: f, icon: i, cardIcon: ci, cardCount: cc }));
     }
+    try {
+      const s = JSON.parse(localStorage.getItem('popupQueueSettings') || '{}');
+      if (s.font) document.getElementById('popQFont').value = s.font;
+      if (s.icon) document.getElementById('popQIcon').value = s.icon;
+      if (s.cardIcon) document.getElementById('popQCardIcon').value = s.cardIcon;
+      if (s.cardCount) document.getElementById('popQCardCount').value = s.cardCount;
+    } catch {}
     document.getElementById('popQFont').addEventListener('input', applySize);
     document.getElementById('popQIcon').addEventListener('input', applySize);
+    document.getElementById('popQCardIcon').addEventListener('input', applySize);
+    document.getElementById('popQCardCount').addEventListener('input', applySize);
     applySize();
 
     function renderRow(q, idx) {
@@ -122,7 +199,7 @@
         : '';
       const cntInline = `<span class="cnt-inline">SL ×${q.count || 1}</span>`;
       const beansInline = q.diamond != null
-        ? `<span class="beans-inline">KC ${Number(q.diamond).toLocaleString('en-US')}</span>` : '';
+        ? `<span class="beans-inline"><span class="bean-icon small"></span> x${Number(q.diamond).toLocaleString('en-US')}</span>` : '';
       return `<div class="queue-row ${q.status}" data-id="${escapeHtml(q.id)}">
         ${giftIcon}
         <div class="qrow-meta">
@@ -131,7 +208,10 @@
             Tên Hiệu Ứng: <b>${escapeHtml(q.gift_name)}</b>${cntInline}${beansInline}
           </div>
         </div>
-        <button class="qrow-del" data-del="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
+        <div class="qrow-actions">
+          <button class="qrow-toggle" data-toggle="${escapeHtml(q.id)}" title="${isPlaying ? 'Tạm dừng' : 'Phát'}">${isPlaying ? '⏸' : '▶'}</button>
+          <button class="qrow-del" data-del="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
+        </div>
       </div>`;
     }
 
@@ -151,6 +231,12 @@
           ipcRenderer.send('popup-queue:remove', id);
         };
       });
+      q.querySelectorAll('[data-toggle]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          ipcRenderer.send('popup-queue:action', { type: 'toggle', id: btn.dataset.toggle });
+        };
+      });
       // Right-click context menu cho mỗi row
       q.querySelectorAll('.queue-row').forEach(row => {
         row.oncontextmenu = (e) => {
@@ -161,11 +247,13 @@
             { icon: '🔝', label: 'Ưu tiên lên đầu', action: () => ipcRenderer.send('popup-queue:action', { type: 'top', id }) },
             { icon: '⬆️', label: 'Di chuyển lên 1 hàng', action: () => ipcRenderer.send('popup-queue:action', { type: 'up', id }) },
             { icon: '⬇️', label: 'Di chuyển xuống 1 hàng', action: () => ipcRenderer.send('popup-queue:action', { type: 'down', id }) },
+            { icon: '▶/⏸', label: 'Phát/Tạm dừng', action: () => ipcRenderer.send('popup-queue:action', { type: 'toggle', id }) },
             { divider: true },
             { icon: '🗑', label: 'Xoá', danger: true, action: () => ipcRenderer.send('popup-queue:remove', id) },
           ]);
         };
       });
+      renderCards();
     }
 
     // Mini context menu — copy logic từ main app cho popup window.
@@ -206,6 +294,12 @@
       document.getElementById('popQGifts').textContent = stats.gifts;
       document.getElementById('popQDiamond').textContent = stats.diamond;
       document.getElementById('popQUsers').textContent = stats.users.size;
+      const playing = snapshot.some(q => q.status === 'playing');
+      const btn = document.getElementById('popQToggle');
+      if (btn) {
+        btn.textContent = playing ? '⏸ Dừng' : '▶ Phát';
+        btn.title = playing ? 'Tạm dừng hiệu ứng đang phát' : 'Phát/kích hoạt lại hiệu ứng kế tiếp';
+      }
     }
 
     // Snapshot từ app: full array thay thế cũ → re-render.
@@ -245,6 +339,11 @@
       // Báo app clear toàn bộ queue thực tế (không chỉ popup)
       ipcRenderer.send('popup-queue:clear-all');
     };
+    document.getElementById('popQShuffle').onclick = () => {
+      ipcRenderer.send('popup-queue:action', { type: 'shuffle' });
+    };
+    document.getElementById('popQToggle').onclick = () => ipcRenderer.send('popup-queue:action', { type: 'toggle-current' });
+    document.getElementById('popQSettingsBtn').onclick = () => document.getElementById('popQSettings').classList.toggle('open');
     renderAll();
   </script>
 </body>

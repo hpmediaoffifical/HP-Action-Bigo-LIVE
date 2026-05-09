@@ -839,7 +839,7 @@ function ensureQueuePopup() {
   queuePopup = new BrowserWindow({
     width: saved.width || 420, height: saved.height || 760,
     x: saved.x, y: saved.y,
-    title: '📋 DANH SÁCH HIỆU ỨNG — HP Action - BIGO LIVE',
+    title: '📋 HÀNH ĐỘNG — HP Action - BIGO LIVE',
     icon: APP_ICON || undefined,
     parent: win,
     webPreferences: { nodeIntegration: true, contextIsolation: false },
@@ -987,7 +987,7 @@ ipcMain.on('popup-chats:request-snapshot', () => {
   }
 });
 
-// =================== Popup window (Lịch sử quà) ===================
+// =================== Popup window (ĐÃ NHẬN) ===================
 function ensureGiftsPopup() {
   if (giftsPopup && !giftsPopup.isDestroyed()) return giftsPopup;
   const saved = getSavedBounds('popupGifts', { width: 380, height: 720 });
@@ -995,7 +995,7 @@ function ensureGiftsPopup() {
     width: saved.width || 380,
     height: saved.height || 720,
     x: saved.x, y: saved.y,
-    title: '🎁 QUÀ ĐÃ NHẬN — HP Action - BIGO LIVE',
+    title: '🎁 ĐÃ NHẬN — HP Action - BIGO LIVE',
     icon: APP_ICON || undefined,
     parent: win,
     webPreferences: {

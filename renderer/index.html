@@ -53,7 +53,7 @@
           <div class="connect-stats">
             <span title="Số người xem LIVE hiện tại">👁️ <b id="csViewers">0</b></span>
             <span title="Số lần đã phát hiệu ứng (kể cả phát thử)">🎵 <b id="csEffects">0</b></span>
-            <span title="Tổng đậu (KC) đã nhận từ live">💎 <b id="csDiamond">0</b></span>
+            <span title="Tổng đậu BIGO đã nhận từ live"><span class="bean-icon inline"></span><b id="csDiamond">0</b></span>
             <span title="Số user khác nhau đã tặng quà">👤 <b id="csUsers">0</b></span>
             <span title="Tổng số quà đã nhận từ live">🎁 <b id="csGifts">0</b></span>
             <button id="btnResetStats" class="tiny cs-reset" title="Reset bộ đếm về 0">↺ Reset</button>
@@ -76,18 +76,30 @@
         <aside class="embed-right">
           <div class="panel right-panel-section" data-rps="queue">
             <div class="panel-head">
-              <h2>📋 DANH SÁCH HIỆU ỨNG</h2>
+              <h2>📋 HÀNH ĐỘNG</h2>
               <div style="display:flex; gap:4px">
+                <button id="btnShuffleMiniQueue" class="tiny" title="Xúc xắc: trộn ngẫu nhiên danh sách đang chờ">🎲</button>
+                <button id="btnToggleMiniQueue" class="tiny" title="Phát/Tạm dừng hiệu ứng">▶/⏸</button>
+                <button id="btnQueueCardSettings" class="tiny" title="Cài đặt kích thước card quà">⚙</button>
                 <button id="btnClearMiniQueue" class="tiny danger" title="Xoá toàn bộ DSHT (sẽ hỏi xác nhận)">🗑 Xoá tất cả</button>
                 <button id="btnPopupQueueRight" class="tiny" title="Mở popup riêng">📤</button>
                 <button class="tiny rps-collapse" data-rps-target="queue" title="Thu gọn / mở">▼</button>
               </div>
             </div>
+            <div id="queueCardSettings" class="queue-settings-popover">
+              <label>Icon quà <span id="qCardIconVal">34</span>px
+                <input type="range" id="qCardIcon" min="24" max="80" value="34" />
+              </label>
+              <label>Số lượng <span id="qCardCountVal">11</span>px
+                <input type="range" id="qCardCount" min="8" max="24" value="11" />
+              </label>
+            </div>
+            <div id="miniQueueCards" class="queue-cards"></div>
             <div id="miniQueue" class="mini-queue"></div>
           </div>
           <div class="panel right-panel-section" data-rps="gifts">
             <div class="panel-head">
-              <h2>🎁 QUÀ ĐÃ NHẬN</h2>
+              <h2>🎁 ĐÃ NHẬN</h2>
               <div style="display:flex; gap:4px">
                 <button id="btnPopupGifts" class="tiny" title="Mở popup riêng để xem song song">📤</button>
                 <button class="tiny rps-collapse" data-rps-target="gifts" title="Thu gọn / mở">▼</button>
@@ -117,15 +129,17 @@
     <section class="tab-panel" data-tab="queue">
       <div class="panel" id="effectQueuePanel">
         <div class="panel-head">
-          <h2>📋 DANH SÁCH HIỆU ỨNG</h2>
+          <h2>📋 HÀNH ĐỘNG</h2>
           <div class="queue-stats">
             <span>🎁 quà: <b id="qStatGifts">0</b></span>
-            <span>💎 đậu: <b id="qStatDiamond">0</b></span>
+            <span><span class="bean-icon inline"></span>đậu: <b id="qStatDiamond">0</b></span>
             <span>👤 user: <b id="qStatUsers">0</b></span>
+            <button id="btnToggleQueue" class="tiny" title="Phát/Tạm dừng hiệu ứng">▶/⏸</button>
+            <button id="btnQueueSettings" class="tiny" title="Cài đặt kích thước danh sách">⚙</button>
             <button id="btnPopupQueue" class="tiny" title="Mở popup riêng để giám sát">📤</button>
           </div>
         </div>
-        <div class="row" style="margin-bottom:8px; align-items:center">
+        <div id="queueSettings" class="row queue-settings-popover" style="margin-bottom:8px; align-items:center">
           <label>Cỡ chữ <span id="qSizeFontVal" style="color:#ffd166">13</span>px
             <input type="range" id="qSizeFont" min="11" max="100" value="13" />
           </label>
@@ -483,8 +497,8 @@
         </label>
         <label>Sắp xếp
           <select id="spMasterSort">
-            <option value="kc-asc" selected>KC thấp → cao</option>
-            <option value="kc-desc">KC cao → thấp</option>
+            <option value="kc-asc" selected>Đậu thấp → cao</option>
+            <option value="kc-desc">Đậu cao → thấp</option>
             <option value="id-asc">Mã ↑</option>
             <option value="id-desc">Mã ↓</option>
             <option value="name-asc">Tên A → Z</option>
@@ -503,7 +517,7 @@
       <div class="master-table-wrap">
         <table class="master-table">
           <thead>
-            <tr><th style="width:40px">Icon</th><th style="width:80px">Mã</th><th style="width:80px">KC</th><th>Tên quà</th><th style="width:32px">⭐</th></tr>
+            <tr><th style="width:40px">Icon</th><th style="width:80px">Mã</th><th style="width:80px">Đậu</th><th>Tên quà</th><th style="width:32px">⭐</th></tr>
           </thead>
           <tbody id="spMasterTableBody"></tbody>
         </table>
@@ -525,13 +539,13 @@
         </label>
       </div>
       <div class="form-row" style="margin-bottom:6px">
-        <label style="flex:2">Quà tặng: <b id="dlgMasterTotal">2410</b> Icon
+        <label style="flex:2"><span id="dlgMasterTotal">Số lượng: đang tải...</span>
           <input id="dlgMasterFilter" placeholder="gõ tên hoặc mã quà..." />
         </label>
         <label>Sắp xếp
           <select id="dlgMasterSort">
-            <option value="kc-asc" selected>KC thấp → cao</option>
-            <option value="kc-desc">KC cao → thấp</option>
+            <option value="kc-asc" selected>Đậu thấp → cao</option>
+            <option value="kc-desc">Đậu cao → thấp</option>
             <option value="id-asc">Mã ↑</option>
             <option value="id-desc">Mã ↓</option>
             <option value="name-asc">Tên A → Z</option>
@@ -550,7 +564,7 @@
       <div class="master-table-wrap">
         <table class="master-table">
           <thead>
-            <tr><th style="width:40px">Icon</th><th style="width:80px">Mã</th><th style="width:80px">KC</th><th>Tên quà</th><th style="width:32px">⭐</th></tr>
+            <tr><th style="width:40px">Icon</th><th style="width:80px">Mã</th><th style="width:80px">Đậu</th><th>Tên quà</th><th style="width:32px">⭐</th></tr>
           </thead>
           <tbody id="dlgMasterTableBody"></tbody>
         </table>

@@ -10,6 +10,9 @@
     h1 { font-size: 14px; color: #ff8a3d; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
     .pop-stats { font-size: 11px; color: #8a8f9a; }
     .pop-controls { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; font-size: 11px; color: #8a8f9a; }
+    .pop-settings { display:none; gap:8px; margin:-2px 0 8px; padding:7px 8px; background:#0f1117; border:1px solid #262a35; border-radius:8px; align-items:center; }
+    .pop-settings.open { display:flex; }
+    .pop-settings label { min-width:0; flex:1 0 150px; display:grid; grid-template-columns:auto auto 1fr; align-items:center; gap:5px; color:#8a8f9a; font-size:11px; }
     #popChats {
       background: #0f1117; border-radius: 6px; padding: 6px;
       max-height: calc(100vh - 100px); overflow-y: auto;
@@ -24,12 +27,13 @@
     <span class="pop-stats" id="popChatCount">0 dòng</span>
   </h1>
   <div class="pop-controls">
-    Cỡ chữ
-    <span style="font-size:10px">A-</span>
-    <input type="range" id="popChatFont" min="11" max="100" value="13" style="width:120px" />
-    <span style="font-size:14px">A+</span>
-    <span id="popChatFontVal" style="color:#ffd166">13</span>
+    <button id="popChatSettingsBtn" class="tiny" title="Cài đặt kích thước popup">⚙</button>
     <button id="popChatClear" class="tiny danger" title="Xoá hiển thị">🗑 Xoá</button>
+  </div>
+  <div id="popChatSettings" class="pop-settings">
+    <label>Cỡ chữ <span id="popChatFontVal" style="color:#ffd166">13</span>px
+      <input type="range" id="popChatFont" min="11" max="100" value="13" />
+    </label>
   </div>
   <div id="popChats"></div>
   <script>
@@ -57,9 +61,15 @@
       const f = fontInput.value;
       cont.style.setProperty('--chat-font', f + 'px');
       fontVal.textContent = f;
+      localStorage.setItem('popupChatFont', f);
     }
+    try {
+      const savedFont = localStorage.getItem('popupChatFont');
+      if (savedFont) fontInput.value = savedFont;
+    } catch {}
     fontInput.addEventListener('input', applyFont);
     applyFont();
+    document.getElementById('popChatSettingsBtn').onclick = () => document.getElementById('popChatSettings').classList.toggle('open');
 
     let totalRows = 0;
 

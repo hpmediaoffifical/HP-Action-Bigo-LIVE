@@ -99,19 +99,24 @@ function updateConnectStats() {
 // =================== Effect Queue State ===================
 const queueItems = []; // { id, ts, user, avatar, gift_id, gift_name, gift_icon, count, diamond, status }
 const QUEUE_MAX = 5000; // Cho phép hold 5000 items in-memory; render UI giới hạn theo maxListItems.
-const PLAY_DURATION_MS = 5000; // assume effect ~5s — TODO sync với 'ended' từ overlay sau
+let queuePaused = false;
+const missingMediaWarned = new Set();
 
 function loadQueueSettings() {
   try {
     const s = JSON.parse(localStorage.getItem('queueSettings') || '{}');
     if (s.font) els.qSizeFont.value = s.font;
     if (s.icon) els.qSizeIcon.value = s.icon;
+    if (s.cardIcon && els.qCardIcon) els.qCardIcon.value = s.cardIcon;
+    if (s.cardCount && els.qCardCount) els.qCardCount.value = s.cardCount;
   } catch {}
   applyQueueSize();
 }
 function saveQueueSettings() {
   localStorage.setItem('queueSettings', JSON.stringify({
     font: els.qSizeFont.value, icon: els.qSizeIcon.value,
+    cardIcon: els.qCardIcon?.value || 34,
+    cardCount: els.qCardCount?.value || 11,
   }));
 }
 function applyQueueSize() {
@@ -121,6 +126,12 @@ function applyQueueSize() {
   els.effectQueue.style.setProperty('--queue-icon', icon + 'px');
   els.qSizeFontVal.textContent = font;
   els.qSizeIconVal.textContent = icon;
+  if (els.miniQueueCards && els.qCardIcon && els.qCardCount) {
+    els.miniQueueCards.style.setProperty('--queue-card-icon', els.qCardIcon.value + 'px');
+    els.miniQueueCards.style.setProperty('--queue-card-count', els.qCardCount.value + 'px');
+    if (els.qCardIconVal) els.qCardIconVal.textContent = els.qCardIcon.value;
+    if (els.qCardCountVal) els.qCardCountVal.textContent = els.qCardCount.value;
+  }
 }
 
 // Push batch N entries (chia tách thành N hàng).
@@ -131,9 +142,10 @@ function pushPlayBatch(item, ev, playTimes) {
   const baseUser = ev?.user || 'NHPHUNG';
   // Avatar: NHPHUNG → logo HP. User thường → raw avatar (nếu scraper bắt được).
   const baseAvatar = resolveAvatarForUser(baseUser, ev?.user_avatar_url);
-  const baseName = ev?.gift_name || item?.alias || (item?.matchKeys || [])[0] || '?';
+  const baseName = item?.alias || ev?.gift_name || (item?.matchKeys || [])[0] || '?';
   const baseId = ev?.gift_id ?? null;
   const baseIcon = ev?.gift_icon || ev?.gift_icon_url || (item ? getGiftIcon(item) : '');
+  const baseGiftKey = buildQueueGiftKey(baseId, baseName, baseIcon);
   const baseDiamond = ev?.total_diamond != null && playTimes > 0
     ? Math.max(1, Math.round(ev.total_diamond / playTimes))
     : null;
@@ -149,29 +161,24 @@ function pushPlayBatch(item, ev, playTimes) {
       ts: Date.now() + i,
       user: baseUser, avatar: baseAvatar,
       gift_name: baseName, gift_id: baseId, gift_icon: baseIcon,
+      gift_key: baseGiftKey,
       level: baseLevel,
       count: 1, step: i + 1, total: playTimes,
       diamond: baseDiamond,
       mediaFile, overlayId,
+      itemId: item?.id || null,
       status: 'queued', // tất cả queued — processor sẽ pick first
       playTimes: 1,
     });
   }
+  const shouldAutoStart = !queuePaused && !queueItems.some(q => q.status === 'playing');
 
   // Priority: 0 = append cuối queue (FIFO chuẩn).
-  // N > 0 = chèn vào HÀNG N (1-indexed, đếm từ trên cùng cả playing item).
-  // User: "tôi chọn 2 nhưng không lên hàng 2" — fix off-by-one trước đó dùng
-  // priority như array index (idx N), giờ chuyển sang display row N.
+  // N > 0 = chèn vào hàng chờ N. Quà đang phát nằm trên cùng và KHÔNG tính là hàng chờ.
   const priority = item?.priority || 0;
   if (priority > 0 && queueItems.length > 0) {
-    const hasPlaying = queueItems[0]?.status === 'playing';
-    // Display row N (1-indexed) → array idx (N - 1).
-    // Nếu queueItems[0] = playing, idx tối thiểu = 1 (không thể displace playing).
-    const minIdx = hasPlaying ? 1 : 0;
-    const desiredIdx = priority - 1; // row N → idx N-1
-    const insertIdx = Math.max(minIdx, Math.min(desiredIdx, queueItems.length));
-    queueItems.splice(insertIdx, 0, ...batch);
-    appendLog(`[queue] ${baseName}: priority=${priority} → hàng ${insertIdx + 1} (queue có ${queueItems.length} hàng${hasPlaying ? ', đang phát ở hàng 1' : ''})`);
+    insertBatchByQueuePriority(batch, priority);
+    appendLog(`[queue] ${baseName}: priority=${priority} → chèn vào hàng chờ ${priority}`);
   } else {
     queueItems.push(...batch);
     if (priority > 0) {
@@ -181,11 +188,70 @@ function pushPlayBatch(item, ev, playTimes) {
   while (queueItems.length > QUEUE_MAX) queueItems.shift();
 
   // Đảm bảo chỉ có 1 entry 'playing' tại 1 thời điểm. Nếu chưa có ai playing → mark [0]
-  if (!queueItems.some(q => q.status === 'playing') && queueItems.length > 0) {
-    queueItems[0].status = 'playing';
+  if (shouldAutoStart && queueItems.length > 0) {
+    const firstQueued = queueItems.find(q => q.status === 'queued');
+    if (firstQueued) {
+      firstQueued.status = 'playing';
+      firstQueued.playStartedAt = Date.now();
+      playQueueItem(firstQueued);
+    }
   }
-  renderQueue(); renderMiniQueue(); updateQueueStats();
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats();
   forwardQueueSnapshot();
+}
+
+function insertBatchByQueuePriority(batch, priority) {
+  const playing = queueItems.filter(q => q.status === 'playing');
+  const queued = queueItems.filter(q => q.status === 'queued');
+  const insertAt = Math.max(0, Math.min((parseInt(priority, 10) || 1) - 1, queued.length));
+  queued.splice(insertAt, 0, ...batch);
+  queueItems.length = 0;
+  queueItems.push(...playing, ...queued);
+}
+
+async function playQueueItem(q) {
+  if (!q || !q.overlayId || !q.mediaFile || !window.bigo.overlayPlay) return;
+  if (window.bigo.effectsExists) {
+    let exists = true;
+    try { exists = await window.bigo.effectsExists(q.mediaFile); } catch { exists = false; }
+    if (!exists) { await handleMissingQueueMedia(q); return; }
+  }
+  const payload = resolveMediaPayload(q.mediaFile);
+  const r = await window.bigo.overlayPlay({ overlayId: q.overlayId, ...payload }).catch(e => ({ ok: false, error: e.message }));
+  if (r && r.ok === false) await handleMissingQueueMedia(q);
+}
+
+async function handleMissingQueueMedia(q) {
+  const file = q?.mediaFile || '';
+  const label = fileDisplayLabel(file);
+  if (q?.itemId) {
+    const found = findItemById(q.itemId);
+    if (found) found.item.mediaFile = '';
+  }
+  const idx = queueItems.findIndex(x => x.id === q.id);
+  if (idx !== -1) queueItems.splice(idx, 1);
+  await persistMapping().catch(() => {});
+  renderGiftTable();
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
+  if (!missingMediaWarned.has(file)) {
+    missingMediaWarned.add(file);
+    setTimeout(() => alert(`Thiếu dữ liệu nhạc/video:\n${label}\n\nApp đã xoá tên file bị thiếu khỏi cấu hình. Hãy chọn lại file hiệu ứng.`), 100);
+  }
+  if (!queuePaused && !queueItems.some(x => x.status === 'playing')) {
+    markNextQueueItemPlaying();
+    renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
+  }
+}
+
+function markNextQueueItemPlaying(delayMs = 0) {
+  if (queuePaused) return;
+  const nextQ = queueItems.find(q => q.status === 'queued');
+  if (!nextQ) return;
+  nextQ.status = 'playing';
+  nextQ.playStartedAt = Date.now();
+  const play = () => playQueueItem(nextQ);
+  if (delayMs > 0) setTimeout(play, delayMs);
+  else play();
 }
 
 // Hook: overlay:effect-ended từ overlay window (player/audio fire 'ended')
@@ -208,18 +274,17 @@ if (window.bigo.onOverlayEffectEnded) {
       queueItems.splice(playingIdx, 1);
       // Mark next queued as playing
       if (queueItems.length > 0 && !queueItems.some(q => q.status === 'playing')) {
-        const nextQ = queueItems.find(q => q.status === 'queued');
-        if (nextQ) nextQ.status = 'playing';
+        markNextQueueItemPlaying();
       }
       // Decrement 🎵 counter khi item end naturally
       sessionStats.effects = Math.max(0, sessionStats.effects - 1);
       updateConnectStats();
-      renderQueue(); renderMiniQueue(); updateQueueStats();
+      renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats();
       forwardQueueSnapshot();
       // Cũ: setTimeout(...) — bỏ delay, xoá thẳng để DSHT luôn chỉ chứa playing + queued
       setTimeout(() => {
         // Empty placeholder để giữ tương thích với code cũ. Có thể xoá block sau.
-        renderQueue(); renderMiniQueue();
+        renderQueue(); renderMiniQueue(); renderQueueCards();
       }, 400);
     }
   });
@@ -234,6 +299,56 @@ function getQueueDisplayList() {
   const playing = queueItems.filter(q => q.status === 'playing');
   const queued = queueItems.filter(q => q.status === 'queued');
   return [...playing, ...queued];
+}
+
+function buildQueueGiftKey(giftId, giftName, giftIcon) {
+  if (giftId != null && String(giftId).trim()) return 'id:' + String(giftId).trim();
+  const name = String(giftName || '').trim().toLowerCase();
+  if (name) return 'name:' + name;
+  const icon = String(giftIcon || '').trim();
+  return icon ? 'icon:' + icon : 'unknown';
+}
+
+function getQueueGiftKey(q) {
+  return q?.gift_key || buildQueueGiftKey(q?.gift_id, q?.gift_name, q?.gift_icon);
+}
+
+function getQueueGroups() {
+  const groups = new Map();
+  for (const q of getQueueDisplayList()) {
+    const key = getQueueGiftKey(q);
+    let g = groups.get(key);
+    if (!g) {
+      g = { key, name: q.gift_name || '?', icon: q.gift_icon || '', total: 0, diamond: 0, playing: null };
+      groups.set(key, g);
+    }
+    g.total += 1;
+    g.diamond += Number(q.diamond || 0);
+    if (q.status === 'playing' && !g.playing) g.playing = q;
+  }
+  return [...groups.values()];
+}
+
+function renderQueueCards() {
+  const el = document.getElementById('miniQueueCards');
+  if (!el) return;
+  const groups = getQueueGroups();
+  if (!groups.length) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = groups.map(g => {
+    const icon = g.icon
+      ? `<img class="queue-card-icon" src="${escapeHtml(g.icon)}" loading="lazy" />`
+      : '<div class="queue-card-icon empty"></div>';
+    return `<button class="queue-card ${g.playing ? 'playing' : ''}" data-gift-key="${escapeHtml(g.key)}" title="Ưu tiên tất cả ${escapeHtml(g.name)} lên đầu hàng chờ">
+      ${icon}
+      <span class="queue-card-count">${g.total.toLocaleString('en-US')}</span>
+    </button>`;
+  }).join('');
+  el.querySelectorAll('[data-gift-key]').forEach(card => {
+    card.onclick = () => queuePromoteGiftGroup(card.dataset.giftKey);
+  });
 }
 
 // Layout chuẩn (theo yêu cầu user):
@@ -252,7 +367,7 @@ function renderQueueRowHtml(q, opts = {}) {
   const cntInline = q.count > 1 || q.total > 1
     ? `<span class="cnt-inline">×${q.count}</span>` : '';
   const beansInline = q.diamond != null
-    ? `<span class="beans-inline">💎 ${q.diamond.toLocaleString('en-US')}</span>` : '';
+    ? `<span class="beans-inline">${beanIconHtml('small')} x${q.diamond.toLocaleString('en-US')}</span>` : '';
   const rowClass = opts.rowClass || 'mini-queue-row';
   return `<div class="${rowClass} ${q.status}" data-id="${escapeHtml(q.id)}">
     ${avHtml}
@@ -261,7 +376,10 @@ function renderQueueRowHtml(q, opts = {}) {
       <div class="qrow-user">${escapeHtml(q.user)}${playingBadge}</div>
       <div class="qrow-effect">tặng <b>${escapeHtml(q.gift_name)}</b>${cntInline}${beansInline}</div>
     </div>
-    <button class="qrow-del" data-qid="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
+    <div class="qrow-actions">
+      <button class="qrow-toggle" data-toggle-qid="${escapeHtml(q.id)}" title="${isPlaying ? 'Tạm dừng hiệu ứng đang phát' : 'Phát hiệu ứng này'}">${isPlaying ? '⏸' : '▶'}</button>
+      <button class="qrow-del" data-qid="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
+    </div>
   </div>`;
 }
 
@@ -286,6 +404,9 @@ function renderMiniQueue() {
   el.querySelectorAll('[data-qid]').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); removeQueueItemById(btn.dataset.qid); };
   });
+  el.querySelectorAll('[data-toggle-qid]').forEach(btn => {
+    btn.onclick = (e) => { e.stopPropagation(); queueToggleById(btn.dataset.toggleQid); };
+  });
   el.querySelectorAll('.mini-queue-row').forEach(row => wireQueueContextMenu(row));
 }
 
@@ -302,13 +423,12 @@ function removeQueueItemById(id) {
   }
   // Mark playing cho item tiếp theo (nếu có)
   if (removed.status === 'playing' && queueItems.length > 0) {
-    const nextQ = queueItems.find(q => q.status === 'queued');
-    if (nextQ) nextQ.status = 'playing';
+    markNextQueueItemPlaying(removed.overlayId ? 550 : 0);
   }
   // Decrement counter 🎵 effects
   sessionStats.effects = Math.max(0, sessionStats.effects - 1);
   updateConnectStats();
-  renderQueue(); renderMiniQueue(); updateQueueStats();
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats();
   forwardQueueSnapshot();
 }
 
@@ -326,7 +446,7 @@ function clearAllQueue() {
   sessionStats.effects = Math.max(0, sessionStats.effects - queueItems.length);
   updateConnectStats();
   queueItems.length = 0;
-  renderQueue(); renderMiniQueue(); updateQueueStats();
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats();
   forwardQueueSnapshot();
   if (window.bigo.popupResetQueue) window.bigo.popupResetQueue().catch(() => {});
 }
@@ -439,6 +559,7 @@ function renderQueue() {
   const list = getQueueDisplayList();
   if (!list.length) {
     els.effectQueue.innerHTML = '<div style="color:#555;text-align:center;padding:16px">Chưa có hiệu ứng nào trong danh sách</div>';
+    updateQueueControlButtons();
     return;
   }
   const maxRows = Math.max(5, Math.min(500, parseInt(appSettings?.maxListItems, 10) || 20));
@@ -452,7 +573,23 @@ function renderQueue() {
   els.effectQueue.querySelectorAll('[data-qid]').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); removeQueueItemById(btn.dataset.qid); };
   });
+  els.effectQueue.querySelectorAll('[data-toggle-qid]').forEach(btn => {
+    btn.onclick = (e) => { e.stopPropagation(); queueToggleById(btn.dataset.toggleQid); };
+  });
   els.effectQueue.querySelectorAll('.queue-row').forEach(row => wireQueueContextMenu(row));
+  updateQueueControlButtons();
+}
+
+function updateQueueControlButtons() {
+  const playing = queueItems.some(q => q.status === 'playing');
+  const label = playing ? '⏸' : '▶';
+  const title = playing ? 'Tạm dừng hiệu ứng đang phát' : 'Phát/kích hoạt lại hiệu ứng kế tiếp';
+  for (const id of ['btnToggleMiniQueue', 'btnToggleQueue']) {
+    const btn = document.getElementById(id);
+    if (!btn) continue;
+    btn.textContent = id === 'btnToggleQueue' ? `${label} ${playing ? 'Dừng' : 'Phát'}` : label;
+    btn.title = title;
+  }
 }
 
 // Wire right-click context menu cho 1 queue row (mini hoặc main).
@@ -468,6 +605,8 @@ function wireQueueContextMenu(row) {
       { icon: '🔝', label: 'Ưu tiên lên đầu', action: () => queueMoveTop(id) },
       { icon: '⬆️', label: 'Di chuyển lên 1 hàng', action: () => queueMoveUp(id) },
       { icon: '⬇️', label: 'Di chuyển xuống 1 hàng', action: () => queueMoveDown(id) },
+      { icon: '▶', label: 'Phát/kích hoạt lại', action: () => queuePlayById(id) },
+      { icon: '⏹', label: 'Dừng hiệu ứng', action: () => queueStopById(id) },
       { divider: true },
       { icon: '🗑', label: 'Xoá', danger: true, action: () => removeQueueItemById(id) },
     ]);
@@ -485,7 +624,7 @@ function queueMoveTop(id) {
   const playingIdx = queueItems.findIndex(q => q.status === 'playing');
   const insertAt = playingIdx >= 0 ? playingIdx + 1 : 0;
   queueItems.splice(insertAt, 0, item);
-  renderQueue(); renderMiniQueue(); updateQueueStats(); forwardQueueSnapshot();
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
 }
 function queueMoveUp(id) {
   const idx = queueItems.findIndex(q => q.id === id);
@@ -495,7 +634,7 @@ function queueMoveUp(id) {
   if (item.status === 'playing' || above.status === 'playing') return;
   queueItems[idx - 1] = item;
   queueItems[idx] = above;
-  renderQueue(); renderMiniQueue(); updateQueueStats(); forwardQueueSnapshot();
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
 }
 function queueMoveDown(id) {
   const idx = queueItems.findIndex(q => q.id === id);
@@ -505,7 +644,89 @@ function queueMoveDown(id) {
   if (item.status === 'playing') return;
   queueItems[idx + 1] = item;
   queueItems[idx] = below;
-  renderQueue(); renderMiniQueue(); updateQueueStats(); forwardQueueSnapshot();
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
+}
+
+function queueStopById(id) {
+  const q = queueItems.find(x => x.id === id) || queueItems.find(x => x.status === 'playing');
+  if (!q || q.status !== 'playing') return;
+  queuePaused = true;
+  if (q.overlayId && window.bigo.overlayStopEffect) {
+    window.bigo.overlayStopEffect(q.overlayId).catch(() => {});
+  }
+  q.status = 'queued';
+  q.stoppedAt = Date.now();
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
+}
+
+function queuePlayById(id) {
+  let q = id ? queueItems.find(x => x.id === id) : null;
+  if (!q) q = queueItems.find(x => x.status === 'queued') || queueItems.find(x => x.status === 'playing');
+  if (!q) return;
+  if (q.status === 'playing') {
+    queueStopById(q.id);
+    setTimeout(() => queuePlayById(q.id), 550);
+    return;
+  }
+  queuePaused = false;
+  const current = queueItems.find(x => x.status === 'playing' && x.id !== q.id);
+  if (current) queueStopById(current.id);
+  q.status = 'playing';
+  q.playStartedAt = Date.now();
+  const wait = current || (q.stoppedAt && Date.now() - q.stoppedAt < 550) ? 550 : 0;
+  if (wait) setTimeout(() => playQueueItem(q), wait);
+  else playQueueItem(q);
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
+}
+
+function queueStopCurrent() {
+  const current = queueItems.find(q => q.status === 'playing');
+  if (current) queueStopById(current.id);
+}
+
+function queuePlayCurrent() {
+  queuePlayById(null);
+}
+
+function queueToggleById(id) {
+  const q = id ? queueItems.find(x => x.id === id) : null;
+  if (q?.status === 'playing' || (!q && queueItems.some(x => x.status === 'playing'))) queueStopCurrent();
+  else queuePlayById(id || null);
+}
+
+function queueToggleCurrent() {
+  if (queueItems.some(q => q.status === 'playing')) queueStopCurrent();
+  else queuePlayCurrent();
+}
+
+function queueShuffleQueued() {
+  const playing = queueItems.filter(q => q.status === 'playing');
+  const queued = queueItems.filter(q => q.status === 'queued');
+  if (queued.length < 2) return;
+  for (let i = queued.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [queued[i], queued[j]] = [queued[j], queued[i]];
+  }
+  queueItems.length = 0;
+  queueItems.push(...playing, ...queued);
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
+}
+
+function queuePromoteGiftGroup(giftKey) {
+  if (!giftKey) return;
+  const promote = [];
+  const rest = [];
+  for (const q of queueItems) {
+    if (q.status === 'queued' && getQueueGiftKey(q) === giftKey) promote.push(q);
+    else rest.push(q);
+  }
+  if (!promote.length) return;
+  const playingIdx = rest.findIndex(q => q.status === 'playing');
+  const insertAt = playingIdx >= 0 ? playingIdx + 1 : 0;
+  rest.splice(insertAt, 0, ...promote);
+  queueItems.length = 0;
+  queueItems.push(...rest);
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
 }
 
 function updateQueueStats() {
@@ -540,6 +761,9 @@ const els = {
   bgmVol: $('bgmVol'), bgmVolVal: $('bgmVolVal'),
   fxVol: $('fxVol'), fxVolVal: $('fxVolVal'),
   maxListItems: $('maxListItems'),
+  miniQueueCards: $('miniQueueCards'),
+  qCardIcon: $('qCardIcon'), qCardIconVal: $('qCardIconVal'),
+  qCardCount: $('qCardCount'), qCardCountVal: $('qCardCountVal'),
   // Gift dialog extras
   dlgPauseBgm: $('dlgPauseBgm'), dlgPreFx: $('dlgPreFx'),
   effectQueue: $('effectQueue'), btnClearQueue: $('btnClearQueue'),
@@ -576,6 +800,9 @@ const els = {
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+function beanIconHtml(cls = '') {
+  return `<span class="bean-icon ${cls}" aria-label="BIGO bean"></span>`;
+}
 function appendLog(msg) {
   // Log panel đã được bỏ. Giữ console.log để debug qua DevTools.
   if (!els.log) { console.log('[bigo]', msg); return; }
@@ -585,23 +812,86 @@ function appendLog(msg) {
 }
 function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+function appConfirm({ title = 'Xác nhận thao tác', message = '', detail = '', okText = 'Đồng ý', cancelText = 'Huỷ', danger = false } = {}) {
+  return new Promise(resolve => {
+    const existing = document.querySelector('.app-confirm-backdrop');
+    if (existing) existing.remove();
+    const backdrop = document.createElement('div');
+    backdrop.className = 'app-confirm-backdrop';
+    backdrop.innerHTML = `
+      <div class="app-confirm-card ${danger ? 'danger' : ''}" role="dialog" aria-modal="true">
+        <button class="app-confirm-close" data-confirm="cancel" title="Đóng">✕</button>
+        <div class="app-confirm-icon">${danger ? '⚠' : '✓'}</div>
+        <div class="app-confirm-body">
+          <div class="app-confirm-title">${escapeHtml(title)}</div>
+          <div class="app-confirm-message">${escapeHtml(message)}</div>
+          ${detail ? `<div class="app-confirm-detail">${escapeHtml(detail)}</div>` : ''}
+        </div>
+        <div class="app-confirm-actions">
+          <button class="tiny" data-confirm="cancel">${escapeHtml(cancelText)}</button>
+          <button class="tiny primary ${danger ? 'danger' : ''}" data-confirm="ok">${escapeHtml(okText)}</button>
+        </div>
+      </div>`;
+    const done = (value) => { backdrop.remove(); resolve(value); };
+    backdrop.addEventListener('click', (e) => {
+      const action = e.target.closest('[data-confirm]')?.dataset.confirm;
+      if (action) done(action === 'ok');
+      else if (e.target === backdrop) done(false);
+    });
+    const onKey = (e) => {
+      if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); done(false); }
+      if (e.key === 'Enter') { document.removeEventListener('keydown', onKey); done(true); }
+    };
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(backdrop);
+    backdrop.querySelector('[data-confirm="ok"]')?.focus();
+  });
+}
+
+async function confirmClearQueue() {
+  if (queueItems.length === 0) {
+    appendLog('[queue] HÀNH ĐỘNG đã trống');
+    return false;
+  }
+  return appConfirm({
+    title: 'Xoá toàn bộ HÀNH ĐỘNG?',
+    message: `${queueItems.length.toLocaleString('en-US')} hành động đang chờ sẽ bị xoá.`,
+    detail: 'Thao tác này không thể hoàn tác. Hành động đang phát cũng sẽ dừng ngay.',
+    okText: 'Xoá tất cả',
+    cancelText: 'Giữ lại',
+    danger: true,
+  });
+}
+
 // =================== Queue listeners (sau khi els đã declared) ===================
 els.qSizeFont.addEventListener('input', () => { applyQueueSize(); saveQueueSettings(); });
 els.qSizeIcon.addEventListener('input', () => { applyQueueSize(); saveQueueSettings(); });
-els.btnClearQueue.onclick = () => {
-  if (!confirm('Xoá tất cả hiệu ứng đang chờ?')) return;
+if (els.qCardIcon) els.qCardIcon.addEventListener('input', () => { applyQueueSize(); saveQueueSettings(); });
+if (els.qCardCount) els.qCardCount.addEventListener('input', () => { applyQueueSize(); saveQueueSettings(); });
+els.btnClearQueue.onclick = async () => {
+  if (!(await confirmClearQueue())) return;
   clearAllQueue();
 };
 
 // IPC listeners từ popup window (popup user bấm X / Xoá tất cả / right-click)
 if (window.bigo.onQueueRemove) window.bigo.onQueueRemove(id => removeQueueItemById(id));
-if (window.bigo.onQueueClearAll) window.bigo.onQueueClearAll(() => clearAllQueue());
+if (window.bigo.onQueueClearAll) window.bigo.onQueueClearAll(async () => {
+  if (await confirmClearQueue()) clearAllQueue();
+});
 if (window.bigo.onQueueAction) {
-  window.bigo.onQueueAction(({ type, id }) => {
+  window.bigo.onQueueAction(({ type, id, giftKey }) => {
+    if (type === 'shuffle') { queueShuffleQueued(); return; }
+    if (type === 'promote-group') { queuePromoteGiftGroup(giftKey); return; }
+    if (type === 'play-current') { queuePlayCurrent(); return; }
+    if (type === 'stop-current') { queueStopCurrent(); return; }
+    if (type === 'toggle-current') { queueToggleCurrent(); return; }
     if (!id) return;
     if (type === 'top') queueMoveTop(id);
     else if (type === 'up') queueMoveUp(id);
     else if (type === 'down') queueMoveDown(id);
+    else if (type === 'play') queuePlayById(id);
+    else if (type === 'stop') queueStopById(id);
+    else if (type === 'toggle') queueToggleById(id);
   });
 }
 
@@ -675,7 +965,7 @@ if (btnConfigImport) {
 // Reset stats button → bộ đếm về 0 (giữ session vẫn chạy)
 if (els.btnResetStats) {
   els.btnResetStats.addEventListener('click', () => {
-    if (!confirm('Reset bộ đếm 🎵 💎 👤 🎁 về 0?')) return;
+    if (!confirm('Reset bộ đếm 🎵 đậu 👤 🎁 về 0?')) return;
     resetSessionStats();
   });
 }
@@ -994,9 +1284,10 @@ function setLiveInfo(text, cls) {
 }
 
 function getEffectPlayTimes(ev) {
-  const diamond = parseInt(ev?.total_diamond, 10) || 0;
-  if (diamond > 0) return Math.max(1, Math.min(1000, diamond));
-  return Math.max(1, Math.min(1000, ev?.total_count || ev?.gift_count || 1));
+  // HÀNH ĐỘNG chạy theo số lượng quà/combo, không theo tổng đậu.
+  // Ví dụ Bell x10 = 10 hàng hành động; 14 combo x10 = 140 hàng.
+  const total = parseInt(ev?.total_count, 10) || ((parseInt(ev?.gift_count, 10) || 1) * (parseInt(ev?.combo, 10) || 1));
+  return Math.max(1, Math.min(1000, total || 1));
 }
 
 function readViewerCount(roomData) {
@@ -1025,6 +1316,7 @@ async function init() {
 
   mapping = await window.bigo.mappingLoad();
   await reloadEffects();
+  await validateConfiguredMediaFiles();
   renderGiftTable();
   renderOverlayTable();
   // Re-apply heart goal UI sau khi mapping load (vì lần đầu chạy trong initAppSettings,
@@ -1034,6 +1326,7 @@ async function init() {
   loadQueueSettings();
   renderQueue();
   renderMiniQueue();
+  renderQueueCards();
   renderSettingsGroupsList();
   // Chat font size slider — persist localStorage
   const chatFont = document.getElementById('chatFontSize');
@@ -1148,6 +1441,28 @@ async function reloadEffects() {
   if (currentVal) els.dlgFile.value = currentVal;
 }
 
+async function validateConfiguredMediaFiles() {
+  if (!window.bigo.effectsExists) return;
+  const missing = [];
+  for (const grp of (mapping.groups || [])) {
+    for (const item of (grp.items || [])) {
+      if (!item.mediaFile) continue;
+      let exists = true;
+      try { exists = await window.bigo.effectsExists(item.mediaFile); } catch { exists = false; }
+      if (!exists) {
+        missing.push(`${item.alias || (item.matchKeys || [])[0] || 'Quà'}: ${fileDisplayLabel(item.mediaFile)}`);
+        item.mediaFile = '';
+      }
+    }
+  }
+  if (!missing.length) return;
+  await persistMapping();
+  renderGiftTable();
+  const msg = `Thiếu dữ liệu nhạc/video:\n${missing.slice(0, 12).join('\n')}${missing.length > 12 ? `\n... và ${missing.length - 12} file khác` : ''}\n\nApp đã xoá tên file bị thiếu khỏi cấu hình để bạn chọn lại.`;
+  appendLog('[media] ' + msg.replace(/\n/g, ' | '));
+  setTimeout(() => alert(msg), 300);
+}
+
 els.dlgPickFile.onclick = async () => {
   const r = await window.bigo.effectsPickFiles();
   if (!r.ok || !r.files || !r.files.length) return;
@@ -1164,6 +1479,7 @@ els.dlgPickFile.onclick = async () => {
     }
   }
   els.dlgFile.value = picked.fileUrl;
+  await autoSaveOpenGiftFields();
   appendLog(`đã chọn ${r.files.length} file (giữ ở vị trí gốc, không copy vào assets/effects)`);
 };
 // dlgOpenFolder button đã bỏ — không cần mở thư mục assets/effects nữa.
@@ -1171,6 +1487,20 @@ if (els.dlgOpenFolder) els.dlgOpenFolder.onclick = () => window.bigo.effectsOpen
 
 async function persistMapping() {
   await window.bigo.mappingSave(mapping);
+}
+
+async function autoSaveOpenGiftFields() {
+  const itemId = els.giftDialog?.dataset?.editingId;
+  if (!itemId) return;
+  const found = findItemById(itemId);
+  if (!found) return;
+  found.item.mediaFile = els.dlgFile.value;
+  found.item.overlayId = els.dlgOverlay.value;
+  found.item.priority = els.dlgPriority ? Math.max(0, Math.min(100, parseInt(els.dlgPriority.value, 10) || 0)) : 0;
+  found.item.pauseBgm = els.dlgPauseBgm ? els.dlgPauseBgm.checked : false;
+  found.item.preEffect = els.dlgPreFx ? els.dlgPreFx.checked : false;
+  await persistMapping();
+  renderGiftTable();
 }
 
 // =================== Gift Table ===================
@@ -1438,10 +1768,6 @@ async function groupAction(act, gid, value, itemId) {
       if (found.item.pauseBgm) pauseBgmForEffect();
       // Pre-effect: phát ÂM THANH/VIDEO trước (1 lần) nếu cả gift + setting cùng bật
       maybeDispatchPreEffect(found.item);
-      const payload = resolveMediaPayload(found.item.mediaFile);
-      for (let i = 0; i < playTimes; i++) {
-        await window.bigo.overlayPlay({ overlayId: found.item.overlayId, ...payload });
-      }
       // Manual play cũng counter 🎵 effects để user thấy stats hoạt động khi test
       sessionStats.effects += playTimes;
       updateConnectStats();
@@ -1508,7 +1834,7 @@ function renderMasterTable() {
     els.dlgMasterCount.textContent = 'đang tải...';
     return;
   }
-  if (els.dlgMasterTotal) els.dlgMasterTotal.textContent = masterFullList.length;
+  if (els.dlgMasterTotal) els.dlgMasterTotal.textContent = `Số lượng: ${masterFullList.length.toLocaleString('en-US')} quà`;
   const filter = els.dlgMasterFilter.value.toLowerCase().trim();
   const sortKey = els.dlgMasterSort.value;
   const vnOnly = els.dlgMasterVnOnly && els.dlgMasterVnOnly.checked;
@@ -1533,7 +1859,7 @@ function renderMasterTable() {
     return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
       <td><img src="${escapeHtml(src)}" loading="lazy" draggable="true" data-typeid="${g.typeid}" title="Kéo ra desktop = ${g.typeid}.png" /></td>
       <td><span class="id">${g.typeid}</span></td>
-      <td><span class="price">💎 ${g.diamonds ?? '?'}</span></td>
+      <td><span class="price">${beanIconHtml('small')} ${g.diamonds ?? '?'}</span></td>
       <td><span class="name">${escapeHtml(g.name)}</span></td>
       <td><button class="fav-btn ${isFav ? 'on' : ''}" data-fav="${g.typeid}" title="Đánh dấu yêu thích">${isFav ? '⭐' : '☆'}</button></td>
     </tr>`;
@@ -1582,6 +1908,12 @@ els.dlgMasterFilter.addEventListener('input', scheduleRenderMaster);
 els.dlgMasterSort.addEventListener('change', renderMasterTable);
 if (els.dlgMasterVnOnly) els.dlgMasterVnOnly.addEventListener('change', renderMasterTable);
 if (els.dlgMasterFavOnly) els.dlgMasterFavOnly.addEventListener('change', renderMasterTable);
+if (els.dlgFile) els.dlgFile.addEventListener('change', () => autoSaveOpenGiftFields());
+if (els.dlgOverlay) els.dlgOverlay.addEventListener('change', () => autoSaveOpenGiftFields());
+if (els.dlgPriority) els.dlgPriority.addEventListener('change', () => autoSaveOpenGiftFields());
+if (els.dlgPriority) els.dlgPriority.addEventListener('input', () => autoSaveOpenGiftFields());
+if (els.dlgPauseBgm) els.dlgPauseBgm.addEventListener('change', () => autoSaveOpenGiftFields());
+if (els.dlgPreFx) els.dlgPreFx.addEventListener('change', () => autoSaveOpenGiftFields());
 
 async function openGiftDialog(gift = null, groupId = null) {
   els.giftDialogTitle.textContent = gift ? 'Sửa quà' : 'Thêm quà';
@@ -1969,15 +2301,21 @@ els.btnPopupGifts.onclick = () => window.bigo.popupOpenGifts();
 if (els.btnPopupQueue) els.btnPopupQueue.onclick = () => window.bigo.popupOpenQueue();
 // Nút "🗑 Xoá tất cả" trên panel DSHT mini (trang chính) — confirm trước
 const btnClearMiniQueue = document.getElementById('btnClearMiniQueue');
-if (btnClearMiniQueue) btnClearMiniQueue.onclick = () => {
-  if (queueItems.length === 0) {
-    appendLog('[queue] DSHT đã trống');
-    return;
-  }
-  if (confirm(`⚠️ Xoá TOÀN BỘ ${queueItems.length} hiệu ứng đang chờ?\n\nThao tác này không thể hoàn tác. Hiệu ứng đang phát cũng sẽ dừng ngay.`)) {
-    clearAllQueue();
-  }
+if (btnClearMiniQueue) btnClearMiniQueue.onclick = async () => {
+  if (await confirmClearQueue()) clearAllQueue();
 };
+const btnShuffleMiniQueue = document.getElementById('btnShuffleMiniQueue');
+if (btnShuffleMiniQueue) btnShuffleMiniQueue.onclick = () => queueShuffleQueued();
+const btnToggleMiniQueue = document.getElementById('btnToggleMiniQueue');
+if (btnToggleMiniQueue) btnToggleMiniQueue.onclick = () => queueToggleCurrent();
+const btnToggleQueue = document.getElementById('btnToggleQueue');
+if (btnToggleQueue) btnToggleQueue.onclick = () => queueToggleCurrent();
+const btnQueueSettings = document.getElementById('btnQueueSettings');
+const queueSettings = document.getElementById('queueSettings');
+if (btnQueueSettings && queueSettings) btnQueueSettings.onclick = () => queueSettings.classList.toggle('open');
+const btnQueueCardSettings = document.getElementById('btnQueueCardSettings');
+const queueCardSettings = document.getElementById('queueCardSettings');
+if (btnQueueCardSettings && queueCardSettings) btnQueueCardSettings.onclick = () => queueCardSettings.classList.toggle('open');
 // Chat popup button
 const btnPopupChats = document.getElementById('btnPopupChats');
 if (btnPopupChats) btnPopupChats.onclick = () => window.bigo.popupOpenChats();
@@ -2047,24 +2385,19 @@ const RECEIVED_MAX = 200;
 function addReceivedGift(ev) {
   if (!ev || ev.type !== 'gift') return;
   const total = ev.total_count != null ? ev.total_count : ((ev.gift_count || 1) * (ev.combo || 1));
-  const unitDiamond = ev.total_diamond != null && total > 0 ? Math.round(ev.total_diamond / total) : null;
-  const rows = Math.max(1, Math.min(1000, total || 1));
-  for (let i = rows; i >= 1; i--) {
-    receivedGifts.unshift({
-      id: 'rg_' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2, 5),
-      ts: Date.now() + i,
-      user: ev.user || '?',
-      avatar: resolveAvatarForUser(ev.user, ev.user_avatar_url),
-      gift_name: ev.gift_name || '?',
-      gift_id: ev.gift_id,
-      gift_icon: ev.gift_icon || ev.gift_icon_url || '',
-      count: 1,
-      diamond: unitDiamond,
-      level: ev.level,
-      step: i,
-      total,
-    });
-  }
+  receivedGifts.unshift({
+    id: 'rg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+    ts: Date.now(),
+    user: ev.user || '?',
+    avatar: resolveAvatarForUser(ev.user, ev.user_avatar_url),
+    gift_name: ev.gift_name || '?',
+    gift_id: ev.gift_id,
+    gift_icon: ev.gift_icon || ev.gift_icon_url || '',
+    count: Math.max(1, total || 1),
+    diamond: ev.total_diamond ?? null,
+    level: ev.level,
+    total,
+  });
   if (receivedGifts.length > RECEIVED_MAX) receivedGifts.length = RECEIVED_MAX;
   renderReceivedGifts();
   forwardReceivedGiftsSnapshot();
@@ -2077,13 +2410,13 @@ function renderReceivedGifts() {
     cont.innerHTML = '';
     return;
   }
-  // Tổng quan: tổng KC + số quà + số user (hiển thị header trên list)
+  // Tổng quan: tổng đậu + số quà + số user (hiển thị header trên list)
   const totalDiamond = receivedGifts.reduce((s, g) => s + (g.diamond || 0), 0);
   const totalCount = receivedGifts.reduce((s, g) => s + (g.count || 0), 0);
   const uniqueUsers = new Set(receivedGifts.map(g => g.user)).size;
   cont.innerHTML = `
     <div class="rcv-summary">
-      <span title="Tổng KC nhận được">💎 <b>${totalDiamond.toLocaleString('en-US')}</b></span>
+      <span title="Tổng đậu nhận được">${beanIconHtml('inline')}<b>${totalDiamond.toLocaleString('en-US')}</b></span>
       <span title="Tổng số quà">🎁 <b>${totalCount}</b></span>
       <span title="Số user khác nhau">👤 <b>${uniqueUsers}</b></span>
     </div>
@@ -2095,16 +2428,16 @@ function renderReceivedGifts() {
     const avUrl = resolveAvatarForUser(g.user, g.avatar);
     const avHtml = avUrl ? `<img class="rcv-avatar" src="${escapeHtml(avUrl)}" loading="lazy" />` : '';
     const lvlBadge = g.level ? `<span class="lvl tier-${levelTier(g.level)}" style="margin-right:4px">Lv.${g.level}</span>` : '';
-    // Tổng KC = (đơn giá × số lượng). Tooltip show breakdown nếu có data.
+    // Tổng đậu = (đơn giá × số lượng). Tooltip show breakdown nếu có data.
     let beansHtml;
     if (g.diamond != null) {
       const unit = g.count > 0 ? Math.round(g.diamond / g.count) : g.diamond;
       const tooltip = g.count > 1
-        ? `${unit.toLocaleString('en-US')} KC × ${g.count} = ${g.diamond.toLocaleString('en-US')} KC`
-        : `${g.diamond.toLocaleString('en-US')} KC`;
-      beansHtml = `<span class="rcv-beans" title="${escapeHtml(tooltip)}">💎 ${g.diamond.toLocaleString('en-US')}</span>`;
+        ? `${unit.toLocaleString('en-US')} đậu × ${g.count} = ${g.diamond.toLocaleString('en-US')} đậu`
+        : `${g.diamond.toLocaleString('en-US')} đậu`;
+      beansHtml = `<span class="rcv-beans" title="${escapeHtml(tooltip)}">${beanIconHtml('small')} ${g.diamond.toLocaleString('en-US')}</span>`;
     } else {
-      beansHtml = `<span class="rcv-beans rcv-beans-unknown" title="Chưa có dữ liệu KC trong master">💎 ?</span>`;
+      beansHtml = `<span class="rcv-beans rcv-beans-unknown" title="Chưa có dữ liệu đậu trong master">${beanIconHtml('small')} ?</span>`;
     }
     return `<div class="rcv-row ${avUrl ? '' : 'no-avatar'}" data-gid="${g.id}">
       ${avHtml}
@@ -2294,16 +2627,12 @@ function renderParsed(ev) {
       addReceivedGift(ev);
     }
     if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
-      // Mỗi 1 KC tương ứng 1 lần hiệu ứng. Ví dụ Bell ×1 giá 50 KC → 50 hàng.
+      // Mỗi 1 đậu tương ứng 1 lần hiệu ứng. Ví dụ Bell ×1 giá 50 đậu → 50 hàng.
       // Tạm dừng nhạc nền nếu gift cấu hình "không chạy chung"
       if (matched.pauseBgm) pauseBgmForEffect();
       // Pre-effect: phát ÂM THANH/VIDEO trước MỘT LẦN (không lặp theo combo)
       maybeDispatchPreEffect(matched);
-      const payload = resolveMediaPayload(matched.mediaFile);
       pushQueue(ev, matched, playTimes);
-      for (let i = 0; i < playTimes; i++) {
-        window.bigo.overlayPlay({ overlayId: matched.overlayId, ...payload });
-      }
     }
   }
 }
@@ -2644,7 +2973,7 @@ function renderSpecialPickerTable() {
       return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}" data-icon="${escapeHtml(iconUrl)}">
         <td>${iconUrl ? `<img src="${escapeHtml(iconUrl)}" style="width:32px;height:32px;object-fit:contain" />` : ''}</td>
         <td><span class="id">${g.typeid}</span></td>
-        <td><span class="price">💎 ${g.diamonds ?? '?'}</span></td>
+      <td><span class="price">${beanIconHtml('small')} ${g.diamonds ?? '?'}</span></td>
         <td><span class="name">${escapeHtml(g.name)}</span></td>
         <td><button type="button" class="fav-btn ${isFav ? 'on' : ''}" data-fav="${g.typeid}" title="Yêu thích">${isFav ? '⭐' : '☆'}</button></td>
       </tr>`;
@@ -3156,19 +3485,10 @@ if (grpDlgSave) {
 
 // =================== Quản lý nhóm trong tab Cài đặt ===================
 async function settingsGroupRename(gid) {
-  console.log('[settingsGroupRename]', gid);
   const g = findGroupById(gid);
   if (!g) { alert('Nhóm không tồn tại (gid=' + gid + ')'); return; }
   if (g.isCommon) { alert('Không thể đổi tên NHÓM CHUNG'); return; }
-  const newName = prompt('Đổi tên nhóm:', g.name);
-  if (!newName || !newName.trim()) return;
-  const lower = newName.trim().toLowerCase();
-  const dup = (mapping.groups || []).find(x => x.id !== gid && x.name.toLowerCase() === lower);
-  if (dup) { alert(`Đã có nhóm "${dup.name}" - tên trùng (không phân biệt hoa/thường)`); return; }
-  g.name = newName.trim();
-  await persistMapping();
-  renderSettingsGroupsList();
-  renderGiftTable();
+  openGroupEditDialog(g);
 }
 
 async function settingsGroupDelete(gid) {
@@ -3241,22 +3561,21 @@ document.body.addEventListener('click', async (e) => {
   const renameBtn = e.target.closest('[data-glsact="rename"]');
   if (renameBtn) {
     e.preventDefault();
-    console.log('[delegated] gls rename:', renameBtn.dataset.gid);
-    settingsGroupRename(renameBtn.dataset.gid);
+    e.stopPropagation();
+    await settingsGroupRename(renameBtn.dataset.gid);
     return;
   }
   // Settings groups list — nút Xoá
   const delBtn = e.target.closest('[data-glsact="del"]');
   if (delBtn) {
     e.preventDefault();
-    console.log('[delegated] gls delete:', delBtn.dataset.gid);
-    settingsGroupDelete(delBtn.dataset.gid);
+    e.stopPropagation();
+    await settingsGroupDelete(delBtn.dataset.gid);
     return;
   }
   // Nút + Tạo nhóm
   if (e.target.closest('#btnCreateGroup')) {
     e.preventDefault();
-    console.log('[delegated] create group');
     await _handleCreateGroup();
     return;
   }

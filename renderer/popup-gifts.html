@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <title>QUÀ ĐÃ NHẬN — HP Action - BIGO LIVE</title>
+  <title>ĐÃ NHẬN — HP Action - BIGO LIVE</title>
   <link rel="icon" type="image/png" href="../logo-hp.png" />
   <link rel="stylesheet" href="style.css" />
   <style>
@@ -16,11 +16,11 @@
 </head>
 <body>
   <h1>
-    🎁 Lịch sử quà
-    <span class="pop-stats">💎<b id="popDiamond">0</b> · 🎁<b id="popCount">0</b> · 👤<b id="popUsers">0</b></span>
+    🎁 ĐÃ NHẬN
+    <span class="pop-stats"><span class="bean-icon small"></span><b id="popDiamond">0</b> · 🎁<b id="popCount">0</b> · 👤<b id="popUsers">0</b></span>
   </h1>
   <div class="pop-controls" style="font-size:11px; color:#8a8f9a">
-    📌 Lịch sử quà chỉ xem (read-only) — quà mới ở trên cùng. NPC theo dõi để biết user nào tặng gì.
+    📌 Danh sách chỉ xem (read-only) — quà mới ở trên cùng. NPC theo dõi để biết user nào tặng gì.
   </div>
   <div id="popGifts"></div>
   <script>
@@ -65,16 +65,16 @@
         : `<div class="rcv-icon-empty"></div>`;
       const lvlBadge = g.level
         ? `<span class="lvl tier-${levelTier(g.level)}" style="margin-right:4px">Lv.${g.level}</span>` : '';
-      // 💎 KC tổng (đơn giá × số lượng) — tooltip chi tiết
+      // Đậu tổng (đơn giá × số lượng) — tooltip chi tiết
       let beansHtml;
       if (g.diamond != null) {
         const unit = g.count > 0 ? Math.round(g.diamond / g.count) : g.diamond;
         const tooltip = g.count > 1
-          ? `${unit.toLocaleString('en-US')} KC × ${g.count} = ${g.diamond.toLocaleString('en-US')} KC`
-          : `${g.diamond.toLocaleString('en-US')} KC`;
-        beansHtml = `<span class="rcv-beans" title="${escapeHtml(tooltip)}">💎 ${g.diamond.toLocaleString('en-US')}</span>`;
+          ? `${unit.toLocaleString('en-US')} đậu × ${g.count} = ${g.diamond.toLocaleString('en-US')} đậu`
+          : `${g.diamond.toLocaleString('en-US')} đậu`;
+        beansHtml = `<span class="rcv-beans" title="${escapeHtml(tooltip)}"><span class="bean-icon small"></span> ${g.diamond.toLocaleString('en-US')}</span>`;
       } else {
-        beansHtml = `<span class="rcv-beans rcv-beans-unknown" title="Chưa có dữ liệu KC">💎 ?</span>`;
+        beansHtml = `<span class="rcv-beans rcv-beans-unknown" title="Chưa có dữ liệu đậu"><span class="bean-icon small"></span> ?</span>`;
       }
       return `<div class="rcv-row ${g.avatar ? '' : 'no-avatar'}" data-gid="${escapeHtml(g.id)}">
         ${avatar}

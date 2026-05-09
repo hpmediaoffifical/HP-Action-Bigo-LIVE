@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('bigo', {
   effectsList: () => ipcRenderer.invoke('effects:list'),
   effectsPickFiles: () => ipcRenderer.invoke('effects:pick-files'),
   effectsOpenFolder: () => ipcRenderer.invoke('effects:open-folder'),
+  effectsExists: (mediaFile) => ipcRenderer.invoke('effects:exists', mediaFile),
   pickBgmFile: () => ipcRenderer.invoke('bgm:pick-file'),
   pickPreFxFile: () => ipcRenderer.invoke('preFx:pick-file'),
 
