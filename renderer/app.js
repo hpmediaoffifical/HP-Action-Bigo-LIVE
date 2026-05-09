@@ -1613,6 +1613,18 @@ function renderGroupsInto(container, opts) {
   }
 }
 
+function isSpecialTriggerItem(item) {
+  const keys = new Set((item?.matchKeys || []).map(k => String(k).toLowerCase().trim()).filter(Boolean));
+  if (item?.alias) keys.add(String(item.alias).toLowerCase().trim());
+  const se = appSettings?.specialEffects || {};
+  for (const cfg of Object.values(se)) {
+    if (!cfg || typeof cfg !== 'object') continue;
+    if (cfg.typeid != null && keys.has(String(cfg.typeid).toLowerCase())) return true;
+    if (cfg.giftName && keys.has(String(cfg.giftName).toLowerCase().trim())) return true;
+  }
+  return false;
+}
+
 // Drag-drop reorder cho items trong cùng group + giữa groups
 function wireDragDrop(container) {
   let dragIid = null;
@@ -1677,14 +1689,18 @@ function renderGroupCard(grp, overlayMap) {
       ? `<img src="${escapeHtml(iconUrl)}" class="grow-icon" loading="lazy" />`
       : '<div class="grow-icon-empty"></div>';
     const displayName = item.alias || (item.matchKeys || [])[0] || '?';
-    const priorityBadge = item.priority > 0 ? `<span class="prio-badge" title="Ưu tiên: chèn vào hàng ${item.priority} trong queue">⚡ #${item.priority}</span>` : '';
-    const pauseBgmBadge = item.pauseBgm ? '<span class="pause-bgm-badge" title="Tạm dừng nhạc nền khi hiệu ứng này phát">🔇</span>' : '';
-    const preEffectBadge = item.preEffect ? '<span class="pre-effect-badge" title="Phát âm thanh/video trước hiệu ứng">🔔</span>' : '';
+    const overlayTarget = overlayMap.get(item.overlayId)?.target || 'native';
+    const priorityBadge = item.priority > 0 ? `<span class="gift-state-badge prio-badge" title="Ưu tiên: chèn vào hàng ${item.priority} trong queue">⚡#${item.priority}</span>` : '';
+    const pauseBgmBadge = item.pauseBgm ? '<span class="gift-state-badge pause-bgm-badge" title="Tạm dừng nhạc nền khi hiệu ứng này phát">🔇</span>' : '';
+    const preEffectBadge = item.preEffect ? '<span class="gift-state-badge pre-effect-badge" title="Phát âm thanh/video trước hiệu ứng">🔔</span>' : '';
+    const targetBadge = item.overlayId ? `<span class="gift-state-badge target-badge" title="Đích phát: ${overlayTarget === 'obs' ? 'OBS localhost' : overlayTarget === 'both' ? 'Cửa sổ + OBS localhost' : 'Cửa sổ máy tính'}">${overlayTarget === 'obs' ? '🔗' : overlayTarget === 'both' ? '🖥🔗' : '🖥'}</span>` : '';
+    const missingBadge = !item.mediaFile ? '<span class="gift-state-badge missing-badge" title="Chưa chọn file hiệu ứng">⚠️</span>' : '';
+    const specialBadge = isSpecialTriggerItem(item) ? '<span class="gift-state-badge special-badge" title="Quà này đang dùng làm trigger Hiệu Ứng Đặc Biệt">🎯</span>' : '';
     // Hiển thị tên file rút gọn (basename) nếu là full path/URL
     const fileDisplay = displayEffectName(item.mediaFile);
     const fileLine = item.mediaFile
-      ? `<div class="grow-sub"><code>${escapeHtml(fileDisplay)}</code>${priorityBadge}${pauseBgmBadge}${preEffectBadge}</div>`
-      : '<div class="grow-sub" style="color:#ff6b6b">— chưa có file hiệu ứng —</div>';
+      ? `<div class="grow-sub"><code>${escapeHtml(fileDisplay)}</code><span class="gift-state-badges">${priorityBadge}${pauseBgmBadge}${preEffectBadge}${targetBadge}${specialBadge}</span></div>`
+      : `<div class="grow-sub"><span style="color:#ff6b6b">— chưa có file hiệu ứng —</span><span class="gift-state-badges">${missingBadge}${targetBadge}${specialBadge}</span></div>`;
     return `<div class="group-item" data-iid="${item.id}" data-gid="${grp.id}">
       ${iconCell}
       <div class="grow-meta">
@@ -1718,7 +1734,7 @@ function renderGroupCard(grp, overlayMap) {
       <span class="group-name">${escapeHtml(grp.name)}</span>
       <span class="group-badge">${(grp.items || []).length} mục</span>
       ${toggleHtml}
-      <button class="tiny" data-act="add-item" data-gid="${grp.id}" title="Thêm vào nhóm">+ mục</button>
+      <button class="tiny" data-act="add-item" data-gid="${grp.id}" title="Thêm quà vào nhóm">+ Thêm quà</button>
       ${editBtn}
       ${delBtn}
       <button class="tiny" data-act="collapse" data-gid="${grp.id}" title="Thu gọn/Mở">${collapsed ? '▶' : '▼'}</button>
