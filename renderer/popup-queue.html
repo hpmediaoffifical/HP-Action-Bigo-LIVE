@@ -200,12 +200,13 @@
       const cntInline = `<span class="cnt-inline">SL ×${q.count || 1}</span>`;
       const beansInline = q.diamond != null
         ? `<span class="beans-inline"><span class="bean-icon small"></span> x${Number(q.diamond).toLocaleString('en-US')}</span>` : '';
+      const effectName = q.effect_name || q.gift_name || 'Hiệu ứng';
       return `<div class="queue-row ${q.status}" data-id="${escapeHtml(q.id)}">
         ${giftIcon}
         <div class="qrow-meta">
           <div class="qrow-user">${escapeHtml(q.user)}${playingBadge}</div>
-          <div class="qrow-effect" title="Tên Hiệu Ứng: ${escapeHtml(q.gift_name)}">
-            Tên Hiệu Ứng: <b>${escapeHtml(q.gift_name)}</b>${cntInline}${beansInline}
+          <div class="qrow-effect" title="${escapeHtml(effectName)}">
+            <b>${escapeHtml(effectName)}</b>${cntInline}${beansInline}
           </div>
         </div>
         <div class="qrow-actions">

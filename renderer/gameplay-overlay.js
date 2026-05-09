@@ -41,6 +41,9 @@ function iconSrc(item) {
   if (item.icon) return item.icon;
   return '';
 }
+function normalizeIconUrl(icon) {
+  return String(icon || '').replace(/\\/g, '/').replace(/[?#].*$/, '').trim().toLowerCase();
+}
 function orderedItemsForDisplay() {
   const items = [...(cfg.items || [])];
   if (!cfg.centerLargest || items.length < 3) return items;
@@ -58,22 +61,7 @@ function orderedItemsForDisplay() {
 function orderedSlotsForDisplay() {
   const slots = Array.isArray(cfg.slots) ? [...cfg.slots] : [];
   if (!slots.length) return orderedItemsForDisplay();
-  const itemPositions = slots.map((slot, idx) => ({ slot, idx })).filter(x => (x.slot.itemId || x.slot.id) && x.slot.visible !== false);
-  if (!cfg.centerLargest || itemPositions.length < 3) return slots;
-  let maxPos = -1;
-  let maxCount = 0;
-  itemPositions.forEach(({ slot }, pos) => {
-    const itemId = slot.itemId || slot.id;
-    const count = state.get(itemId)?.count || 0;
-    if (count > maxCount) { maxCount = count; maxPos = pos; }
-  });
-  if (maxPos < 0 || maxCount <= 0) return slots;
-  const orderedItems = itemPositions.map(x => x.slot);
-  const [top] = orderedItems.splice(maxPos, 1);
-  orderedItems.splice(Math.floor((itemPositions.length - 1) / 2), 0, top);
-  const next = [...slots];
-  itemPositions.forEach(({ idx }, pos) => { next[idx] = orderedItems[pos]; });
-  return next;
+  return slots;
 }
 function nameClass(name) {
   const mode = cfg.nameMode || 'marquee';
@@ -92,6 +80,9 @@ function render() {
   wrap.style.setProperty('--card-bg-rgb', `${bg.r}, ${bg.g}, ${bg.b}`);
   wrap.style.setProperty('--card-opacity', String((parseInt(cfg.cardOpacity, 10) || 86) / 100));
   wrap.style.setProperty('--text-color', cfg.textColor || '#ffffff');
+  wrap.style.setProperty('--slot-number-color', cfg.slotNumberColor || '#ffffff');
+  wrap.style.setProperty('--count-color', cfg.countColor || '#ffffff');
+  wrap.style.setProperty('--count-size', `${Math.max(9, Math.min(28, parseInt(cfg.countSize, 10) || 12))}px`);
   wrap.style.setProperty('--text-font', `'${String(cfg.textFont || 'Segoe UI').replace(/'/g, '')}', sans-serif`);
   const iconSize = Math.max(28, Math.min(120, parseInt(cfg.iconSize, 10) || 54));
   const parsedItemGap = parseInt(cfg.itemGap, 10);
@@ -111,6 +102,7 @@ function render() {
     const icon = iconSrc(item);
     const labelPosition = ['top', 'bottom', 'left', 'right'].includes(cfg.labelPosition) ? cfg.labelPosition : 'bottom';
     const name = item.name || '';
+    const slotNumber = String(item.number || '').trim();
     const isActive = activeIds.has(itemId);
     const classes = [
       'gift',
@@ -121,8 +113,9 @@ function render() {
     return `<div class="${classes}" data-id="${escapeHtml(itemId)}">
       <div class="icon-wrap">
         ${icon ? `<img src="${escapeHtml(icon)}" />` : '<div style="width:50px;height:50px"></div>'}
-        ${cfg.showCount !== false && st.count ? `<div class="count">${Number(st.count).toLocaleString('en-US')}</div>` : ''}
+        ${st.count ? `<div class="count">${Number(st.count).toLocaleString('en-US')}</div>` : ''}
       </div>
+      ${slotNumber ? `<div class="slot-number">${escapeHtml(slotNumber)}</div>` : ''}
       ${cfg.showName === false ? '' : `<div class="name${nameClass(name)}"><span>${escapeHtml(name)}</span></div>`}
     </div>`;
   }).join('');
@@ -152,7 +145,7 @@ es.addEventListener('gift', e => {
   const total = parseInt(ev.total_count, 10) || ((parseInt(ev.gift_count, 10) || 1) * (parseInt(ev.combo, 10) || 1));
   for (const item of cfg.items || []) {
     const keys = itemKeys(item);
-    const sameIcon = !!ev.gift_icon && !!item.icon && ev.gift_icon === item.icon;
+    const sameIcon = !!ev.gift_icon && !!item.icon && normalizeIconUrl(ev.gift_icon) === normalizeIconUrl(item.icon);
     if (!keys.includes(evKey) && !keys.includes(evNameKey) && !sameIcon) continue;
     const st = state.get(item.id) || { count: 0 };
     st.count += Math.max(1, total || 1);

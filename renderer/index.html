@@ -7,6 +7,22 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <section id="licenseGate" class="license-gate" aria-label="Nhập KEY bản quyền">
+    <div class="license-card">
+      <div class="license-logo-wrap"><img src="../logo-hp.png" alt="HP Action" /></div>
+      <h1>HP Action - BIGO LIVE</h1>
+      <p class="license-subtitle">Nhập KEY bản quyền để sử dụng phần mềm trên thiết bị này.</p>
+      <form id="licenseGateForm" class="license-form">
+        <input id="licenseGateKey" type="password" autocomplete="off" placeholder="Nhập KEY bản quyền" />
+        <button id="licenseGateSubmit" class="primary" type="submit">KÍCH HOẠT</button>
+      </form>
+      <div id="licenseGateMessage" class="license-message">Đang kiểm tra KEY...</div>
+      <div class="license-developer">
+        <div>HP Action - Bigo LIVE by HP Media</div>
+        <a href="https://www.facebook.com/hpvn.media" data-ext="https://www.facebook.com/hpvn.media">Liên hệ bản quyền</a>
+      </div>
+    </div>
+  </section>
   <div class="app-layout">
     <aside class="sidebar">
       <div class="sidebar-logo" title="BIGO Action">
@@ -224,6 +240,7 @@
         <div class="gameplay-edit-panel">
           <label class="gameplay-field">Nhóm quà
             <select id="gameplayGroup"></select>
+            <div id="gameplayGroupChecks" class="gameplay-group-checks"></div>
           </label>
           <label class="gameplay-field">Hướng hiển thị
             <select id="gameplayOrientation">
@@ -247,21 +264,24 @@
             <label>Độ trong suốt <span id="gameplayCardOpacityVal">86%</span><input id="gameplayCardOpacity" type="range" min="20" max="100" value="86" /></label>
             <label>Kiểu tên quà<select id="gameplayNameMode"><option value="normal">Bình thường</option><option value="marquee">Chạy khi chữ dài</option><option value="wrap">Xuống dòng 2 hàng</option></select></label>
             <label>Font chữ<select id="gameplayTextFont"><option value="Segoe UI">Segoe UI</option><option value="Arial">Arial</option><option value="Tahoma">Tahoma</option><option value="Impact">Impact</option><option value="Consolas">Consolas</option></select></label>
-            <label>Màu chữ<input id="gameplayTextColor" type="color" value="#ffffff" /></label>
             <label class="gameplay-switch"><span>In hoa tên quà</span><input id="gameplayUppercase" type="checkbox" /></label>
             <label class="gameplay-switch"><span>Hiện tên dưới icon</span><input id="gameplayShowName" type="checkbox" checked /></label>
             <label class="gameplay-switch"><span>Hiện số đếm quà</span><input id="gameplayShowCount" type="checkbox" checked /></label>
+          </div>
+          <div class="gameplay-option-group">
+            <div class="gameplay-option-title">Kích thước & màu sắc</div>
+            <label>Màu chữ<input id="gameplayTextColor" type="color" value="#ffffff" /></label>
+            <label>Màu số phía trên<input id="gameplaySlotNumberColor" type="color" value="#ffffff" /></label>
+            <label>Màu số đếm phía dưới<input id="gameplayCountColor" type="color" value="#ffffff" /></label>
             <label>Kích thước icon <span id="gameplayIconSizeVal">54px</span><input id="gameplayIconSize" type="range" min="28" max="120" value="54" /></label>
+            <label>Kích thước số đếm <span id="gameplayCountSizeVal">12px</span><input id="gameplayCountSize" type="range" min="9" max="28" value="12" /></label>
             <label>Khoảng cách ngang <span id="gameplayItemGapVal">10px</span><input id="gameplayItemGap" type="range" min="0" max="60" value="10" /></label>
           </div>
           <div class="gameplay-option-group">
-            <div class="gameplay-option-title">Hiệu ứng nổi bật</div>
+            <div class="gameplay-option-title">Hiệu ứng & sắp xếp</div>
             <label class="gameplay-switch"><span>Phóng to quà khi chạy</span><input id="gameplayEnlargeActive" type="checkbox" /></label>
             <label>Kích cỡ phóng to <span id="gameplayActiveScaleVal">140%</span><input id="gameplayActiveScale" type="range" min="100" max="200" value="140" /></label>
             <label class="gameplay-switch"><span>Làm xám quà không chạy</span><input id="gameplayGrayInactive" type="checkbox" /></label>
-          </div>
-          <div class="gameplay-option-group">
-            <div class="gameplay-option-title">Sắp xếp & điểm</div>
             <label class="gameplay-switch"><span>Xếp quà lớn nhất ở giữa</span><input id="gameplayCenterLargest" type="checkbox" /></label>
             <label class="gameplay-switch"><span>Giữ điểm đã tặng</span><input id="gameplayKeepScore" type="checkbox" /></label>
           </div>
@@ -675,6 +695,11 @@
         <label>Overlay
           <select id="dlgOverlay"></select>
         </label>
+      </div>
+      <div class="media-drop" id="dlgMediaDrop">
+        <div class="media-drop-title">Kéo thả video/mp3 vào đây hoặc bấm 📁 Chọn để thêm nhiều hiệu ứng</div>
+        <div class="media-drop-hint">Từ 2 file trở lên: app tự phát ngẫu nhiên mỗi lần quà được kích hoạt.</div>
+        <div id="dlgMediaList" class="media-list"></div>
       </div>
       <div class="form-row">
         <label class="checkbox-row" title="Khi BẬT: nhạc nền tự dừng trong lúc phát hiệu ứng. Khi TẮT: nhạc nền chạy chung với hiệu ứng.">

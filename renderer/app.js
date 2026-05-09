@@ -150,11 +150,12 @@ function pushPlayBatch(item, ev, playTimes) {
     ? Math.max(1, Math.round(ev.total_diamond / playTimes))
     : null;
   const baseLevel = ev?.level ?? null;
-  const mediaFile = item?.mediaFile || null;
+  const mediaFiles = normalizeMediaFiles(item);
   const overlayId = item?.overlayId || null;
 
   const batch = [];
   for (let i = 0; i < playTimes; i++) {
+    const selectedMediaFile = mediaFiles.length > 1 ? chooseEffectMedia(item) : (mediaFiles[0] || null);
     batch.push({
       id: 'q_' + batchId + '_' + i,
       batchId,
@@ -165,7 +166,10 @@ function pushPlayBatch(item, ev, playTimes) {
       level: baseLevel,
       count: 1, step: i + 1, total: playTimes,
       diamond: baseDiamond,
-      mediaFile, overlayId,
+      mediaFile: selectedMediaFile,
+      effect_name: selectedMediaFile ? effectNameFromMediaFile(selectedMediaFile) : baseName,
+      mediaFiles,
+      overlayId,
       pauseBgm: !!item?.pauseBgm,
       itemId: item?.id || null,
       status: 'queued', // tất cả queued — processor sẽ pick first
@@ -228,7 +232,11 @@ async function handleMissingQueueMedia(q) {
   const label = fileDisplayLabel(file);
   if (q?.itemId) {
     const found = findItemById(q.itemId);
-    if (found) found.item.mediaFile = '';
+    if (found) {
+      const remaining = normalizeMediaFiles(found.item).filter(x => x !== file);
+      found.item.mediaFiles = remaining;
+      found.item.mediaFile = remaining[0] || '';
+    }
   }
   const idx = queueItems.findIndex(x => x.id === q.id);
   if (idx !== -1) queueItems.splice(idx, 1);
@@ -322,14 +330,21 @@ function getQueueGroups() {
     const key = getQueueGiftKey(q);
     let g = groups.get(key);
     if (!g) {
-      g = { key, name: q.gift_name || '?', icon: q.gift_icon || '', total: 0, diamond: 0, playing: null };
+      g = { key, name: q.gift_name || '?', icon: q.gift_icon || '', total: 0, diamond: 0, playing: null, itemIds: new Set(), identities: new Set() };
       groups.set(key, g);
     }
+    if (q.itemId) {
+      g.itemIds.add(q.itemId);
+      const found = findItemById(q.itemId);
+      if (found?.item) g.identities.add(gameplayItemIdentity(found.item));
+    }
+    if (q.gift_id != null && String(q.gift_id).trim()) g.identities.add(`id:${String(q.gift_id).trim()}`);
+    else if (q.gift_name) g.identities.add(`name:${String(q.gift_name).trim().toLowerCase()}`);
     g.total += 1;
     g.diamond += Number(q.diamond || 0);
     if (q.status === 'playing' && !g.playing) g.playing = q;
   }
-  return [...groups.values()];
+  return [...groups.values()].map(g => ({ ...g, itemIds: [...g.itemIds], identities: [...g.identities] }));
 }
 
 function renderQueueCards() {
@@ -372,13 +387,14 @@ function renderQueueRowHtml(q, opts = {}) {
     ? `<span class="cnt-inline">×${q.count}</span>` : '';
   const beansInline = q.diamond != null
     ? `<span class="beans-inline">${beanIconHtml('small')} x${q.diamond.toLocaleString('en-US')}</span>` : '';
+  const effectName = q.effect_name || q.gift_name || 'Hiệu ứng';
   const rowClass = opts.rowClass || 'mini-queue-row';
   return `<div class="${rowClass} ${q.status}" data-id="${escapeHtml(q.id)}">
     ${avHtml}
     ${giftIconHtml}
     <div class="qrow-meta">
       <div class="qrow-user">${escapeHtml(q.user)}${playingBadge}</div>
-      <div class="qrow-effect">tặng <b>${escapeHtml(q.gift_name)}</b>${cntInline}${beansInline}</div>
+      <div class="qrow-effect">tặng <b>${escapeHtml(effectName)}</b>${cntInline}${beansInline}</div>
     </div>
     <div class="qrow-actions">
       <button class="qrow-toggle" data-toggle-qid="${escapeHtml(q.id)}" title="${isPlaying ? 'Tạm dừng hiệu ứng đang phát' : 'Phát hiệu ứng này'}">${isPlaying ? '⏸' : '▶'}</button>
@@ -568,7 +584,7 @@ function checkClearGiftTrigger(ev) {
 }
 
 function pushQueue(ev, matched, playTimes) {
-  if (!matched || !matched.mediaFile) return;
+  if (!matched || !hasEffectMedia(matched)) return;
   // Dùng pushPlayBatch để chia tách thành playTimes entries
   pushPlayBatch(matched, ev, playTimes);
 }
@@ -783,10 +799,10 @@ const els = {
   miniQueueCards: $('miniQueueCards'),
   qCardIcon: $('qCardIcon'), qCardIconVal: $('qCardIconVal'),
   qCardCount: $('qCardCount'), qCardCountVal: $('qCardCountVal'),
-  gameplayGroup: $('gameplayGroup'), gameplayOrientation: $('gameplayOrientation'), gameplayLabelPosition: $('gameplayLabelPosition'),
-  gameplayNameMode: $('gameplayNameMode'), gameplayIconSize: $('gameplayIconSize'), gameplayIconSizeVal: $('gameplayIconSizeVal'), gameplayItemGap: $('gameplayItemGap'), gameplayItemGapVal: $('gameplayItemGapVal'), gameplayEnlargeActive: $('gameplayEnlargeActive'), gameplayActiveScale: $('gameplayActiveScale'), gameplayActiveScaleVal: $('gameplayActiveScaleVal'),
+  gameplayGroup: $('gameplayGroup'), gameplayGroupChecks: $('gameplayGroupChecks'), gameplayUseCommonGroup: $('gameplayUseCommonGroup'), gameplayOrientation: $('gameplayOrientation'), gameplayLabelPosition: $('gameplayLabelPosition'),
+  gameplayNameMode: $('gameplayNameMode'), gameplayIconSize: $('gameplayIconSize'), gameplayIconSizeVal: $('gameplayIconSizeVal'), gameplayCountSize: $('gameplayCountSize'), gameplayCountSizeVal: $('gameplayCountSizeVal'), gameplayItemGap: $('gameplayItemGap'), gameplayItemGapVal: $('gameplayItemGapVal'), gameplayEnlargeActive: $('gameplayEnlargeActive'), gameplayActiveScale: $('gameplayActiveScale'), gameplayActiveScaleVal: $('gameplayActiveScaleVal'),
   gameplayCardBg: $('gameplayCardBg'), gameplayCardOpacity: $('gameplayCardOpacity'), gameplayCardOpacityVal: $('gameplayCardOpacityVal'),
-  gameplayTextFont: $('gameplayTextFont'), gameplayTextColor: $('gameplayTextColor'), gameplayUppercase: $('gameplayUppercase'), gameplayShowName: $('gameplayShowName'), gameplayShowCount: $('gameplayShowCount'),
+  gameplayTextFont: $('gameplayTextFont'), gameplayTextColor: $('gameplayTextColor'), gameplaySlotNumberColor: $('gameplaySlotNumberColor'), gameplayCountColor: $('gameplayCountColor'), gameplayUppercase: $('gameplayUppercase'), gameplayShowName: $('gameplayShowName'), gameplayShowCount: $('gameplayShowCount'),
   gameplayCenterLargest: $('gameplayCenterLargest'), gameplayGrayInactive: $('gameplayGrayInactive'), gameplayKeepScore: $('gameplayKeepScore'),
   gameplayReview: $('gameplayReview'), gameplayGridEditor: $('gameplayGridEditor'), gameplayItems: $('gameplayItems'), btnGameplayAddCol: $('btnGameplayAddCol'), btnGameplayAddRow: $('btnGameplayAddRow'), btnGameplayDelCol: $('btnGameplayDelCol'), btnGameplayDelRow: $('btnGameplayDelRow'), btnGameplaySave: $('btnGameplaySave'), btnGameplayCopyUrl: $('btnGameplayCopyUrl'),
   // Gift dialog extras
@@ -808,7 +824,7 @@ const els = {
   dlgGroup: $('dlgGroup'), dlgFile: $('dlgFile'), dlgOverlay: $('dlgOverlay'),
   dlgPriority: $('dlgPriority'),
   dlgGiftSave: $('dlgGiftSave'), groupList: $('groupList'),
-  dlgPickFile: $('dlgPickFile'), dlgOpenFolder: $('dlgOpenFolder'),
+  dlgPickFile: $('dlgPickFile'), dlgOpenFolder: $('dlgOpenFolder'), dlgMediaDrop: $('dlgMediaDrop'), dlgMediaList: $('dlgMediaList'),
   dlgMasterFilter: $('dlgMasterFilter'), dlgMasterSort: $('dlgMasterSort'),
   dlgMasterTableBody: $('dlgMasterTableBody'), dlgMasterCount: $('dlgMasterCount'),
   dlgMasterVnOnly: $('dlgMasterVnOnly'), dlgMasterFavOnly: $('dlgMasterFavOnly'),
@@ -837,6 +853,38 @@ function displayEffectName(mediaFile) {
     catch { name = name.split(/[\\\/]/).pop() || name; }
   }
   return name.replace(/\.(webm|mp4|mp3|wav|ogg|gif)$/i, '');
+}
+function normalizeMediaFiles(itemOrFiles) {
+  const raw = Array.isArray(itemOrFiles)
+    ? itemOrFiles
+    : [itemOrFiles?.mediaFile, ...(Array.isArray(itemOrFiles?.mediaFiles) ? itemOrFiles.mediaFiles : [])];
+  const seen = new Set();
+  const files = [];
+  for (const value of raw) {
+    const file = String(value || '').trim();
+    if (!file || seen.has(file)) continue;
+    seen.add(file);
+    files.push(file);
+  }
+  return files;
+}
+function hasEffectMedia(item) {
+  return normalizeMediaFiles(item).length > 0;
+}
+function chooseEffectMedia(item) {
+  const files = normalizeMediaFiles(item);
+  if (!files.length) return '';
+  if (files.length === 1) return files[0];
+  return files[Math.floor(Math.random() * files.length)];
+}
+function fileUrlFromPath(filePath) {
+  return 'file:///' + String(filePath || '').replace(/\\/g, '/').replace(/^\/+/, '');
+}
+function mediaIconFor(file) {
+  return /\.(mp3|wav|ogg|m4a|flac)(\?|#|$)/i.test(String(file || '')) ? '🎵' : '🎬';
+}
+function effectNameFromMediaFile(file) {
+  return displayEffectName(fileDisplayLabel(file)).replace(/^📁\s*/, '') || 'Hiệu ứng';
 }
 function isAudioEffectFile(mediaFile) {
   return /\.(mp3|wav|ogg)(\?|#|$)/i.test(String(mediaFile || ''));
@@ -1252,6 +1300,143 @@ async function verifyLicense(key, action = 'verify') {
   return info;
 }
 
+function isLicenseUsable(info) {
+  if (!info || typeof info !== 'object') return { ok: false, error: 'KEY không hợp lệ' };
+  const status = String(info.TRANG_THAI || info.status || '').toUpperCase();
+  const expiry = info.HAN_SU_DUNG || info.expiry || info.han_su_dung || '';
+  if (status && !['ACTIVE', 'INACTIVE'].includes(status)) return { ok: false, error: status === 'EXPIRED' ? 'KEY đã hết hạn' : 'KEY không khả dụng' };
+  if (expiry) {
+    const d = new Date(expiry);
+    if (!isNaN(d.getTime()) && d.getTime() < Date.now()) return { ok: false, error: 'KEY đã hết hạn' };
+  }
+  return { ok: true };
+}
+
+function setLicenseGateMessage(text, kind = '') {
+  const el = document.getElementById('licenseGateMessage');
+  if (!el) return;
+  el.textContent = text || '';
+  el.className = `license-message ${kind}`.trim();
+}
+
+function updateLicenseLockoutUi() {
+  const input = document.getElementById('licenseGateKey');
+  const btn = document.getElementById('licenseGateSubmit');
+  const until = parseInt(localStorage.getItem('hp_license_lock_until') || '0', 10);
+  const left = Math.ceil((until - Date.now()) / 1000);
+  if (left > 0) {
+    if (input) input.disabled = true;
+    if (btn) btn.disabled = true;
+    setLicenseGateMessage(`Nhập sai quá 5 lần. Vui lòng thử lại sau ${left} giây.`, 'err');
+    return true;
+  }
+  if (until) {
+    localStorage.removeItem('hp_license_lock_until');
+    localStorage.removeItem('hp_license_fail_count');
+  }
+  if (input) input.disabled = false;
+  if (btn) btn.disabled = false;
+  return false;
+}
+
+function recordLicenseFailure(message) {
+  const count = (parseInt(localStorage.getItem('hp_license_fail_count') || '0', 10) || 0) + 1;
+  if (count >= 5) {
+    localStorage.setItem('hp_license_lock_until', String(Date.now() + 60000));
+    localStorage.setItem('hp_license_fail_count', '5');
+    updateLicenseLockoutUi();
+    return;
+  }
+  localStorage.setItem('hp_license_fail_count', String(count));
+  setLicenseGateMessage(`${message || 'KEY sai hoặc không hợp lệ'} (${count}/5 lần)`, 'err');
+}
+
+function waitForLicenseGateUnlock() {
+  return new Promise(resolve => {
+    const wait = setInterval(() => {
+      if (document.body.classList.contains('license-ok')) { clearInterval(wait); resolve(true); }
+    }, 200);
+  });
+}
+
+async function unlockLicenseGate(info, key, machineId) {
+  try {
+    localStorage.setItem('hp_license_key', key);
+    localStorage.setItem('hp_license_info', JSON.stringify(info || {}));
+    localStorage.setItem('hp_license_machine_id', machineId || '');
+    localStorage.setItem('hp_license_verified_at', String(Date.now()));
+    localStorage.removeItem('hp_license_fail_count');
+    localStorage.removeItem('hp_license_lock_until');
+  } catch {}
+  renderLicenseStatus(info);
+  updateHeaderLicense(info);
+  checkLicenseReminder(info);
+  setLicenseGateMessage('KEY hợp lệ. Đang mở ứng dụng...', 'ok');
+  document.body.classList.add('license-ok');
+}
+
+async function submitLicenseGateKey(key, action = 'activate') {
+  const input = document.getElementById('licenseGateKey');
+  const btn = document.getElementById('licenseGateSubmit');
+  key = String(key || '').trim();
+  if (!key) { setLicenseGateMessage('Vui lòng nhập KEY bản quyền.', 'err'); return false; }
+  if (updateLicenseLockoutUi()) return false;
+  if (btn) btn.disabled = true;
+  if (input) input.disabled = true;
+  setLicenseGateMessage('Đang kiểm tra KEY và thiết bị...', '');
+  try {
+    const machineId = await ensureMachineId();
+    const info = await verifyLicense(key, action);
+    const usable = isLicenseUsable(info);
+    if (!info || !usable.ok) {
+      recordLicenseFailure(usable.error || 'KEY sai hoặc không hợp lệ');
+      return false;
+    }
+    await unlockLicenseGate(info, key, machineId);
+    return true;
+  } catch (e) {
+    recordLicenseFailure(e?.message || 'Không kiểm tra được KEY');
+    return false;
+  } finally {
+    if (!document.body.classList.contains('license-ok') && !updateLicenseLockoutUi()) {
+      if (btn) btn.disabled = false;
+      if (input) input.disabled = false;
+    }
+  }
+}
+
+async function ensureLicenseGate() {
+  document.body.classList.remove('license-ok');
+  const form = document.getElementById('licenseGateForm');
+  const input = document.getElementById('licenseGateKey');
+  if (input) {
+    try { input.value = localStorage.getItem('hp_license_key') || ''; } catch {}
+  }
+  if (form && !form.dataset.wired) {
+    form.dataset.wired = '1';
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitLicenseGateKey(input?.value || '', 'activate').catch(() => {});
+    });
+  }
+  setInterval(updateLicenseLockoutUi, 1000);
+  if (updateLicenseLockoutUi()) return waitForLicenseGateUnlock();
+  const cachedKey = (input?.value || '').trim();
+  if (!cachedKey) {
+    setLicenseGateMessage('Nhập KEY bản quyền để tiếp tục.', '');
+    return waitForLicenseGateUnlock();
+  }
+  const machineId = await ensureMachineId();
+  const cachedMachine = localStorage.getItem('hp_license_machine_id') || '';
+  if (cachedMachine && cachedMachine !== machineId) {
+    setLicenseGateMessage('KEY này đã được kích hoạt trên thiết bị khác.', 'err');
+  } else {
+    const ok = await submitLicenseGateKey(cachedKey, 'verify');
+    if (ok) return true;
+  }
+  return waitForLicenseGateUnlock();
+}
+
 (async function wireInfoTab() {
   const verEl = document.getElementById('appVersion');
   if (verEl && window.bigo.appGetVersion) {
@@ -1351,6 +1536,7 @@ function setLiveViewerCount(roomData) {
 }
 
 async function init() {
+  await ensureLicenseGate();
   const s = await window.bigo.settingsLoad();
   els.embedBigoId.value = s.bigoId || '';
   await initAppSettings(s);
@@ -1488,13 +1674,17 @@ async function validateConfiguredMediaFiles() {
   const missing = [];
   for (const grp of (mapping.groups || [])) {
     for (const item of (grp.items || [])) {
-      if (!item.mediaFile) continue;
-      let exists = true;
-      try { exists = await window.bigo.effectsExists(item.mediaFile); } catch { exists = false; }
-      if (!exists) {
-        missing.push(`${item.alias || (item.matchKeys || [])[0] || 'Quà'}: ${fileDisplayLabel(item.mediaFile)}`);
-        item.mediaFile = '';
+      const files = normalizeMediaFiles(item);
+      if (!files.length) continue;
+      const valid = [];
+      for (const file of files) {
+        let exists = true;
+        try { exists = await window.bigo.effectsExists(file); } catch { exists = false; }
+        if (exists) valid.push(file);
+        else missing.push(`${item.alias || (item.matchKeys || [])[0] || 'Quà'}: ${fileDisplayLabel(file)}`);
       }
+      item.mediaFiles = valid;
+      item.mediaFile = valid[0] || '';
     }
   }
   if (!missing.length) return;
@@ -1503,6 +1693,55 @@ async function validateConfiguredMediaFiles() {
   const msg = `Thiếu dữ liệu nhạc/video:\n${missing.slice(0, 12).join('\n')}${missing.length > 12 ? `\n... và ${missing.length - 12} file khác` : ''}\n\nApp đã xoá tên file bị thiếu khỏi cấu hình để bạn chọn lại.`;
   appendLog('[media] ' + msg.replace(/\n/g, ' | '));
   setTimeout(() => alert(msg), 300);
+}
+
+function getDialogMediaFiles() {
+  return normalizeMediaFiles(window._dlgMediaFiles || []);
+}
+
+function setDialogMediaFiles(files, { autosave = true } = {}) {
+  window._dlgMediaFiles = normalizeMediaFiles(files);
+  const primary = window._dlgMediaFiles[0] || '';
+  if (els.dlgFile) {
+    for (const file of window._dlgMediaFiles) {
+      if (!Array.from(els.dlgFile.options).some(o => o.value === file)) {
+        const opt = document.createElement('option');
+        opt.value = file;
+        opt.textContent = fileDisplayLabel(file);
+        els.dlgFile.appendChild(opt);
+      }
+    }
+    els.dlgFile.value = primary;
+  }
+  renderDialogMediaList();
+  if (primary) autoEnablePauseBgmForAudio(primary);
+  if (autosave) autoSaveOpenGiftFields();
+}
+
+function addDialogMediaFiles(files) {
+  const next = [...getDialogMediaFiles(), ...files];
+  setDialogMediaFiles(next);
+}
+
+function renderDialogMediaList() {
+  if (!els.dlgMediaList) return;
+  const files = getDialogMediaFiles();
+  els.dlgMediaList.classList.toggle('empty', files.length === 0);
+  els.dlgMediaList.innerHTML = files.map((file, idx) => `<div class="media-row" data-media-idx="${idx}">
+    <span class="media-row-icon">${mediaIconFor(file)}</span>
+    <span class="media-row-name ${idx === 0 ? 'primary' : ''}" title="${escapeHtml(fileDisplayLabel(file))}">${escapeHtml(fileDisplayLabel(file))}</span>
+    <span class="media-row-actions">
+      <button type="button" class="tiny" data-media-act="up" ${idx === 0 ? 'disabled' : ''}>↑</button>
+      <button type="button" class="tiny" data-media-act="down" ${idx === files.length - 1 ? 'disabled' : ''}>↓</button>
+      <button type="button" class="tiny danger" data-media-act="remove">×</button>
+    </span>
+  </div>`).join('');
+}
+
+function mediaFileFromDroppedFile(file) {
+  if (!file) return '';
+  if (file.path) return fileUrlFromPath(file.path);
+  return '';
 }
 
 els.dlgPickFile.onclick = async () => {
@@ -1520,9 +1759,9 @@ els.dlgPickFile.onclick = async () => {
       els.dlgFile.appendChild(opt);
     }
   }
+  addDialogMediaFiles(r.files.map(f => f.fileUrl));
   els.dlgFile.value = picked.fileUrl;
   autoEnablePauseBgmForAudio(picked.fileUrl || picked.fileName);
-  await autoSaveOpenGiftFields();
   appendLog(`đã chọn ${r.files.length} file (giữ ở vị trí gốc, không copy vào assets/effects)`);
 };
 // dlgOpenFolder button đã bỏ — không cần mở thư mục assets/effects nữa.
@@ -1537,7 +1776,9 @@ async function autoSaveOpenGiftFields() {
   if (!itemId) return;
   const found = findItemById(itemId);
   if (!found) return;
-  found.item.mediaFile = els.dlgFile.value;
+  const mediaFiles = getDialogMediaFiles();
+  found.item.mediaFiles = mediaFiles;
+  found.item.mediaFile = mediaFiles[0] || els.dlgFile.value || '';
   found.item.overlayId = els.dlgOverlay.value;
   found.item.priority = els.dlgPriority ? Math.max(0, Math.min(100, parseInt(els.dlgPriority.value, 10) || 0)) : 0;
   found.item.pauseBgm = els.dlgPauseBgm ? els.dlgPauseBgm.checked : false;
@@ -1642,6 +1883,31 @@ function getGameplayGroups() {
   return (mapping.groups || []).filter(g => g.type !== 'comment');
 }
 
+function gameplayItemIdentity(item) {
+  const keys = (item?.matchKeys || []).map(k => String(k).trim()).filter(Boolean);
+  const typeId = keys.find(k => /^\d+$/.test(k));
+  if (typeId) return `id:${typeId}`;
+  return `name:${String(item?.alias || keys[0] || item?.id || '').trim().toLowerCase()}`;
+}
+
+function getGameplayGroupWithCommon(group) {
+  if (!group) return null;
+  const common = getCommonGroup();
+  const useCommon = appSettings.gameplay?.useCommonGroup !== false;
+  const sourceGroups = group.isCommon || group.id === common.id ? [common] : (useCommon ? [common, group] : [group]);
+  const seen = new Set();
+  const items = [];
+  for (const source of sourceGroups) {
+    for (const item of (source.items || [])) {
+      const key = gameplayItemIdentity(item);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push(item);
+    }
+  }
+  return { ...group, items };
+}
+
 function getGameplayItemIconId(item) {
   for (const k of (item?.matchKeys || [])) {
     const s = String(k).trim();
@@ -1652,6 +1918,14 @@ function getGameplayItemIconId(item) {
 
 function getGameplayItemIcon(item) {
   return getGiftIcon(item) || item?.iconUrl || item?.gift_icon || '';
+}
+
+function normalizeGameplayIconUrl(icon) {
+  return String(icon || '')
+    .replace(/\\/g, '/')
+    .replace(/[?#].*$/, '')
+    .trim()
+    .toLowerCase();
 }
 
 function normalizeGameplayGiftKey(s) {
@@ -1670,16 +1944,21 @@ function getGameplayMatchKeys(item) {
 }
 
 function normalizeGameplaySettings() {
-  if (!appSettings.gameplay) appSettings.gameplay = { groupId: '', orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, showName: true, showCount: true, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] };
+  if (!appSettings.gameplay) appSettings.gameplay = { groupId: '', useCommonGroup: true, orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', slotNumberColor: '#ffffff', countColor: '#ffffff', countSize: 12, uppercase: false, showName: true, showCount: true, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] };
   const groups = getGameplayGroups();
   if (!groups.length) return null;
-  let group = groups.find(g => g.id === appSettings.gameplay.groupId) || groups[0];
-  appSettings.gameplay.groupId = group.id;
+  const selectedGroup = groups.find(g => g.id === appSettings.gameplay.groupId) || groups[0];
+  appSettings.gameplay.groupId = selectedGroup.id;
+  const group = getGameplayGroupWithCommon(selectedGroup);
+  appSettings.gameplay.useCommonGroup = appSettings.gameplay.useCommonGroup !== false;
   appSettings.gameplay.orientation = appSettings.gameplay.orientation === 'vertical' ? 'vertical' : 'horizontal';
   if (!['top', 'bottom', 'left', 'right'].includes(appSettings.gameplay.labelPosition)) appSettings.gameplay.labelPosition = 'bottom';
   if (!['normal', 'marquee', 'wrap'].includes(appSettings.gameplay.nameMode)) appSettings.gameplay.nameMode = 'marquee';
   if (!/^#[0-9a-f]{6}$/i.test(String(appSettings.gameplay.cardBg || ''))) appSettings.gameplay.cardBg = '#8d8d8d';
   if (!/^#[0-9a-f]{6}$/i.test(String(appSettings.gameplay.textColor || ''))) appSettings.gameplay.textColor = '#ffffff';
+  if (!/^#[0-9a-f]{6}$/i.test(String(appSettings.gameplay.slotNumberColor || ''))) appSettings.gameplay.slotNumberColor = '#ffffff';
+  if (!/^#[0-9a-f]{6}$/i.test(String(appSettings.gameplay.countColor || ''))) appSettings.gameplay.countColor = '#ffffff';
+  appSettings.gameplay.countSize = Math.max(9, Math.min(28, parseInt(appSettings.gameplay.countSize, 10) || 12));
   if (!['Segoe UI', 'Arial', 'Tahoma', 'Impact', 'Consolas'].includes(appSettings.gameplay.textFont)) appSettings.gameplay.textFont = 'Segoe UI';
   appSettings.gameplay.uppercase = !!appSettings.gameplay.uppercase;
   appSettings.gameplay.showName = appSettings.gameplay.showName !== false;
@@ -1706,14 +1985,14 @@ function normalizeGameplaySettings() {
   appSettings.gameplay.gridSlots = Array.from({ length: slotCount }, (_, idx) => {
     const slot = currentSlots[idx] || {};
     const itemId = ids.has(slot.itemId) ? slot.itemId : '';
-    return { itemId, text: String(slot.text || ''), visible: slot.visible !== false };
+    return { itemId, text: String(slot.text || ''), number: String(slot.number || ''), visible: !!itemId };
   });
   let fillIdx = 0;
   for (const itemId of appSettings.gameplay.order) {
     if (appSettings.gameplay.gridSlots.some(s => s.itemId === itemId)) continue;
     while (fillIdx < slotCount && appSettings.gameplay.gridSlots[fillIdx].itemId) fillIdx++;
     if (fillIdx >= slotCount) break;
-    appSettings.gameplay.gridSlots[fillIdx].itemId = itemId;
+    appSettings.gameplay.gridSlots[fillIdx] = { itemId, text: '', number: '', visible: true };
   }
   return group;
 }
@@ -1737,7 +2016,7 @@ function buildGameplaySlots() {
   return slots.map((slot, idx) => {
     const item = getGameplayItemById(slot.itemId);
     const visible = slot.visible !== false && (!item || !hidden.has(item.id));
-    if (!item) return { index: idx, itemId: '', text: slot.text || '', visible };
+    if (!item) return { index: idx, itemId: '', text: slot.text || '', number: slot.number || '', visible: false };
     const name = slot.text || getGameplayItemName(item);
     return {
       index: idx,
@@ -1745,6 +2024,7 @@ function buildGameplaySlots() {
       id: item.id,
       name,
       text: slot.text || '',
+      number: slot.number || '',
       visible,
       icon: getGameplayItemIcon(item),
       iconId: getGameplayItemIconId(item),
@@ -1765,6 +2045,9 @@ function buildGameplayConfig() {
     cardOpacity: appSettings.gameplay.cardOpacity,
     textFont: appSettings.gameplay.textFont,
     textColor: appSettings.gameplay.textColor,
+    slotNumberColor: appSettings.gameplay.slotNumberColor,
+    countColor: appSettings.gameplay.countColor,
+    countSize: appSettings.gameplay.countSize,
     uppercase: appSettings.gameplay.uppercase,
     showName: appSettings.gameplay.showName,
     showCount: appSettings.gameplay.showCount,
@@ -1796,7 +2079,40 @@ function itemMatchesGameplayGift(item, ev) {
   if (normalizedName && keys.some(k => normalizeGameplayGiftKey(k) === normalizedName)) return true;
   const icon = String(ev?.gift_icon || ev?.gift_icon_url || '').trim();
   const itemIcon = String(getGameplayItemIcon(item) || '').trim();
-  return !!icon && !!itemIcon && icon === itemIcon;
+  return !!icon && !!itemIcon && normalizeGameplayIconUrl(icon) === normalizeGameplayIconUrl(itemIcon);
+}
+
+function queueGroupMatchesGameplayItem(g, item) {
+  if (!item) return false;
+  if ((g.itemIds || []).includes(item.id)) return true;
+  if ((g.identities || []).includes(gameplayItemIdentity(item))) return true;
+  const gIcon = normalizeGameplayIconUrl(g.icon);
+  const itemIcon = normalizeGameplayIconUrl(getGameplayItemIcon(item));
+  if (gIcon && itemIcon && gIcon === itemIcon) return true;
+  const idMatch = /^id:(.+)$/.exec(g.key || '');
+  const ev = { gift_id: idMatch ? idMatch[1] : null, gift_name: g.name, gift_icon: g.icon };
+  return itemMatchesGameplayGift(item, ev);
+}
+
+function queueGroupMatchesGameplaySlot(g, slot) {
+  if (!slot?.itemId) return false;
+  if ((g.itemIds || []).includes(slot.itemId)) return true;
+  if (slot.iconId && (g.identities || []).includes(`id:${String(slot.iconId)}`)) return true;
+  const gIcon = normalizeGameplayIconUrl(g.icon);
+  const slotIcon = normalizeGameplayIconUrl(slot.icon);
+  if (gIcon && slotIcon && gIcon === slotIcon) return true;
+  const gName = normalizeGameplayGiftKey(g.name);
+  if (gName && (normalizeGameplayGiftKey(slot.name) === gName || (slot.matchKeys || []).some(k => normalizeGameplayGiftKey(k) === gName))) return true;
+  const item = getGameplayItemById(slot.itemId);
+  return queueGroupMatchesGameplayItem(g, item);
+}
+
+function getGameplayQueueCountForSlot(slot, groups = getQueueGroups()) {
+  let total = 0;
+  for (const g of groups) {
+    if (queueGroupMatchesGameplaySlot(g, slot)) total += g.total || 0;
+  }
+  return total;
 }
 
 function getGameplayVisibleItems() {
@@ -1812,9 +2128,7 @@ function getGameplayActiveIdsFromQueue(items = getGameplayVisibleItems()) {
   for (const item of items) {
     for (const g of groups) {
       if (!g.playing) continue;
-      const idMatch = /^id:(.+)$/.exec(g.key || '');
-      const ev = { gift_id: idMatch ? idMatch[1] : null, gift_name: g.name, gift_icon: g.icon };
-      if (itemMatchesGameplayGift(item, ev)) active.add(item.id);
+      if (queueGroupMatchesGameplayItem(g, item)) active.add(item.id);
     }
   }
   return active;
@@ -1836,22 +2150,7 @@ function orderGameplayItemsForDisplay(items) {
 }
 
 function getGameplayDisplaySlots() {
-  const slots = buildGameplaySlots();
-  const itemPositions = slots.map((slot, idx) => ({ slot, idx })).filter(x => x.slot.itemId && x.slot.visible !== false);
-  if (!appSettings.gameplay?.centerLargest || itemPositions.length < 3) return slots;
-  let maxPos = -1;
-  let maxCount = 0;
-  itemPositions.forEach(({ slot }, pos) => {
-    const count = gameplayReviewState.get(slot.itemId)?.count || 0;
-    if (count > maxCount) { maxCount = count; maxPos = pos; }
-  });
-  if (maxPos < 0 || maxCount <= 0) return slots;
-  const orderedItems = itemPositions.map(x => x.slot);
-  const [top] = orderedItems.splice(maxPos, 1);
-  orderedItems.splice(Math.floor((itemPositions.length - 1) / 2), 0, top);
-  const next = [...slots];
-  itemPositions.forEach(({ idx }, pos) => { next[idx] = { ...orderedItems[pos], index: idx }; });
-  return next.map((slot, idx) => ({ ...slot, index: idx }));
+  return buildGameplaySlots();
 }
 
 function gameplayNameClass(name) {
@@ -1873,6 +2172,7 @@ function renderGameplayReview() {
   const baseItems = getGameplayVisibleItems();
   const activeIds = getGameplayActiveIdsFromQueue(baseItems);
   const slots = getGameplayDisplaySlots();
+  const queueGroups = getQueueGroups();
   const hidden = new Set(appSettings.gameplay?.hiddenIds || []);
   els.gameplayReview.classList.toggle('vertical', appSettings.gameplay?.orientation === 'vertical');
   els.gameplayReview.classList.add('grid-mode');
@@ -1884,6 +2184,9 @@ function renderGameplayReview() {
   els.gameplayReview.style.setProperty('--gameplay-card-bg-rgb', `${bg.r}, ${bg.g}, ${bg.b}`);
   els.gameplayReview.style.setProperty('--gameplay-card-opacity', String((appSettings.gameplay?.cardOpacity || 86) / 100));
   els.gameplayReview.style.setProperty('--gameplay-text-color', appSettings.gameplay?.textColor || '#ffffff');
+  els.gameplayReview.style.setProperty('--gameplay-slot-number-color', appSettings.gameplay?.slotNumberColor || '#ffffff');
+  els.gameplayReview.style.setProperty('--gameplay-count-color', appSettings.gameplay?.countColor || '#ffffff');
+  els.gameplayReview.style.setProperty('--gameplay-count-size', `${Math.max(9, Math.min(28, parseInt(appSettings.gameplay?.countSize, 10) || 12))}px`);
   els.gameplayReview.style.setProperty('--gameplay-text-font', `'${String(appSettings.gameplay?.textFont || 'Segoe UI').replace(/'/g, '')}', sans-serif`);
   const iconSize = Math.max(28, Math.min(120, parseInt(appSettings.gameplay?.iconSize, 10) || 54));
   const parsedItemGap = parseInt(appSettings.gameplay?.itemGap, 10);
@@ -1903,7 +2206,8 @@ function renderGameplayReview() {
     }
     const icon = slot.icon || '';
     const name = slot.name || 'Quà';
-    const st = gameplayReviewState.get(slot.itemId) || { count: 0 };
+    const slotNumber = String(slot.number || '').trim();
+    const queueCount = getGameplayQueueCountForSlot(slot, queueGroups);
     const labelPosition = appSettings.gameplay?.labelPosition || 'bottom';
     const isActive = activeIds.has(slot.itemId);
     const classes = [
@@ -1916,8 +2220,9 @@ function renderGameplayReview() {
     return `<div class="${escapeHtml(classes)}" data-iid="${escapeHtml(slot.itemId)}" data-slot="${slot.index}">
       <div class="gameplay-review-icon-wrap">
         ${icon ? `<img src="${escapeHtml(icon)}" loading="lazy" />` : '<div class="gameplay-review-icon-empty"></div>'}
-        ${appSettings.gameplay?.showCount !== false && st.count ? `<span class="queue-card-count gameplay-review-count">${Number(st.count).toLocaleString('en-US')}</span>` : ''}
+        ${queueCount ? `<span class="gameplay-review-count">${Number(queueCount).toLocaleString('en-US')}</span>` : ''}
       </div>
+      ${slotNumber ? `<div class="gameplay-review-slot-number">${escapeHtml(slotNumber)}</div>` : ''}
       ${appSettings.gameplay?.showName === false ? '' : `<div class="gameplay-review-name${gameplayNameClass(name)}"><span>${escapeHtml(name)}</span></div>`}
     </div>`;
   }).join('');
@@ -1926,24 +2231,17 @@ function renderGameplayReview() {
 function syncGameplayCountsFromQueue() {
   if (!appSettings?.gameplay) return;
   const items = getGameplayVisibleItems();
+  const slots = buildGameplaySlots();
   const groups = getQueueGroups();
-  if (!appSettings.gameplay.keepScore) gameplayReviewState.clear();
+  gameplayReviewState.clear();
   const counts = {};
   const activeIds = [...getGameplayActiveIdsFromQueue(items)];
-  for (const item of items) {
-    let total = 0;
-    if (appSettings.gameplay.keepScore) {
-      total = gameplayScoreTotals.get(item.id) || 0;
-    } else {
-      for (const g of groups) {
-        const idMatch = /^id:(.+)$/.exec(g.key || '');
-        const ev = { gift_id: idMatch ? idMatch[1] : null, gift_name: g.name, gift_icon: g.icon };
-        if (itemMatchesGameplayGift(item, ev)) total += g.total || 0;
-      }
-    }
+  for (const slot of slots) {
+    if (!slot.itemId || slot.visible === false) continue;
+    const total = getGameplayQueueCountForSlot(slot, groups);
     if (total > 0) {
-      gameplayReviewState.set(item.id, { count: total });
-      counts[item.id] = total;
+      gameplayReviewState.set(slot.itemId, { count: total });
+      counts[slot.itemId] = total;
     }
   }
   renderGameplayReview();
@@ -1971,9 +2269,7 @@ function initializeGameplayScoreFromQueue() {
   for (const item of items) {
     let total = 0;
     for (const g of groups) {
-      const idMatch = /^id:(.+)$/.exec(g.key || '');
-      const ev = { gift_id: idMatch ? idMatch[1] : null, gift_name: g.name, gift_icon: g.icon };
-      if (itemMatchesGameplayGift(item, ev)) total += g.total || 0;
+      if (queueGroupMatchesGameplayItem(g, item)) total += g.total || 0;
     }
     if (total > 0) gameplayScoreTotals.set(item.id, total);
   }
@@ -1997,11 +2293,12 @@ function renderGameplayGridEditor(group) {
   normalizeGameplaySettings();
   const items = getGameplayOrderedItems(group || findGroupById(appSettings.gameplay.groupId));
   els.gameplayGridEditor.style.setProperty('--gameplay-grid-cols', appSettings.gameplay.gridCols || 10);
+  els.gameplayGridEditor.style.setProperty('--gameplay-slot-number-color', appSettings.gameplay.slotNumberColor || '#ffffff');
   els.gameplayGridEditor.innerHTML = (appSettings.gameplay.gridSlots || []).map((slot, idx) => {
     const item = getGameplayItemById(slot.itemId);
     const icon = item ? getGameplayItemIcon(item) : '';
     const name = item ? getGameplayItemName(item) : 'Chọn quà';
-    const visible = slot.visible !== false;
+    const visible = !!item && slot.visible !== false;
     const pickerItems = items.map(pickerItem => {
       const pickerIcon = getGameplayItemIcon(pickerItem);
       const pickerName = getGameplayItemName(pickerItem);
@@ -2011,9 +2308,12 @@ function renderGameplayGridEditor(group) {
       <div class="slot-topline">
         <span class="slot-index">#${idx + 1}</span>
         <span class="slot-drag" title="Kéo để đổi vị trí">☰</span>
-        <button type="button" class="slot-check ${visible ? 'on' : ''}" data-slot-visible="${idx}" title="${visible ? 'Đang hiển thị trên Review/OBS' : 'Đang ẩn khỏi Review/OBS'}">${visible ? '✓' : ''}</button>
+        <button type="button" class="slot-check ${visible ? 'on' : ''}" data-slot-visible="${idx}" title="${item ? (visible ? 'Đang hiển thị trên Review/OBS' : 'Đang ẩn khỏi Review/OBS') : 'Ô trống không hiển thị'}" ${item ? '' : 'disabled'}>${visible ? '✓' : ''}</button>
       </div>
-      <button type="button" class="slot-thumb" data-slot-open="${idx}" title="Chọn quà">${icon ? `<img src="${escapeHtml(icon)}" loading="lazy" />` : '<span>+</span>'}</button>
+      <div class="slot-thumb-wrap">
+        <button type="button" class="slot-thumb" data-slot-open="${idx}" title="Chọn quà">${icon ? `<img src="${escapeHtml(icon)}" loading="lazy" />` : '<span>+</span>'}</button>
+        <input class="slot-number-input" data-slot-number="${idx}" value="${escapeHtml(slot.number || '')}" placeholder="Số" inputmode="numeric" />
+      </div>
       <div class="slot-info-row">
         <span class="slot-current-name">${escapeHtml(name)}</span>
         <button type="button" class="tiny" data-slot-open="${idx}">Đổi</button>
@@ -2054,17 +2354,17 @@ function resizeGameplayGrid(cols, rows) {
   const oldCols = appSettings.gameplay.gridCols;
   const oldRows = appSettings.gameplay.gridRows;
   const oldSlots = appSettings.gameplay.gridSlots || [];
-  const nextSlots = Array.from({ length: cols * rows }, () => ({ itemId: '', text: '', visible: true }));
+  const nextSlots = Array.from({ length: cols * rows }, () => ({ itemId: '', text: '', number: '', visible: false }));
   for (let r = 0; r < Math.min(oldRows, rows); r++) {
     for (let c = 0; c < Math.min(oldCols, cols); c++) {
-      nextSlots[r * cols + c] = oldSlots[r * oldCols + c] || { itemId: '', text: '' };
+      nextSlots[r * cols + c] = oldSlots[r * oldCols + c] || { itemId: '', text: '', number: '', visible: false };
     }
   }
   saveGameplaySettings({ gridCols: cols, gridRows: rows, gridSlots: nextSlots });
 }
 
 function slotHasContent(slot) {
-  return !!(slot?.itemId || String(slot?.text || '').trim());
+  return !!(slot?.itemId || String(slot?.text || '').trim() || String(slot?.number || '').trim());
 }
 
 async function deleteGameplayGridColumn() {
@@ -2081,7 +2381,7 @@ async function deleteGameplayGridColumn() {
   }
   const nextSlots = [];
   for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols - 1; c++) nextSlots.push(slots[r * cols + c] || { itemId: '', text: '', visible: true });
+    for (let c = 0; c < cols - 1; c++) nextSlots.push(slots[r * cols + c] || { itemId: '', text: '', number: '', visible: false });
   }
   saveGameplaySettings({ gridCols: cols - 1, gridRows: rows, gridSlots: nextSlots });
 }
@@ -2116,6 +2416,14 @@ function renderGameplayUi() {
   const group = normalizeGameplaySettings();
   els.gameplayGroup.innerHTML = groups.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name || 'Nhóm')}</option>`).join('');
   els.gameplayGroup.value = appSettings.gameplay.groupId;
+  if (els.gameplayGroupChecks) {
+    const common = getCommonGroup();
+    els.gameplayGroupChecks.innerHTML = groups.map(g => {
+      const isCommon = g.isCommon || g.id === common.id;
+      const checked = isCommon ? appSettings.gameplay.useCommonGroup !== false : g.id === appSettings.gameplay.groupId;
+      return `<button type="button" class="gameplay-group-check ${checked ? 'on' : ''}" data-gameplay-group-check="${escapeHtml(g.id)}"><span class="box">${checked ? '✓' : ''}</span><span>${escapeHtml(g.name || 'Nhóm')}</span></button>`;
+    }).join('');
+  }
   if (els.gameplayOrientation) els.gameplayOrientation.value = appSettings.gameplay.orientation;
   if (els.gameplayLabelPosition) els.gameplayLabelPosition.value = appSettings.gameplay.labelPosition;
   if (els.gameplayNameMode) els.gameplayNameMode.value = appSettings.gameplay.nameMode;
@@ -2124,11 +2432,16 @@ function renderGameplayUi() {
   if (els.gameplayCardOpacityVal) els.gameplayCardOpacityVal.textContent = `${appSettings.gameplay.cardOpacity}%`;
   if (els.gameplayTextFont) els.gameplayTextFont.value = appSettings.gameplay.textFont;
   if (els.gameplayTextColor) els.gameplayTextColor.value = appSettings.gameplay.textColor;
+  if (els.gameplaySlotNumberColor) els.gameplaySlotNumberColor.value = appSettings.gameplay.slotNumberColor;
+  if (els.gameplayCountColor) els.gameplayCountColor.value = appSettings.gameplay.countColor;
+  if (els.gameplayUseCommonGroup) els.gameplayUseCommonGroup.checked = appSettings.gameplay.useCommonGroup !== false;
   if (els.gameplayUppercase) els.gameplayUppercase.checked = !!appSettings.gameplay.uppercase;
   if (els.gameplayShowName) els.gameplayShowName.checked = appSettings.gameplay.showName !== false;
   if (els.gameplayShowCount) els.gameplayShowCount.checked = appSettings.gameplay.showCount !== false;
   if (els.gameplayIconSize) els.gameplayIconSize.value = appSettings.gameplay.iconSize;
   if (els.gameplayIconSizeVal) els.gameplayIconSizeVal.textContent = `${appSettings.gameplay.iconSize}px`;
+  if (els.gameplayCountSize) els.gameplayCountSize.value = appSettings.gameplay.countSize;
+  if (els.gameplayCountSizeVal) els.gameplayCountSizeVal.textContent = `${appSettings.gameplay.countSize}px`;
   if (els.gameplayItemGap) els.gameplayItemGap.value = appSettings.gameplay.itemGap;
   if (els.gameplayItemGapVal) els.gameplayItemGapVal.textContent = `${appSettings.gameplay.itemGap}px`;
   if (els.gameplayEnlargeActive) els.gameplayEnlargeActive.checked = !!appSettings.gameplay.enlargeActive;
@@ -2283,15 +2596,18 @@ function renderGroupCard(grp, overlayMap) {
     const pauseBgmBadge = item.pauseBgm ? '<span class="gift-state-badge pause-bgm-badge" title="Tạm dừng nhạc nền khi hiệu ứng này phát">🔇</span>' : '';
     const preEffectBadge = item.preEffect ? '<span class="gift-state-badge pre-effect-badge" title="Phát âm thanh/video trước hiệu ứng">🔔</span>' : '';
     const targetBadge = item.overlayId ? `<span class="gift-state-badge target-badge" title="Đích phát: ${overlayTarget === 'obs' ? 'OBS localhost' : overlayTarget === 'both' ? 'Cửa sổ + OBS localhost' : 'Cửa sổ máy tính'}">${overlayTarget === 'obs' ? '🔗' : overlayTarget === 'both' ? '🖥🔗' : '🖥'}</span>` : '';
-    const missingBadge = !item.mediaFile ? '<span class="gift-state-badge missing-badge" title="Chưa chọn file hiệu ứng">⚠️</span>' : '';
+    const mediaFiles = normalizeMediaFiles(item);
+    const missingBadge = !mediaFiles.length ? '<span class="gift-state-badge missing-badge" title="Chưa chọn file hiệu ứng">⚠️</span>' : '';
+    const randomBadge = mediaFiles.length > 1 ? `<span class="gift-state-badge target-badge" title="${mediaFiles.length} hiệu ứng: tự phát ngẫu nhiên">🎲 ${mediaFiles.length}</span>` : '';
     const specialBadge = isSpecialTriggerItem(item) ? '<span class="gift-state-badge special-badge" title="Quà này đang dùng làm trigger Hiệu Ứng Đặc Biệt">🎯</span>' : '';
     // Hiển thị tên file rút gọn (basename) nếu là full path/URL
-    const fileDisplay = displayEffectName(item.mediaFile);
-    const actionBadges = item.mediaFile
-      ? `${priorityBadge}${pauseBgmBadge}${preEffectBadge}${targetBadge}${specialBadge}`
+    const mediaTypeIcon = mediaFiles.length > 1 ? '🎲' : mediaIconFor(mediaFiles[0] || '');
+    const fileDisplay = mediaFiles.length > 1 ? `${mediaFiles.length} hiệu ứng ngẫu nhiên` : displayEffectName(mediaFiles[0] || '');
+    const actionBadges = mediaFiles.length
+      ? `${priorityBadge}${pauseBgmBadge}${preEffectBadge}${randomBadge}${targetBadge}${specialBadge}`
       : `${missingBadge}${targetBadge}${specialBadge}`;
-    const fileLine = item.mediaFile
-      ? `<div class="grow-sub"><code>${escapeHtml(fileDisplay)}</code></div>`
+    const fileLine = mediaFiles.length
+      ? `<div class="grow-sub"><code><span class="media-kind-icon">${escapeHtml(mediaTypeIcon)}</span>${escapeHtml(fileDisplay)}</code></div>`
       : `<div class="grow-sub"><span style="color:#ff6b6b">— chưa có file hiệu ứng —</span></div>`;
     return `<div class="group-item" data-iid="${item.id}" data-gid="${grp.id}">
       ${iconCell}
@@ -2394,7 +2710,7 @@ async function groupAction(act, gid, value, itemId) {
     const found = findItemById(itemId);
     if (!found) return;
     if (act === 'play') {
-      if (!found.item.mediaFile || !found.item.overlayId) { alert('Quà chưa có file hoặc overlay'); return; }
+      if (!hasEffectMedia(found.item) || !found.item.overlayId) { alert('Quà chưa có file hoặc overlay'); return; }
       // Lấy số lượng từ input cùng row
       const countInput = document.querySelector(`.play-count[data-iid="${itemId}"]`);
       const playTimes = Math.max(1, Math.min(1000, parseInt(countInput?.value || '1', 10) || 1));
@@ -2552,6 +2868,12 @@ els.dlgMasterSort.addEventListener('change', renderMasterTable);
 if (els.dlgMasterVnOnly) els.dlgMasterVnOnly.addEventListener('change', renderMasterTable);
 if (els.dlgMasterFavOnly) els.dlgMasterFavOnly.addEventListener('change', renderMasterTable);
 if (els.dlgFile) els.dlgFile.addEventListener('change', () => {
+  const selected = els.dlgFile.value;
+  if (selected) {
+    const files = getDialogMediaFiles();
+    if (!files.includes(selected)) setDialogMediaFiles([selected, ...files]);
+    else if (files[0] !== selected) setDialogMediaFiles([selected, ...files.filter(f => f !== selected)]);
+  }
   autoEnablePauseBgmForAudio(els.dlgFile.value);
   autoSaveOpenGiftFields();
 });
@@ -2560,6 +2882,34 @@ if (els.dlgPriority) els.dlgPriority.addEventListener('change', () => autoSaveOp
 if (els.dlgPriority) els.dlgPriority.addEventListener('input', () => autoSaveOpenGiftFields());
 if (els.dlgPauseBgm) els.dlgPauseBgm.addEventListener('change', () => autoSaveOpenGiftFields());
 if (els.dlgPreFx) els.dlgPreFx.addEventListener('change', () => autoSaveOpenGiftFields());
+if (els.dlgMediaList) {
+  els.dlgMediaList.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-media-act]');
+    if (!btn) return;
+    const row = btn.closest('[data-media-idx]');
+    const idx = parseInt(row?.dataset.mediaIdx, 10);
+    const files = getDialogMediaFiles();
+    if (!Number.isFinite(idx) || !files[idx]) return;
+    if (btn.dataset.mediaAct === 'remove') files.splice(idx, 1);
+    else if (btn.dataset.mediaAct === 'up' && idx > 0) [files[idx - 1], files[idx]] = [files[idx], files[idx - 1]];
+    else if (btn.dataset.mediaAct === 'down' && idx < files.length - 1) [files[idx], files[idx + 1]] = [files[idx + 1], files[idx]];
+    setDialogMediaFiles(files);
+  });
+}
+if (els.dlgMediaDrop) {
+  els.dlgMediaDrop.addEventListener('dragover', (e) => { e.preventDefault(); els.dlgMediaDrop.classList.add('drag-over'); });
+  els.dlgMediaDrop.addEventListener('dragleave', () => els.dlgMediaDrop.classList.remove('drag-over'));
+  els.dlgMediaDrop.addEventListener('drop', (e) => {
+    e.preventDefault();
+    els.dlgMediaDrop.classList.remove('drag-over');
+    const files = Array.from(e.dataTransfer?.files || [])
+      .filter(file => /\.(mp4|webm|mp3|wav|ogg|gif)$/i.test(file.name || ''))
+      .map(mediaFileFromDroppedFile)
+      .filter(Boolean);
+    if (!files.length) { alert('Không đọc được đường dẫn file. Hãy dùng nút 📁 Chọn để thêm file.'); return; }
+    addDialogMediaFiles(files);
+  });
+}
 
 async function openGiftDialog(gift = null, groupId = null) {
   els.giftDialogTitle.textContent = gift ? 'Sửa quà' : 'Thêm quà';
@@ -2594,15 +2944,8 @@ async function openGiftDialog(gift = null, groupId = null) {
     ? mapping.overlays.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('')
     : '<option value="">(chưa có overlay)</option>';
   els.dlgOverlay.value = gift?.overlayId || mapping.overlays[0]?.id || '';
-  // Nếu mediaFile là full URL/path không có trong dropdown → add option để select được
-  const mf = gift?.mediaFile || '';
-  if (mf && !Array.from(els.dlgFile.options).some(o => o.value === mf)) {
-    const opt = document.createElement('option');
-    opt.value = mf;
-    opt.textContent = fileDisplayLabel(mf);
-    els.dlgFile.appendChild(opt);
-  }
-  els.dlgFile.value = mf;
+  const mediaFiles = normalizeMediaFiles(gift || {});
+  setDialogMediaFiles(mediaFiles, { autosave: false });
   if (els.dlgPauseBgm) els.dlgPauseBgm.checked = !!gift?.pauseBgm;
   // preEffect opt-in: chỉ tick khi user đã explicit set true. undefined/false → unchecked.
   if (els.dlgPreFx) els.dlgPreFx.checked = gift?.preEffect === true;
@@ -2621,7 +2964,8 @@ els.dlgGiftSave.onclick = async (e) => {
     id: itemId || uid('i_'),
     matchKeys,
     alias: els.dlgAlias.value.trim(),
-    mediaFile: els.dlgFile.value,
+    mediaFile: getDialogMediaFiles()[0] || els.dlgFile.value,
+    mediaFiles: getDialogMediaFiles(),
     overlayId: els.dlgOverlay.value,
     pauseBgm: els.dlgPauseBgm ? els.dlgPauseBgm.checked : false,
     preEffect: els.dlgPreFx ? els.dlgPreFx.checked : false,
@@ -2691,8 +3035,9 @@ els.btnTestGift.onclick = async () => {
   const allItems = getAllItems();
   if (allItems.length === 0) { alert('Chưa có quà nào'); return; }
   const g = allItems[0];
-  if (!g.mediaFile || !g.overlayId) { alert('Quà đầu tiên chưa có file hoặc overlay'); return; }
-  await window.bigo.overlayPlay({ overlayId: g.overlayId, file: g.mediaFile });
+  const mediaFile = chooseEffectMedia(g);
+  if (!mediaFile || !g.overlayId) { alert('Quà đầu tiên chưa có file hoặc overlay'); return; }
+  await window.bigo.overlayPlay({ overlayId: g.overlayId, ...resolveMediaPayload(mediaFile) });
 };
 
 // =================== Overlay Table ===================
@@ -3283,7 +3628,7 @@ function renderParsed(ev) {
       sessionStats.giftCount += (ev.gift_count || 1) * (ev.combo || 1);
       sessionStats.diamond += ev.total_diamond || 0;
       if (ev.user) sessionStats.users.add(ev.user);
-      if (matched && matched.mediaFile) {
+      if (matched && hasEffectMedia(matched)) {
         sessionStats.effects += playTimes;
       }
       updateConnectStats();
@@ -3292,7 +3637,7 @@ function renderParsed(ev) {
       // Gameplay overlay chỉ nhận bản sao event, không tác động queue/effect pipeline.
       forwardGameplayGiftEvent(ev);
     }
-    if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
+    if (ev.type === 'gift' && matched && hasEffectMedia(matched) && matched.overlayId) {
       // Mỗi quà/combo tương ứng 1 hàng hành động. Ví dụ Bell x10 → 10 hàng.
       // BGM pause/resume chạy theo item đang phát trong playQueueItem().
       // Pre-effect: phát ÂM THANH/VIDEO trước MỘT LẦN (không lặp theo combo)
@@ -3351,7 +3696,7 @@ function renderEmbedEvent(ev) {
 let appSettings = {
   bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
-  gameplay: { groupId: '', orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, showName: true, showCount: true, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] },
+  gameplay: { groupId: '', useCommonGroup: true, orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', slotNumberColor: '#ffffff', countColor: '#ffffff', countSize: 12, uppercase: false, showName: true, showCount: true, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] },
   // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
   specialEffects: {
     clearQueue:      { enabled: false, typeid: null, giftName: '', iconUrl: '' },
@@ -4117,6 +4462,32 @@ if (els.gameplayGroup) {
     saveGameplaySettings({ groupId: els.gameplayGroup.value, order: [], hiddenIds: [] });
   });
 }
+if (els.gameplayGroupChecks) {
+  els.gameplayGroupChecks.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-gameplay-group-check]');
+    if (!btn) return;
+    const gid = btn.dataset.gameplayGroupCheck;
+    const group = findGroupById(gid);
+    if (!group) return;
+    const common = getCommonGroup();
+    gameplayReviewState.clear();
+    if (group.isCommon || group.id === common.id) {
+      if (appSettings.gameplay.groupId !== common.id) {
+        saveGameplaySettings({ groupId: common.id, useCommonGroup: true, order: [], hiddenIds: [] });
+      } else {
+        saveGameplaySettings({ useCommonGroup: appSettings.gameplay.useCommonGroup === false, order: [], hiddenIds: [] });
+      }
+    } else {
+      saveGameplaySettings({ groupId: group.id, order: [], hiddenIds: [] });
+    }
+  });
+}
+if (els.gameplayUseCommonGroup) {
+  els.gameplayUseCommonGroup.addEventListener('change', () => {
+    gameplayReviewState.clear();
+    saveGameplaySettings({ useCommonGroup: els.gameplayUseCommonGroup.checked, order: [], hiddenIds: [] });
+  });
+}
 if (els.gameplayOrientation) {
   els.gameplayOrientation.addEventListener('change', () => {
     saveGameplaySettings({ orientation: els.gameplayOrientation.value === 'vertical' ? 'vertical' : 'horizontal' });
@@ -4163,6 +4534,23 @@ if (els.gameplayTextColor) {
   });
   els.gameplayTextColor.addEventListener('change', () => saveGameplaySettings({ textColor: els.gameplayTextColor.value }));
 }
+if (els.gameplaySlotNumberColor) {
+  els.gameplaySlotNumberColor.addEventListener('input', () => {
+    appSettings.gameplay.slotNumberColor = els.gameplaySlotNumberColor.value;
+    renderGameplayGridEditor(normalizeGameplaySettings());
+    renderGameplayReview();
+    sendGameplayConfig();
+  });
+  els.gameplaySlotNumberColor.addEventListener('change', () => saveGameplaySettings({ slotNumberColor: els.gameplaySlotNumberColor.value }));
+}
+if (els.gameplayCountColor) {
+  els.gameplayCountColor.addEventListener('input', () => {
+    appSettings.gameplay.countColor = els.gameplayCountColor.value;
+    renderGameplayReview();
+    sendGameplayConfig();
+  });
+  els.gameplayCountColor.addEventListener('change', () => saveGameplaySettings({ countColor: els.gameplayCountColor.value }));
+}
 if (els.gameplayUppercase) {
   els.gameplayUppercase.addEventListener('change', () => saveGameplaySettings({ uppercase: els.gameplayUppercase.checked }));
 }
@@ -4181,6 +4569,16 @@ if (els.gameplayIconSize) {
     sendGameplayConfig();
   });
   els.gameplayIconSize.addEventListener('change', () => saveGameplaySettings({ iconSize: Math.max(28, Math.min(120, parseInt(els.gameplayIconSize.value, 10) || 54)) }));
+}
+if (els.gameplayCountSize) {
+  els.gameplayCountSize.addEventListener('input', () => {
+    const countSize = Math.max(9, Math.min(28, parseInt(els.gameplayCountSize.value, 10) || 12));
+    if (els.gameplayCountSizeVal) els.gameplayCountSizeVal.textContent = `${countSize}px`;
+    appSettings.gameplay.countSize = countSize;
+    renderGameplayReview();
+    sendGameplayConfig();
+  });
+  els.gameplayCountSize.addEventListener('change', () => saveGameplaySettings({ countSize: Math.max(9, Math.min(28, parseInt(els.gameplayCountSize.value, 10) || 12)) }));
 }
 if (els.gameplayItemGap) {
   els.gameplayItemGap.addEventListener('input', () => {
@@ -4283,7 +4681,7 @@ if (els.gameplayGridEditor) {
     if (clear) {
       const idx = parseInt(clear.dataset.slotClear, 10);
       const slots = [...(appSettings.gameplay.gridSlots || [])];
-      slots[idx] = { itemId: '', text: '', visible: true };
+      slots[idx] = { itemId: '', text: '', number: '', visible: false };
       saveGameplaySettings({ gridSlots: slots });
       return;
     }
@@ -4292,6 +4690,7 @@ if (els.gameplayGridEditor) {
       const idx = parseInt(visible.dataset.slotVisible, 10);
       const slots = [...(appSettings.gameplay.gridSlots || [])];
       const slot = { ...(slots[idx] || {}) };
+      if (!slot.itemId) return;
       slot.visible = slot.visible === false;
       slots[idx] = slot;
       saveGameplaySettings({ gridSlots: slots });
@@ -4299,17 +4698,18 @@ if (els.gameplayGridEditor) {
     }
   });
   els.gameplayGridEditor.addEventListener('input', (e) => {
-    const input = e.target.closest('[data-slot-text]');
+    const input = e.target.closest('[data-slot-text], [data-slot-number]');
     if (!input) return;
-    const idx = parseInt(input.dataset.slotText, 10);
+    const isNumber = input.matches('[data-slot-number]');
+    const idx = parseInt(isNumber ? input.dataset.slotNumber : input.dataset.slotText, 10);
     const slots = [...(appSettings.gameplay.gridSlots || [])];
-    slots[idx] = { ...(slots[idx] || {}), text: input.value };
+    slots[idx] = { ...(slots[idx] || {}), [isNumber ? 'number' : 'text']: input.value };
     appSettings.gameplay.gridSlots = slots;
     renderGameplayReview();
     sendGameplayConfig();
   });
   els.gameplayGridEditor.addEventListener('focusout', (e) => {
-    const input = e.target.closest('[data-slot-text]');
+    const input = e.target.closest('[data-slot-text], [data-slot-number]');
     if (!input) return;
     saveAppSettings({ gameplay: appSettings.gameplay }).catch(() => {});
   });

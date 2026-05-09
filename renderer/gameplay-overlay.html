@@ -27,7 +27,8 @@
     .name.marquee span { display:inline-block; min-width:100%; padding-left:100%; animation:marquee 5s linear infinite; }
     .name.wrap { white-space:normal; display:grid; place-items:center; }
     @keyframes marquee { from { transform:translateX(0); } to { transform:translateX(-100%); } }
-    .count { position:absolute; left:50%; bottom:-5px; transform:translateX(-50%); min-width:26px; height:18px; padding:0 6px; border-radius:999px; background:#3f3f3f; color:#fff; font-weight:900; font-size:12px; line-height:18px; text-align:center; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,.45); }
+    .count { position:absolute; left:50%; bottom:4px; transform:translateX(-50%); min-width:calc(var(--count-size,12px) + 12px); height:calc(var(--count-size,12px) + 6px); padding:0 6px; border-radius:999px; background:#3f3f3f; color:var(--count-color,#fff); font-weight:900; font-size:var(--count-size,12px); line-height:calc(var(--count-size,12px) + 6px); text-align:center; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,.45); z-index:6; }
+    .slot-number { position:absolute; right:-4px; top:-8px; min-width:18px; color:var(--slot-number-color,#fff); font-size:19px; font-weight:900; line-height:1; text-align:center; text-shadow:0 2px 4px rgba(0,0,0,.45); z-index:4; }
   </style>
 </head>
 <body><div id="wrap"></div><script src="/gameplay-overlay.js"></script></body>
