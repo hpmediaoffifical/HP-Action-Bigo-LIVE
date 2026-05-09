@@ -781,6 +781,7 @@ const els = {
   giftDialog: $('giftDialog'), giftDialogTitle: $('giftDialogTitle'),
   dlgMatchKeys: $('dlgMatchKeys'), dlgAlias: $('dlgAlias'),
   dlgGroup: $('dlgGroup'), dlgFile: $('dlgFile'), dlgOverlay: $('dlgOverlay'),
+  dlgPriority: $('dlgPriority'),
   dlgGiftSave: $('dlgGiftSave'), groupList: $('groupList'),
   dlgPickFile: $('dlgPickFile'), dlgOpenFolder: $('dlgOpenFolder'),
   dlgMasterFilter: $('dlgMasterFilter'), dlgMasterSort: $('dlgMasterSort'),
@@ -2627,7 +2628,7 @@ function renderParsed(ev) {
       addReceivedGift(ev);
     }
     if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
-      // Mỗi 1 đậu tương ứng 1 lần hiệu ứng. Ví dụ Bell ×1 giá 50 đậu → 50 hàng.
+      // Mỗi quà/combo tương ứng 1 hàng hành động. Ví dụ Bell x10 → 10 hàng.
       // Tạm dừng nhạc nền nếu gift cấu hình "không chạy chung"
       if (matched.pauseBgm) pauseBgmForEffect();
       // Pre-effect: phát ÂM THANH/VIDEO trước MỘT LẦN (không lặp theo combo)
