@@ -18,6 +18,7 @@
     .gift.label-left,.gift.label-right { width:116px; height:60px; min-height:60px; flex-direction:row; justify-content:center; padding:23px 8px 8px; margin-top:var(--icon-lift,27px); }
     .gift.label-left { flex-direction:row-reverse; }
     .icon-wrap { position:absolute; left:50%; top:calc((var(--icon-lift,27px) + 5px) * -1); width:var(--icon-size,54px); height:var(--icon-size,54px); flex:0 0 auto; transform:translateX(-50%); transition:transform .16s; transform-origin:center bottom; z-index:2; }
+    #wrap.hide-name .icon-wrap { top:calc((var(--icon-lift,27px) - 12px) * -1); }
     .gift img { width:var(--icon-size,54px); height:var(--icon-size,54px); object-fit:contain; }
     .name { width:100%; max-width:88px; min-height:25px; margin-top:0; color:var(--text-color,#fff); font-family:var(--text-font,'Segoe UI',sans-serif); font-size:12px; font-weight:900; line-height:12px; text-align:center; white-space:normal; overflow:hidden; text-overflow:clip; display:grid; place-items:center; text-transform:none; }
     #wrap.uppercase .name { text-transform:uppercase; }

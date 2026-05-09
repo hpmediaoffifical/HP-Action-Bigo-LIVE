@@ -1070,6 +1070,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .gameplay-review-card.label-right { width: 116px; height: 60px; min-height: 60px; flex-direction: row; justify-content: center; padding: 23px 8px 8px; margin-top: var(--gameplay-icon-lift, 27px); }
 .gameplay-review-card.label-left { flex-direction: row-reverse; }
 .gameplay-review-icon-wrap { position: absolute; left: 50%; top: calc((var(--gameplay-icon-lift, 27px) + 5px) * -1); width: var(--gameplay-icon-size, 54px); height: var(--gameplay-icon-size, 54px); flex: 0 0 auto; transform: translateX(-50%); transition: transform 0.16s; transform-origin: center bottom; z-index: 2; }
+.gameplay-review.hide-name .gameplay-review-icon-wrap { top: calc((var(--gameplay-icon-lift, 27px) - 12px) * -1); }
 .gameplay-review-card.enlarged .gameplay-review-icon-wrap { transform: translateX(-50%) scale(var(--gameplay-active-scale, 1.4)); z-index: 3; }
 .gameplay-review-card img,
 .gameplay-review-icon-empty {
