@@ -9,21 +9,22 @@ const ROOT = path.join(__dirname, '..');
 const APP_ICON = fs.existsSync(path.join(ROOT, 'logo-hp.ico'))
   ? path.join(ROOT, 'logo-hp.ico')
   : (fs.existsSync(path.join(ROOT, 'logo-hp.png')) ? path.join(ROOT, 'logo-hp.png') : null);
-
 class BigoWebListener {
   constructor({ onEvent, onLog }) {
     this.win = null;
     this.bigoId = null;
     this.onEvent = onEvent || (() => {});
     this.onLog = onLog || (() => {});
-    this._bound = false;
-    this._bindIpc();
+    BigoWebListener._bindIpcOnce();
   }
 
-  _bindIpc() {
-    if (this._bound) return;
-    this._bound = true;
-    const forward = (kind) => (_e, payload) => this.onEvent({ kind, ...payload });
+  static _bindIpcOnce() {
+    if (BigoWebListener._ipcBound) return;
+    BigoWebListener._ipcBound = true;
+    const forward = (kind) => (_e, payload) => {
+      const active = BigoWebListener._active;
+      if (active) active.onEvent({ kind, ...payload });
+    };
     ipcMain.on('embed:ready', forward('ready'));
     ipcMain.on('embed:dom-attached', forward('dom-attached'));
     ipcMain.on('embed:parsed', forward('parsed'));
@@ -33,6 +34,7 @@ class BigoWebListener {
 
   async start(bigoId, { visible = false } = {}) {
     if (this.win) await this.stop();
+    BigoWebListener._active = this;
     this.bigoId = bigoId;
     this.onLog(`opening https://www.bigo.tv/${bigoId}`);
     this.win = new BrowserWindow({
@@ -64,6 +66,7 @@ class BigoWebListener {
       this.win = null;
       this.onLog('stopped');
     }
+    if (BigoWebListener._active === this) BigoWebListener._active = null;
   }
 
   // Bring embed window forward — restore nếu minimized, focus, toggle alwaysOnTop ngắn để pop lên
