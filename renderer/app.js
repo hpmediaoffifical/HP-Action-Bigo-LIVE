@@ -2070,6 +2070,7 @@ function renderOverlayTable() {
         <td>${o.clickThrough ? '🔒 Có' : '—'}</td>
         <td class="actions-col">
           <button class="tiny" data-act="show" data-id="${o.id}" title="Mở/hiện overlay">👁</button>
+          <button class="tiny" data-act="obs-copy" data-id="${o.id}" title="Copy link overlay localhost cho OBS Browser Source">🔗 OBS</button>
           <button class="tiny" data-act="hide" data-id="${o.id}" title="Ẩn overlay (gift về vẫn auto-show + play)">🙈</button>
           ${lockBtn}
           <button class="tiny" data-act="edit" data-id="${o.id}">✏️</button>
@@ -2089,6 +2090,10 @@ async function overlayAction(act, id) {
   if (act === 'show') {
     const r = await window.bigo.overlayShow(id);
     if (!r.ok) alert('Lỗi: ' + (r.error || 'unknown'));
+  } else if (act === 'obs-copy') {
+    const r = await window.bigo.obsOverlayCopyUrl(id);
+    if (!r.ok) alert('Lỗi copy OBS link: ' + (r.error || 'unknown'));
+    else alert(`Đã copy link OBS Browser Source:\n${r.url}\n\nTrong OBS: Add Browser Source → paste URL này. Khi OBS đang mở link, hiệu ứng sẽ chạy qua localhost, không cần mở cửa sổ overlay desktop.`);
   } else if (act === 'hide') {
     await window.bigo.overlayHide(id);
   } else if (act === 'lock' || act === 'unlock') {

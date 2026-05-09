@@ -1,9 +1,11 @@
-const { app, BrowserWindow, ipcMain, nativeImage, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeImage, dialog, shell, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { BigoClient } = require('./bigo-client');
 const { BigoWebListener } = require('./web-embed');
 const { OverlayManager } = require('./overlay-manager');
+const { ObsOverlayServer } = require('./obs-overlay-server');
 
 const ROOT = path.join(__dirname, '..');
 const CONFIG_PATH = path.join(ROOT, 'config', 'settings.json');
@@ -27,6 +29,7 @@ let win;
 let client = null;
 let listener = null;
 let overlayManager = null;
+let obsOverlayServer = null;
 let queuePopup = null;
 let heartOverlay = null;
 let chatsPopup = null;
@@ -248,6 +251,14 @@ function enrichGiftEvent(ev) {
 // =================== App ===================
 function loadSettings() { return loadJson(CONFIG_PATH, { env: 'prod', accessToken: '', gameId: '', openid: '', bigoId: '', windowBounds: {} }); }
 function saveSettings(s) { saveJson(CONFIG_PATH, s); }
+function ensureObsOverlaySettings() {
+  const s = loadSettings();
+  if (!s.obsOverlay) s.obsOverlay = {};
+  if (!s.obsOverlay.port) s.obsOverlay.port = 18181;
+  if (!s.obsOverlay.token) s.obsOverlay.token = crypto.randomBytes(18).toString('hex');
+  saveSettings(s);
+  return s.obsOverlay;
+}
 function saveWindowBounds(key, bounds) {
   const s = loadSettings();
   if (!s.windowBounds) s.windowBounds = {};
@@ -292,6 +303,9 @@ function cleanupAuxWindows() {
   giftsPopup = null;
   if (overlayManager) {
     try { overlayManager.destroyAll(); } catch {}
+  }
+  if (obsOverlayServer) {
+    try { obsOverlayServer.stop(); } catch {}
   }
 }
 
@@ -388,6 +402,26 @@ app.whenReady().then(async () => {
         try { win.webContents.send('bigo:log', `[overlay-bounds] ${ov.name || overlayId}: x=${b.x} y=${b.y} w=${b.width} h=${b.height}`); } catch {}
       }
     },
+  });
+  const obsCfg = ensureObsOverlaySettings();
+  obsOverlayServer = new ObsOverlayServer({
+    root: ROOT,
+    port: obsCfg.port || 18181,
+    token: obsCfg.token,
+    onEffectEnded: () => {
+      if (win && !win.isDestroyed()) {
+        try { win.webContents.send('overlay:effect-ended'); } catch {}
+      }
+    },
+    onQueueEmpty: () => {
+      if (win && !win.isDestroyed()) {
+        try { win.webContents.send('overlay:queue-empty'); } catch {}
+      }
+    },
+    onLog: (msg) => { if (win && !win.isDestroyed()) { try { win.webContents.send('bigo:log', msg); } catch {} } },
+  });
+  obsOverlayServer.start().catch(e => {
+    if (win && !win.isDestroyed()) win.webContents.send('bigo:log', `[obs-overlay] ${e.message}`);
   });
   createWindow();
   // Auto-open overlays với cfg.autoOpen = true sau khi app sẵn sàng
@@ -1093,6 +1127,16 @@ ipcMain.handle('embed:show', () => {
 function fileUrl(absPath) {
   return 'file:///' + absPath.replace(/\\/g, '/').replace(/^\/+/, '');
 }
+function pathFromFileUrl(url) {
+  const s = String(url || '');
+  if (!s.startsWith('file://')) return s;
+  try { return decodeURIComponent(new URL(s).pathname).replace(/^\/(?=[A-Za-z]:)/, ''); } catch { return s.replace(/^file:\/\//, ''); }
+}
+function resolveEffectPath({ file, fileUrl: rawUrl }) {
+  if (rawUrl) return pathFromFileUrl(rawUrl);
+  if (file) return path.join(EFFECTS_DIR, file);
+  return null;
+}
 
 ipcMain.handle('overlay:show', (_e, overlayId) => {
   const cfg = mapping.overlays.find(o => o.id === overlayId);
@@ -1202,11 +1246,13 @@ ipcMain.handle('overlay:set-speed', (_e, opts) => {
       }
     }
   }
+  if (obsOverlayServer) obsOverlayServer.setSpeed(payload);
   return { ok: true, ...payload };
 });
 
 // Stop hiệu ứng đang playing trên overlay (user xoá item khỏi DSHT)
 ipcMain.handle('overlay:stop-effect', (_e, overlayId) => {
+  if (obsOverlayServer) obsOverlayServer.stopOverlay(overlayId);
   const ov = overlayManager?.overlays?.get(overlayId);
   if (ov && ov.win && !ov.win.isDestroyed()) {
     try { ov.win.webContents.send('overlay:stop'); } catch {}
@@ -1220,16 +1266,23 @@ ipcMain.handle('overlay:play', (_e, { overlayId, file, fileUrl: rawUrl }) => {
   // 2 modes:
   // - file (basename trong assets/effects) → resolve qua EFFECTS_DIR
   // - fileUrl (raw file:// URL) → dùng thẳng (cho pre-effect sound user pick từ ổ đĩa)
-  let url = null;
-  if (rawUrl) {
-    url = rawUrl;
-  } else if (file) {
-    const full = path.join(EFFECTS_DIR, file);
-    if (!fs.existsSync(full)) return { ok: false, error: 'file không tồn tại' };
-    url = fileUrl(full);
-  } else {
+  const fullPath = resolveEffectPath({ file, fileUrl: rawUrl });
+  if (!fullPath) {
     return { ok: false, error: 'thiếu file' };
   }
-  overlayManager.play(cfg, url);
+  if (!fs.existsSync(fullPath)) return { ok: false, error: 'file không tồn tại' };
+  const sentToObs = obsOverlayServer ? obsOverlayServer.play(overlayId, fullPath) : false;
+  if (!sentToObs) overlayManager.play(cfg, fileUrl(fullPath));
   return { ok: true };
+});
+
+ipcMain.handle('obs-overlay:get-url', (_e, overlayId) => {
+  if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
+  return { ok: true, url: obsOverlayServer.getUrl(overlayId), connected: obsOverlayServer.hasClients(overlayId) };
+});
+ipcMain.handle('obs-overlay:copy-url', (_e, overlayId) => {
+  if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
+  const url = obsOverlayServer.getUrl(overlayId);
+  clipboard.writeText(url);
+  return { ok: true, url, connected: obsOverlayServer.hasClients(overlayId) };
 });

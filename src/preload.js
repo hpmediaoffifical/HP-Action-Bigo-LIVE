@@ -82,6 +82,8 @@ contextBridge.exposeInMainWorld('bigo', {
   overlayPlay: (opts) => ipcRenderer.invoke('overlay:play', opts),
   overlayStopEffect: (overlayId) => ipcRenderer.invoke('overlay:stop-effect', overlayId),
   overlaySetSpeed: (rate) => ipcRenderer.invoke('overlay:set-speed', rate),
+  obsOverlayGetUrl: (overlayId) => ipcRenderer.invoke('obs-overlay:get-url', overlayId),
+  obsOverlayCopyUrl: (overlayId) => ipcRenderer.invoke('obs-overlay:copy-url', overlayId),
 
   // Popup chats (Tương tác)
   popupOpenChats: () => ipcRenderer.invoke('popup:open-chats'),
