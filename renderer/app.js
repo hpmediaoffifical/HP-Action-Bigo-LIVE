@@ -1679,10 +1679,11 @@ function renderGroupCard(grp, overlayMap) {
     const displayName = item.alias || (item.matchKeys || [])[0] || '?';
     const priorityBadge = item.priority > 0 ? `<span class="prio-badge" title="Ưu tiên: chèn vào hàng ${item.priority} trong queue">⚡ #${item.priority}</span>` : '';
     const pauseBgmBadge = item.pauseBgm ? '<span class="pause-bgm-badge" title="Tạm dừng nhạc nền khi hiệu ứng này phát">🔇</span>' : '';
+    const preEffectBadge = item.preEffect ? '<span class="pre-effect-badge" title="Phát âm thanh/video trước hiệu ứng">🔔</span>' : '';
     // Hiển thị tên file rút gọn (basename) nếu là full path/URL
     const fileDisplay = displayEffectName(item.mediaFile);
     const fileLine = item.mediaFile
-      ? `<div class="grow-sub"><code>${escapeHtml(fileDisplay)}</code>${priorityBadge}${pauseBgmBadge}</div>`
+      ? `<div class="grow-sub"><code>${escapeHtml(fileDisplay)}</code>${priorityBadge}${pauseBgmBadge}${preEffectBadge}</div>`
       : '<div class="grow-sub" style="color:#ff6b6b">— chưa có file hiệu ứng —</div>';
     return `<div class="group-item" data-iid="${item.id}" data-gid="${grp.id}">
       ${iconCell}
