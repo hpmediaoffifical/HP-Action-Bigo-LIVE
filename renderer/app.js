@@ -69,12 +69,14 @@ const sessionStats = {
   effects: 0,        // số hiệu ứng đã trigger play
   diamond: 0,        // tổng đậu nhận
   giftCount: 0,      // tổng quà count nhận
+  viewers: 0,        // số người xem live từ public room info
   users: new Set(),  // unique user names
 };
 function resetSessionStats() {
   sessionStats.effects = 0;
   sessionStats.diamond = 0;
   sessionStats.giftCount = 0;
+  sessionStats.viewers = 0;
   sessionStats.users.clear();
   updateConnectStats();
 }
@@ -91,6 +93,7 @@ function updateConnectStats() {
   els.csDiamond.textContent = fmtStat(sessionStats.diamond);
   els.csUsers.textContent = fmtStat(sessionStats.users.size);
   els.csGifts.textContent = fmtStat(sessionStats.giftCount);
+  if (els.csViewers) els.csViewers.textContent = fmtStat(sessionStats.viewers);
 }
 
 // =================== Effect Queue State ===================
@@ -131,7 +134,9 @@ function pushPlayBatch(item, ev, playTimes) {
   const baseName = ev?.gift_name || item?.alias || (item?.matchKeys || [])[0] || '?';
   const baseId = ev?.gift_id ?? null;
   const baseIcon = ev?.gift_icon || ev?.gift_icon_url || (item ? getGiftIcon(item) : '');
-  const baseDiamond = ev?.total_diamond ?? null;
+  const baseDiamond = ev?.total_diamond != null && playTimes > 0
+    ? Math.max(1, Math.round(ev.total_diamond / playTimes))
+    : null;
   const baseLevel = ev?.level ?? null;
   const mediaFile = item?.mediaFile || null;
   const overlayId = item?.overlayId || null;
@@ -521,7 +526,7 @@ const els = {
   liveInfo: $('liveInfo'),
   metaPanel: $('metaPanel'), metaInfo: $('metaInfo'),
   liveChats: $('liveChats'), liveGifts: $('liveGifts'),
-  csEffects: $('csEffects'), csDiamond: $('csDiamond'), csUsers: $('csUsers'), csGifts: $('csGifts'),
+  csViewers: $('csViewers'), csEffects: $('csEffects'), csDiamond: $('csDiamond'), csUsers: $('csUsers'), csGifts: $('csGifts'),
   btnResetStats: $('btnResetStats'),
   btnPopupGifts: $('btnPopupGifts'),
   // Settings tab
@@ -986,6 +991,31 @@ function setLiveInfo(text, cls) {
     <span>${safe}<span class="brand">${brand}</span></span>
     <span>${safe}<span class="brand">${brand}</span></span>
   </div>`;
+}
+
+function getEffectPlayTimes(ev) {
+  const diamond = parseInt(ev?.total_diamond, 10) || 0;
+  if (diamond > 0) return Math.max(1, Math.min(1000, diamond));
+  return Math.max(1, Math.min(1000, ev?.total_count || ev?.gift_count || 1));
+}
+
+function readViewerCount(roomData) {
+  const candidates = [
+    roomData?.viewerCount, roomData?.viewers, roomData?.audienceCount,
+    roomData?.onlineCount, roomData?.online_num, roomData?.user_count,
+  ];
+  for (const v of candidates) {
+    const n = parseInt(v, 10);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return 0;
+}
+
+function setLiveViewerCount(roomData) {
+  const n = readViewerCount(roomData);
+  if (n <= 0 && sessionStats.viewers > 0) return;
+  sessionStats.viewers = n;
+  updateConnectStats();
 }
 
 async function init() {
@@ -1826,6 +1856,24 @@ function resetEmbedUi() {
 
 // Toggle state: false=disconnected, true=connected
 let isConnected = false;
+let liveViewerTimer = null;
+
+function stopLiveViewerRefresh() {
+  if (liveViewerTimer) clearInterval(liveViewerTimer);
+  liveViewerTimer = null;
+}
+
+function startLiveViewerRefresh(bigoId) {
+  stopLiveViewerRefresh();
+  liveViewerTimer = setInterval(async () => {
+    if (!isConnected || !bigoId) return;
+    try {
+      const check = await window.bigo.checkLive(bigoId);
+      const d = check?.data?.data || {};
+      if (check?.ok && d.alive === 1 && readViewerCount(d) > 0) setLiveViewerCount(d);
+    } catch {}
+  }, 30_000);
+}
 
 function setConnectedUi(yes) {
   isConnected = yes;
@@ -1843,6 +1891,7 @@ function setConnectedUi(yes) {
 }
 
 async function disconnect() {
+  stopLiveViewerRefresh();
   await window.bigo.embedStop();
   els.status.textContent = 'disconnected';
   els.status.classList.remove('on');
@@ -1868,6 +1917,7 @@ els.btnConnect.onclick = async () => {
   els.status.classList.remove('connected');
 
   // 1. Stop session cũ + clear UI (đề phòng)
+  stopLiveViewerRefresh();
   await window.bigo.embedStop();
   resetEmbedUi();
 
@@ -1880,12 +1930,14 @@ els.btnConnect.onclick = async () => {
   }
   const d = check.data?.data || {};
   if (d.alive !== 1) {
+    setLiveViewerCount(d);
     setLiveInfo(`🔴 OFFLINE — ${d.nick_name || 'không tìm thấy ID'}`, 'dead');
     els.status.textContent = 'offline';
     els.btnConnect.disabled = false;
     return;
   }
 
+  setLiveViewerCount(d);
   setLiveInfo(`🟢 LIVE — ${d.nick_name} · roomId=${d.roomId} · uid=${d.uid} · "${d.roomTopic || ''}"`, 'live');
 
   // 3. Lưu BIGO ID
@@ -1907,6 +1959,7 @@ els.btnConnect.onclick = async () => {
   els.status.classList.add('connected');
   setConnectedUi(true);
   appendLog(`connected to ${id}`);
+  startLiveViewerRefresh(id);
   // Auto-play BGM khi kết nối thành công (theo nhóm active hoặc Cài đặt chung)
   applyActiveBgm();
   playBgmIfHas();
@@ -1994,18 +2047,24 @@ const RECEIVED_MAX = 200;
 function addReceivedGift(ev) {
   if (!ev || ev.type !== 'gift') return;
   const total = ev.total_count != null ? ev.total_count : ((ev.gift_count || 1) * (ev.combo || 1));
-  receivedGifts.unshift({
-    id: 'rg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
-    ts: Date.now(),
-    user: ev.user || '?',
-    avatar: resolveAvatarForUser(ev.user, ev.user_avatar_url),
-    gift_name: ev.gift_name || '?',
-    gift_id: ev.gift_id,
-    gift_icon: ev.gift_icon || ev.gift_icon_url || '',
-    count: total,
-    diamond: ev.total_diamond,
-    level: ev.level,
-  });
+  const unitDiamond = ev.total_diamond != null && total > 0 ? Math.round(ev.total_diamond / total) : null;
+  const rows = Math.max(1, Math.min(1000, total || 1));
+  for (let i = rows; i >= 1; i--) {
+    receivedGifts.unshift({
+      id: 'rg_' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2, 5),
+      ts: Date.now() + i,
+      user: ev.user || '?',
+      avatar: resolveAvatarForUser(ev.user, ev.user_avatar_url),
+      gift_name: ev.gift_name || '?',
+      gift_id: ev.gift_id,
+      gift_icon: ev.gift_icon || ev.gift_icon_url || '',
+      count: 1,
+      diamond: unitDiamond,
+      level: ev.level,
+      step: i,
+      total,
+    });
+  }
   if (receivedGifts.length > RECEIVED_MAX) receivedGifts.length = RECEIVED_MAX;
   renderReceivedGifts();
   forwardReceivedGiftsSnapshot();
@@ -2221,30 +2280,30 @@ function renderParsed(ev) {
       checkSpecialEffectsTriggers(ev);
     }
     const matched = findGiftByEvent(ev);
+    const playTimes = ev.type === 'gift' ? getEffectPlayTimes(ev) : 1;
     // Update session stats (chỉ count gift, không count gift_overlay duplicate)
     if (ev.type === 'gift') {
       sessionStats.giftCount += (ev.gift_count || 1) * (ev.combo || 1);
       sessionStats.diamond += ev.total_diamond || 0;
       if (ev.user) sessionStats.users.add(ev.user);
       if (matched && matched.mediaFile) {
-        sessionStats.effects += Math.max(1, Math.min(1000, ev.total_count || ev.gift_count || 1));
+        sessionStats.effects += playTimes;
       }
       updateConnectStats();
       // Push vào received gifts list (right panel) — layout mới gọn
       addReceivedGift(ev);
     }
     if (ev.type === 'gift' && matched && matched.mediaFile && matched.overlayId) {
-      // Combo: tặng N lần thì phát N lần. total_count = gift_count × combo.
-      const playTimes = Math.max(1, Math.min(1000, ev.total_count || ev.gift_count || 1));
+      // Mỗi 1 KC tương ứng 1 lần hiệu ứng. Ví dụ Bell ×1 giá 50 KC → 50 hàng.
       // Tạm dừng nhạc nền nếu gift cấu hình "không chạy chung"
       if (matched.pauseBgm) pauseBgmForEffect();
       // Pre-effect: phát ÂM THANH/VIDEO trước MỘT LẦN (không lặp theo combo)
       maybeDispatchPreEffect(matched);
       const payload = resolveMediaPayload(matched.mediaFile);
+      pushQueue(ev, matched, playTimes);
       for (let i = 0; i < playTimes; i++) {
         window.bigo.overlayPlay({ overlayId: matched.overlayId, ...payload });
       }
-      pushQueue(ev, matched, playTimes);
     }
   }
 }
@@ -2277,6 +2336,7 @@ function renderEmbedEvent(ev) {
     return renderParsed(ev);
   }
   if (ev.kind === 'meta') {
+    if (ev.viewerCount != null) setLiveViewerCount(ev);
     // Panel "Room hiện tại" đã bỏ - silently ignore meta event
     if (els.metaPanel && els.metaInfo) {
       els.metaPanel.style.display = 'block';

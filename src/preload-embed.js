@@ -97,25 +97,54 @@ function normalize(s) {
     .toLowerCase();
 }
 
-// 3-LAYER DEDUP cho chat/gift detection:
+function hasDescendantWithSameText(el, text) {
+  const target = normalize(text);
+  if (!target || !el) return false;
+  const stack = [];
+  if (el.children) for (const c of el.children) stack.push(c);
+  if (el.shadowRoot) stack.push(el.shadowRoot);
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node) continue;
+    if (node.nodeType === 1) {
+      const childText = (node.textContent || '').trim();
+      if (childText && normalize(childText) === target) return true;
+    }
+    if (node.children) for (const c of node.children) stack.push(c);
+    if (node.shadowRoot) stack.push(node.shadowRoot);
+  }
+  return false;
+}
+
+function isVisibleElement(el) {
+  try {
+    const style = getComputedStyle(el);
+    if (!style || style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  } catch {
+    return true;
+  }
+}
+
+// DEDUP cho chat/gift detection:
 //
 // Layer A — WeakMap elementContent (per-element):
 //   Skip nếu cùng element + cùng text. Khác text → process (virtualized recycle).
 //
-// Layer B — Map recentTextHashes (cross-element time window):
-//   React re-render → NEW element + SAME text. Window 300ms catch re-render
-//   (1-200ms) nhưng KHÔNG drop legit gift sends (Bigo UI 500ms+ apart typical).
+// Layer B — recentRemovedText:
+//   React re-render thường remove rồi add lại SAME text rất nhanh. Skip trong
+//   cửa sổ ngắn để không bắn duplicate khi DOM render lại.
 //
-// Layer C — Map recentRemovedText (DOM remove → add detection):
-//   PRECISE detection cho React re-render: nếu element bị REMOVED rồi
-//   element MỚI added với SAME text trong 500ms → đó là re-render. Skip.
-//   Layer C ưu tiên hơn Layer B vì có evidence (remove event) thay vì
-//   guess time-based.
+// Layer C — recentTextHashes:
+//   Fallback cross-element time window cực ngắn cho trường hợp không bắt được
+//   removed node, nhưng vẫn tránh drop quà liên tiếp hợp lệ.
 const elementContent = new WeakMap();
 const recentTextHashes = new Map();
 const recentRemovedText = new Map();
 const TEXT_DEDUP_WINDOW_MS = 300;
 const REMOVE_RERENDER_WINDOW_MS = 500;
+let currentGiftBatchKeys = null;
 
 // Counter diagnostic — track tổng gifts captured cumulative.
 let _totalGiftsCaptured = 0;
@@ -124,16 +153,27 @@ let _totalHeartsCaptured = 0;
 
 // Process 1 element (+ descendants nếu có) → return { chats, gifts } captured.
 // Dùng cả từ tick scan VÀ MutationObserver (real-time).
-function processElement(rootEl) {
+function processElement(rootEl, opts = {}) {
+  const includeGifts = opts.includeGifts !== false;
   const chats = [];
   const gifts = [];
   if (!rootEl) return { chats, gifts };
   for (const el of walkAllElements(rootEl)) {
     if (el.nodeType !== 1) continue;
+    if (!isVisibleElement(el)) continue;
     const text = (el.textContent || '').trim();
     if (text.length < 5 || text.length > 300) continue;
     // Layer A: same element + same text → skip.
     if (elementContent.get(el) === text) continue;
+
+    // BIGO DOM thường lồng nhiều wrapper có cùng textContent cho 1 dòng quà.
+    // Nếu xử lý cả parent + child sẽ nhân đôi quà x1 thành 2 lần. Chỉ giữ
+    // element sâu nhất có cùng text; các dòng quà riêng biệt vẫn là elements
+    // sibling nên không bị loại.
+    if (hasDescendantWithSameText(el, text)) {
+      elementContent.set(el, text);
+      continue;
+    }
 
     // Filter "shared this LIVE" enter notification — không phải chat thật
     if (/shared\s+this\s+(live|LIVE)\s*$/i.test(text)) {
@@ -149,21 +189,30 @@ function processElement(rootEl) {
     const m = tryMatchChat(text);
     if (!m) continue;
 
+    const giftM = m.content.match(/sent\s+(?:a\s+)?(.+?)\s*[×xX](\d+)\s*$/);
+    const isGift = !!giftM || /^sent\s+/i.test(m.content);
+    if (isGift && !includeGifts) {
+      elementContent.set(el, text);
+      continue;
+    }
+
     const nowMs = Date.now();
-    // Layer C: nếu text vừa bị REMOVED khỏi DOM trong 500ms qua → đây là React
-    // re-render (remove old + add new same-text). Skip.
-    const removedTime = recentRemovedText.get(text);
-    if (removedTime && nowMs - removedTime < REMOVE_RERENDER_WINDOW_MS) {
-      elementContent.set(el, text);
-      continue;
+    if (!isGift) {
+      // Layer B: nếu text vừa bị REMOVED khỏi DOM trong 500ms qua → đây là React
+      // re-render (remove old + add new same-text). Skip.
+      const removedTime = recentRemovedText.get(text);
+      if (removedTime && nowMs - removedTime < REMOVE_RERENDER_WINDOW_MS) {
+        elementContent.set(el, text);
+        continue;
+      }
+      // Layer C: cross-element text dedup time-based fallback (300ms).
+      const lastTextSeen = recentTextHashes.get(text);
+      if (lastTextSeen && nowMs - lastTextSeen < TEXT_DEDUP_WINDOW_MS) {
+        elementContent.set(el, text);
+        continue;
+      }
+      recentTextHashes.set(text, nowMs);
     }
-    // Layer B: cross-element text dedup time-based fallback (300ms).
-    const lastTextSeen = recentTextHashes.get(text);
-    if (lastTextSeen && nowMs - lastTextSeen < TEXT_DEDUP_WINDOW_MS) {
-      elementContent.set(el, text);
-      continue;
-    }
-    recentTextHashes.set(text, nowMs);
 
     // Đánh dấu text đã process (Layer A persist).
     elementContent.set(el, text);
@@ -171,10 +220,20 @@ function processElement(rootEl) {
     const avatarUrl = findAvatarUrl(el);
     const giftIconUrl = findGiftIconUrl(el);
 
-    const giftM = m.content.match(/sent\s+(?:a\s+)?(.+?)\s*[×xX](\d+)\s*$/);
-    const isGift = !!giftM || /^sent\s+/i.test(m.content);
-
     if (isGift) {
+      let rectKey = '';
+      try {
+        const r = el.getBoundingClientRect();
+        rectKey = `${Math.round(r.top)}|${Math.round(r.left)}|${Math.round(r.width)}|${Math.round(r.height)}`;
+      } catch {}
+      const giftKey = `g|${normalize(m.user)}|${normalize(m.content)}|${normalize(giftIconUrl)}|${normalize(avatarUrl)}|${rectKey}`;
+      if (currentGiftBatchKeys) {
+        if (currentGiftBatchKeys.has(giftKey)) {
+          elementContent.set(el, text);
+          continue;
+        }
+        currentGiftBatchKeys.add(giftKey);
+      }
       // KHÔNG hash-dedup cho gifts — tin tưởng WeakMap elementContent đã handle
       // per-element dedup (skip nếu cùng element + cùng text). 2 chat rows khác
       // (kể cả cùng content) là 2 elements khác → cả 2 fire. Virtualized list
@@ -234,7 +293,10 @@ function processElement(rootEl) {
 // Wrapper backward-compat: scan toàn bộ document.body.
 function scanChatsAndGifts() {
   if (!document.body) return { chats: [], gifts: [] };
-  const r = processElement(document.body);
+  // Tick scan chỉ làm safety-net cho chat/meta. Gift chỉ lấy realtime từ
+  // MutationObserver để tránh cùng một dòng quà bị observer bắt xong rồi
+  // tick toàn document bắt lại lần nữa.
+  const r = processElement(document.body, { includeGifts: false });
   pruneMap(seenChats, 2000, 60_000);
   pruneMap(seenGifts, 500, 1500);
   pruneMap(recentTextHashes, 500, 5_000); // text dedup giữ 5s
@@ -265,6 +327,7 @@ function attachMutationObserver() {
     }
     // PASS 2: Process added nodes. processElement tự check Layer C.
     const collected = { chats: [], gifts: [] };
+    currentGiftBatchKeys = new Set();
     for (const m of mutations) {
       if (m.type !== 'childList') continue;
       for (const node of m.addedNodes) {
@@ -274,6 +337,7 @@ function attachMutationObserver() {
         collected.gifts.push(...r.gifts);
       }
     }
+    currentGiftBatchKeys = null;
     if (collected.chats.length || collected.gifts.length) {
       _totalChatsCaptured += collected.chats.length;
       _totalGiftsCaptured += collected.gifts.filter(g => g.type === 'gift').length;
@@ -373,6 +437,16 @@ function detectHeartFromChat(content) {
   return 0;
 }
 
+function parseViewerCountFromRoomText(text) {
+  const compact = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!/BIGO\s*ID\s*[:：]/i.test(compact)) return 0;
+  const afterId = compact.replace(/.*?BIGO\s*ID\s*[:：]\s*\S+\s*/i, '');
+  const nums = (afterId.match(/\b\d{1,7}\b/g) || []).map(n => parseInt(n, 10)).filter(n => n >= 0);
+  // Header BIGO web shows beans first, viewer count second/last:
+  // "BIGO ID:H2083 432074 553" → viewerCount = 553.
+  return nums.length ? nums[nums.length - 1] : 0;
+}
+
 function scanRoomMeta() {
   const meta = {};
   if (!document.body) return meta;
@@ -380,8 +454,10 @@ function scanRoomMeta() {
     if (el.nodeType !== 1) continue;
     const t = (el.textContent || '').trim();
     if (t.length > 200) continue;
-    const m = t.match(/^BIGO\s*ID\s*[:：]\s*(\S+)/i);
+    const m = t.match(/BIGO\s*ID\s*[:：]\s*(\S+)/i);
     if (m && !meta.bigoId) meta.bigoId = m[1];
+    const viewerCount = parseViewerCountFromRoomText(t);
+    if (viewerCount > 0 && !meta.viewerCount) meta.viewerCount = viewerCount;
   }
   if (document.title) meta.title = document.title;
   return meta;

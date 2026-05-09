@@ -217,7 +217,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .bigo-id-label { color: #ffd166; font-weight: 700; font-size: 14px; }
 /* Connect / Disconnect button in dam */
 #btnConnect { font-weight: 700; letter-spacing: 0.5px; }
-.connect-input { flex: 0 1 220px; min-width: 160px; }
+.connect-input { flex: 0 0 150px; width: 150px; min-width: 120px; }
 .live-info-inline { flex: 1; min-width: 180px; font-family: 'Consolas', monospace; font-size: 12px; color: #8ad6ff; padding: 4px 0; background: #0f1117; border-radius: 6px; white-space: nowrap; overflow: hidden; }
 .live-info-inline.live { color: #4ad07a; }
 .live-info-inline.dead { color: #ff6b6b; }

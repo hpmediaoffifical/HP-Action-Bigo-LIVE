@@ -6,21 +6,69 @@
   <link rel="icon" type="image/png" href="../logo-hp.png" />
   <link rel="stylesheet" href="style.css" />
   <style>
-    body { padding: 12px; min-width: 360px; }
-    h1 { font-size: 14px; color: #ff8a3d; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center; }
+    body { padding: 10px; min-width: 360px; }
+    h1 { font-size: 14px; color: #ff8a3d; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
     .pop-stats { font-size: 11px; color: #8a8f9a; }
     .pop-stats b { color: #ffd166; }
     .pop-controls { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; font-size: 11px; color: #8a8f9a; flex-wrap: wrap; }
-    #popQueue { background: #0f1117; border-radius: 6px; padding: 6px; max-height: calc(100vh - 140px); overflow-y: auto;
+    #popQueue { background: #0f1117; border-radius: 6px; padding: 5px; max-height: calc(100vh - 132px); overflow-y: auto;
                 --queue-font: 14px; --queue-icon: 40px; }
-    /* Apply CSS vars vào qrow-* classes — slider điều chỉnh font/icon size */
-    #popQueue .qrow-avatar { width: var(--queue-icon, 36px) !important; height: var(--queue-icon, 36px) !important; }
-    #popQueue .qrow-gift-icon, #popQueue .qrow-gift-icon-empty {
-      width: var(--queue-icon, 32px) !important; height: var(--queue-icon, 32px) !important;
+    #popQueue .queue-row {
+      display: grid;
+      grid-template-columns: var(--queue-icon, 40px) minmax(0, 1fr) 30px;
+      align-items: center;
+      gap: 9px;
+      min-height: calc(var(--queue-icon, 40px) + 10px);
+      padding: 6px 8px;
+      margin-bottom: 5px;
+      border-radius: 7px;
+      background: #1c1f28;
+      border-left: 3px solid transparent;
     }
-    #popQueue .qrow-user { font-size: var(--queue-font, 14px) !important; }
-    #popQueue .qrow-effect { font-size: calc(var(--queue-font, 14px) - 2px) !important; }
-    #popQueue .cnt-inline, #popQueue .beans-inline { font-size: calc(var(--queue-font, 14px) - 3px); }
+    #popQueue .queue-row.playing {
+      background: linear-gradient(90deg, rgba(254,44,85,0.22), rgba(254,44,85,0.04));
+      border-left-color: #fe2c55;
+    }
+    #popQueue .qrow-gift-icon, #popQueue .qrow-gift-icon-empty {
+      width: var(--queue-icon, 40px) !important;
+      height: var(--queue-icon, 40px) !important;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    #popQueue .qrow-meta { min-width: 0; display: grid; gap: 2px; }
+    #popQueue .qrow-user {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #ffd166;
+      font-size: var(--queue-font, 14px) !important;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #popQueue .qrow-effect {
+      font-size: calc(var(--queue-font, 14px) - 2px) !important;
+      color: #c9d6ff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #popQueue .qrow-effect b { color: #fff; }
+    #popQueue .cnt-inline { color: #ff3b6f; font-weight: 800; margin-left: 6px; }
+    #popQueue .beans-inline { color: #8ad6ff; font-weight: 700; margin-left: 6px; }
+    #popQueue .qrow-del {
+      position: static;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      justify-self: end;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+    }
     .pop-stt { color: #8a8f9a; font-weight: 700; min-width: 22px; display: inline-block; text-align: center;
                background: #1c1f28; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 6px; }
     .queue-row.playing .pop-stt { background: #fe2c55; color: #fff; }
@@ -66,25 +114,22 @@
 
     function renderRow(q, idx) {
       const isPlaying = q.status === 'playing';
-      const avatar = q.avatar
-        ? `<img class="qrow-avatar" src="${escapeHtml(q.avatar)}" />`
-        : '';
       const giftIcon = q.gift_icon
         ? `<img class="qrow-gift-icon" src="${escapeHtml(q.gift_icon)}" />`
         : `<div class="qrow-gift-icon-empty"></div>`;
       const playingBadge = isPlaying
         ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>'
         : '';
-      const cntInline = (q.count > 1 || q.total > 1)
-        ? `<span class="cnt-inline">×${q.count}</span>` : '';
+      const cntInline = `<span class="cnt-inline">SL ×${q.count || 1}</span>`;
       const beansInline = q.diamond != null
-        ? `<span class="beans-inline">💎 ${Number(q.diamond).toLocaleString('en-US')}</span>` : '';
+        ? `<span class="beans-inline">KC ${Number(q.diamond).toLocaleString('en-US')}</span>` : '';
       return `<div class="queue-row ${q.status}" data-id="${escapeHtml(q.id)}">
-        ${avatar}
         ${giftIcon}
         <div class="qrow-meta">
           <div class="qrow-user">${escapeHtml(q.user)}${playingBadge}</div>
-          <div class="qrow-effect">tặng <b>${escapeHtml(q.gift_name)}</b>${cntInline}${beansInline}</div>
+          <div class="qrow-effect" title="Tên Hiệu Ứng: ${escapeHtml(q.gift_name)}">
+            Tên Hiệu Ứng: <b>${escapeHtml(q.gift_name)}</b>${cntInline}${beansInline}
+          </div>
         </div>
         <button class="qrow-del" data-del="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
       </div>`;

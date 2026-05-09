@@ -27,6 +27,11 @@ let win;
 let client = null;
 let listener = null;
 let overlayManager = null;
+let queuePopup = null;
+let heartOverlay = null;
+let chatsPopup = null;
+let giftsPopup = null;
+let isQuitting = false;
 let giftMaster = { fetchedAt: 0, gifts: [], byImgUrl: null, byName: null, byTypeId: null };
 
 // =================== Helpers ===================
@@ -266,6 +271,57 @@ function trackWindowBounds(window, key) {
   window.on('close', save);
 }
 
+function cleanupAuxWindows() {
+  if (listener) {
+    try { listener.stop().catch(() => {}); } catch {}
+    listener = null;
+  }
+  if (client) {
+    try { client.stop().catch(() => {}); } catch {}
+    client = null;
+  }
+  for (const key of ['queuePopup', 'heartOverlay', 'chatsPopup', 'giftsPopup']) {
+    const w = { queuePopup, heartOverlay, chatsPopup, giftsPopup }[key];
+    if (w && !w.isDestroyed()) {
+      try { w.destroy(); } catch {}
+    }
+  }
+  queuePopup = null;
+  heartOverlay = null;
+  chatsPopup = null;
+  giftsPopup = null;
+  if (overlayManager) {
+    try { overlayManager.destroyAll(); } catch {}
+  }
+}
+
+function focusMainWindow() {
+  if (!win || win.isDestroyed()) return;
+  try {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    // Overlay windows can be always-on-top; briefly lift main above them so
+    // launching the app visibly opens HP Action, not only the green overlay.
+    win.setAlwaysOnTop(true, 'screen-saver');
+    win.focus();
+    win.moveTop();
+    setTimeout(() => {
+      try { if (win && !win.isDestroyed()) win.setAlwaysOnTop(false); } catch {}
+    }, 700);
+  } catch {}
+}
+
+function hardExitApp() {
+  isQuitting = true;
+  cleanupAuxWindows();
+  try {
+    for (const w of BrowserWindow.getAllWindows()) {
+      try { if (!w.isDestroyed()) w.destroy(); } catch {}
+    }
+  } catch {}
+  setTimeout(() => app.exit(0), 50);
+}
+
 function createWindow() {
   const saved = getSavedBounds('main', { width: 1280, height: 860 });
   win = new BrowserWindow({
@@ -282,9 +338,10 @@ function createWindow() {
   });
   win.setMenuBarVisibility(false);
   win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
+  win.webContents.once('did-finish-load', () => focusMainWindow());
   // Confirm khi đóng app — tránh user bấm nhầm X làm mất session
   win.on('close', (e) => {
-    if (win._allowClose) return;
+    if (isQuitting || win._allowClose) return;
     e.preventDefault();
     const { dialog } = require('electron');
     const r = dialog.showMessageBoxSync(win, {
@@ -297,8 +354,8 @@ function createWindow() {
       detail: 'Mọi session/queue/chat đang chạy sẽ bị mất. Bạn chắc chắn muốn thoát?',
     });
     if (r === 1) {
-      win._allowClose = true;
-      win.close();
+      if (win) win._allowClose = true;
+      hardExitApp();
     }
   });
   win.on('closed', () => { win = null; });
@@ -314,11 +371,7 @@ if (!gotLock) {
   process.exit(0);
 }
 app.on('second-instance', () => {
-  if (win && !win.isDestroyed()) {
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.focus();
-  }
+  focusMainWindow();
 });
 
 app.whenReady().then(async () => {
@@ -344,6 +397,7 @@ app.whenReady().then(async () => {
         try { overlayManager.show(ov); } catch (e) { console.warn('autoOpen overlay failed:', e); }
       }
     }
+    focusMainWindow();
   }, 1200);
   // Background: load master → auto-download icons nếu thiếu
   (async () => {
@@ -364,9 +418,16 @@ app.whenReady().then(async () => {
   })().catch(() => {});
 });
 app.on('window-all-closed', () => {
-  if (listener) listener.stop().catch(() => {});
-  if (overlayManager) overlayManager.destroyAll();
-  if (process.platform !== 'darwin') app.quit();
+  cleanupAuxWindows();
+  if (process.platform !== 'darwin') app.exit(0);
+});
+app.on('before-quit', () => {
+  isQuitting = true;
+  cleanupAuxWindows();
+});
+app.on('will-quit', () => {
+  isQuitting = true;
+  cleanupAuxWindows();
 });
 
 // =================== Settings & mapping IPC ===================
@@ -772,7 +833,6 @@ ipcMain.on('gifts:start-drag', (event, typeid) => {
 });
 
 // =================== Popup window (Hàng đợi hiệu ứng) ===================
-let queuePopup = null;
 function ensureQueuePopup() {
   if (queuePopup && !queuePopup.isDestroyed()) return queuePopup;
   const saved = getSavedBounds('popupQueue', { width: 420, height: 760 });
@@ -839,7 +899,6 @@ ipcMain.on('popup-queue:action', (_e, payload) => {
 // =================== Heart Goal Overlay window ===================
 // Cửa sổ riêng hiển thị vòng tròn progress cho TÁP TIM. OBS-friendly:
 // frameless + transparent, drag/resize, persist bounds.
-let heartOverlay = null;
 function ensureHeartOverlay() {
   if (heartOverlay && !heartOverlay.isDestroyed()) return heartOverlay;
   const saved = getSavedBounds('heartOverlay', { width: 320, height: 320, x: null, y: null });
@@ -880,7 +939,6 @@ ipcMain.handle('heart-overlay:update', (_e, payload) => {
 });
 
 // =================== Popup window (Tương tác - chats) ===================
-let chatsPopup = null;
 function ensureChatsPopup() {
   if (chatsPopup && !chatsPopup.isDestroyed()) return chatsPopup;
   const saved = getSavedBounds('popupChats', { width: 400, height: 720 });
@@ -930,8 +988,6 @@ ipcMain.on('popup-chats:request-snapshot', () => {
 });
 
 // =================== Popup window (Lịch sử quà) ===================
-let giftsPopup = null;
-
 function ensureGiftsPopup() {
   if (giftsPopup && !giftsPopup.isDestroyed()) return giftsPopup;
   const saved = getSavedBounds('popupGifts', { width: 380, height: 720 });
