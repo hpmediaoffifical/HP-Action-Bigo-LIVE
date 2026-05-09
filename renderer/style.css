@@ -1077,7 +1077,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   background: transparent;
 }
 .gameplay-review-icon-empty { border: 1px dashed #303746; }
-.gameplay-review-name { max-width: 72px; min-height: 30px; margin-top: 12px; color: var(--gameplay-text-color, #fff); font-family: var(--gameplay-text-font, 'Segoe UI', sans-serif); font-size: 15px; font-weight: 900; line-height: 14px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: grid; place-items: center; text-transform: none; }
+.gameplay-review-name { max-width: 72px; min-height: 30px; margin-top: 16px; color: var(--gameplay-text-color, #fff); font-family: var(--gameplay-text-font, 'Segoe UI', sans-serif); font-size: 15px; font-weight: 900; line-height: 14px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: grid; place-items: center; text-transform: none; }
 .gameplay-review.uppercase .gameplay-review-name { text-transform: uppercase; }
 .gameplay-review-card.label-left .gameplay-review-name,
 .gameplay-review-card.label-right .gameplay-review-name { max-width: 70px; text-align: left; }
@@ -1085,7 +1085,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .gameplay-review-name.marquee span { display: inline-block; min-width: 100%; padding-left: 100%; animation: gameplay-marquee 5s linear infinite; }
 .gameplay-review-name.wrap { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; place-items: initial; }
 @keyframes gameplay-marquee { from { transform: translateX(0); } to { transform: translateX(-100%); } }
-.gameplay-review-count { position: absolute; left: 50%; right: auto; bottom: -11px; transform: translateX(-50%); background: #3f3f3f; min-width: 26px; height: 18px; line-height: 18px; padding: 0 6px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+.gameplay-review-count { position: absolute; left: 50%; right: auto; bottom: -5px; transform: translateX(-50%); background: #3f3f3f; min-width: 26px; height: 18px; line-height: 18px; padding: 0 6px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
 .gameplay-options { display: grid; grid-template-columns: repeat(3, minmax(190px, 1fr)); gap: 10px; margin-top: 10px; padding: 10px; border-radius: 12px; background: #0f1117; border: 1px solid #262a35; }
 .gameplay-option-group { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 10px; background: #151821; border: 1px solid #242936; }
 .gameplay-option-title { color: #ff8a3d; font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
