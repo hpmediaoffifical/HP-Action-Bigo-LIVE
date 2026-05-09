@@ -97,20 +97,25 @@ function normalize(s) {
     .toLowerCase();
 }
 
-// 2-LAYER DEDUP cho chat/gift detection:
+// 3-LAYER DEDUP cho chat/gift detection:
 //
 // Layer A — WeakMap elementContent (per-element):
-//   Skip nếu cùng element + cùng text. Handle MutationObserver + tick scan
-//   trùng element. Khác text trên cùng element → process lại (virtualized).
+//   Skip nếu cùng element + cùng text. Khác text → process (virtualized recycle).
 //
-// Layer B — Map recentTextHashes (cross-element, 100ms window):
-//   Khi React/Vue re-render: tạo NEW element với SAME content trong vài ms.
-//   WeakMap không catch (different element). Layer B catch via text + timestamp.
-//   100ms đủ ngắn để KHÔNG drop manual taps (>150ms tap rate) nhưng đủ rộng
-//   để catch render duplicates (~1-50ms).
+// Layer B — Map recentTextHashes (cross-element time window):
+//   React re-render → NEW element + SAME text. Window 300ms catch re-render
+//   (1-200ms) nhưng KHÔNG drop legit gift sends (Bigo UI 500ms+ apart typical).
+//
+// Layer C — Map recentRemovedText (DOM remove → add detection):
+//   PRECISE detection cho React re-render: nếu element bị REMOVED rồi
+//   element MỚI added với SAME text trong 500ms → đó là re-render. Skip.
+//   Layer C ưu tiên hơn Layer B vì có evidence (remove event) thay vì
+//   guess time-based.
 const elementContent = new WeakMap();
 const recentTextHashes = new Map();
-const TEXT_DEDUP_WINDOW_MS = 100;
+const recentRemovedText = new Map();
+const TEXT_DEDUP_WINDOW_MS = 300;
+const REMOVE_RERENDER_WINDOW_MS = 500;
 
 // Counter diagnostic — track tổng gifts captured cumulative.
 let _totalGiftsCaptured = 0;
@@ -144,12 +149,18 @@ function processElement(rootEl) {
     const m = tryMatchChat(text);
     if (!m) continue;
 
-    // Layer B: cross-element text dedup. Catch React re-render → new element +
-    // same content trong window 100ms. KHÔNG drop manual taps (rate >150ms).
-    const lastTextSeen = recentTextHashes.get(text);
     const nowMs = Date.now();
+    // Layer C: nếu text vừa bị REMOVED khỏi DOM trong 500ms qua → đây là React
+    // re-render (remove old + add new same-text). Skip.
+    const removedTime = recentRemovedText.get(text);
+    if (removedTime && nowMs - removedTime < REMOVE_RERENDER_WINDOW_MS) {
+      elementContent.set(el, text);
+      continue;
+    }
+    // Layer B: cross-element text dedup time-based fallback (300ms).
+    const lastTextSeen = recentTextHashes.get(text);
     if (lastTextSeen && nowMs - lastTextSeen < TEXT_DEDUP_WINDOW_MS) {
-      elementContent.set(el, text); // mark to skip future scans of this element
+      elementContent.set(el, text);
       continue;
     }
     recentTextHashes.set(text, nowMs);
@@ -226,7 +237,8 @@ function scanChatsAndGifts() {
   const r = processElement(document.body);
   pruneMap(seenChats, 2000, 60_000);
   pruneMap(seenGifts, 500, 1500);
-  pruneMap(recentTextHashes, 500, 5_000); // text dedup chỉ giữ 5s
+  pruneMap(recentTextHashes, 500, 5_000); // text dedup giữ 5s
+  pruneMap(recentRemovedText, 500, 3_000); // removed text giữ 3s (đủ catch re-render)
   return r;
 }
 
@@ -238,6 +250,20 @@ function attachMutationObserver() {
   if (_moAttached || !document.body) return;
   _moAttached = true;
   const observer = new MutationObserver((mutations) => {
+    // PASS 1: Track removed nodes' text → recentRemovedText. Layer C dùng để
+    // skip new elements với text giống nhau (React re-render pattern).
+    const nowMs = Date.now();
+    for (const m of mutations) {
+      if (m.type !== 'childList') continue;
+      for (const node of m.removedNodes) {
+        if (!node || node.nodeType !== 1) continue;
+        const text = (node.textContent || '').trim();
+        if (text.length >= 5 && text.length <= 300) {
+          recentRemovedText.set(text, nowMs);
+        }
+      }
+    }
+    // PASS 2: Process added nodes. processElement tự check Layer C.
     const collected = { chats: [], gifts: [] };
     for (const m of mutations) {
       if (m.type !== 'childList') continue;
