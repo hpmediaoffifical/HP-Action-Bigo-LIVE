@@ -184,6 +184,7 @@ class ObsOverlayServer {
     if (req.method === 'GET' && reqUrl.pathname === '/pk-duo-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'pk-duo-overlay.css'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/pk-duo-arrow.svg') return this._serveFile(path.join(this.root, 'renderer', 'pk-duo-arrow.svg'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/pk-duo-boost.svg') return this._serveFile(path.join(this.root, 'renderer', 'pk-duo-boost.svg'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/pk-duo-neutral.svg') return this._serveFile(path.join(this.root, 'renderer', 'pk-duo-neutral.svg'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/score-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/score-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.css'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/logo-hp.png') return this._serveFile(path.join(this.root, 'logo-hp.png'), res);

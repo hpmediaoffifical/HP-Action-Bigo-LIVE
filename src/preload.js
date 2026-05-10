@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld('bigo', {
 
   // App info
   appGetVersion: () => ipcRenderer.invoke('app:get-version'),
+  windowSizeLock: (locked) => ipcRenderer.invoke('app:window-size-lock', locked),
 
   // Heart Goal overlay (vòng tròn progress)
   heartOverlayShow: () => ipcRenderer.invoke('heart-overlay:show'),

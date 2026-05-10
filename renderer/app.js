@@ -1068,17 +1068,17 @@ if (els.btnResetStats) {
   if (!btn) return;
   const KEY = 'hp_app_locked';
   const apply = (locked) => {
-    document.body.classList.toggle('app-locked', locked);
     btn.classList.toggle('locked', locked);
     btn.title = locked
-      ? 'Đang khoá — bấm để mở khoá cài đặt'
-      : 'Khoá cài đặt — chống chỉnh nhầm trong khi stream';
-    btn.textContent = locked ? '🔒' : '🔐';
+      ? 'Đang khoá kích thước cửa sổ — bấm để mở resize'
+      : 'Khoá kích thước cửa sổ hiện tại sau khi đã chỉnh vừa màn hình';
+    btn.textContent = locked ? '🔒' : '🔓';
+    if (window.bigo?.windowSizeLock) window.bigo.windowSizeLock(locked).catch(() => {});
   };
-  // Restore from localStorage
-  try { apply(localStorage.getItem(KEY) === '1'); } catch {}
+  // Mặc định mở resize; user chỉnh kích thước theo màn hình rồi bấm khoá để giữ layout hiện tại.
+  try { apply(localStorage.getItem(KEY) === '1'); } catch { apply(false); }
   btn.addEventListener('click', () => {
-    const next = !document.body.classList.contains('app-locked');
+    const next = !btn.classList.contains('locked');
     apply(next);
     try { localStorage.setItem(KEY, next ? '1' : '0'); } catch {}
   });
@@ -1490,6 +1490,22 @@ document.body.addEventListener('click', (e) => {
 // =================== Init ===================
 // Marquee suffix branding (chữ chạy)
 const LIVE_SUFFIX = ' - Phần mềm Độc quyền thuộc về HP Media | HPVN.MEDIA';
+
+// Status dot — textContent ẩn (font-size:0), nhưng title hiện khi hover.
+// Theo dõi textContent → đồng bộ vào attribute title để user vẫn biết trạng thái chi tiết.
+if (els.status) {
+  const syncStatusTitle = () => {
+    const txt = (els.status.textContent || '').trim();
+    els.status.title = txt || 'Chưa kết nối';
+  };
+  syncStatusTitle();
+  try {
+    new MutationObserver(syncStatusTitle).observe(els.status, {
+      childList: true, characterData: true, subtree: true,
+    });
+  } catch {}
+}
+
 function setLiveInfo(text, cls) {
   const target = els.headerLiveInfo || els.liveInfo;
   if (!target) return;
@@ -3218,6 +3234,10 @@ function startLiveViewerRefresh(bigoId) {
 
 function setConnectedUi(yes) {
   isConnected = yes;
+  if (els.embedBigoId) {
+    els.embedBigoId.disabled = !!yes;
+    els.embedBigoId.title = yes ? 'Đã kết nối. Bấm HỦY KẾT NỐI để nhập BIGO ID khác.' : '';
+  }
   if (yes) {
     els.btnConnect.textContent = 'HỦY KẾT NỐI';
     els.btnConnect.classList.remove('primary');
@@ -5417,10 +5437,15 @@ function pkDuoBoardHtml(state = pkDuoPublicState()) {
   const sec = Math.ceil((state.remainingMs || 0) / 1000);
   const status = state.status === 'prestart' ? `${sec}s` : (state.status === 'running' ? `${sec}s` : (state.status === 'finished' ? 'Kết thúc' : state.content));
   const urgent = state.status === 'running' && sec <= 10 && sec > 0;
-  return `<div class="pkduo-board status-${escapeHtml(state.status || 'idle')}${urgent ? ' urgent' : ''}" style="--pk-a:${escapeHtml(state.teamA.color)};--pk-b:${escapeHtml(state.teamB.color)};--pk-bg:${pkDuoHexToRgb(state.bgColor)};--pk-bg-opacity:${(state.bgOpacity / 100).toFixed(2)};--pk-gift:${state.giftSize}px;--pk-text:${state.textSize}px;--pk-push:${state.push}%;--pk-a-width:${Math.max(8, Math.min(92, 50 + Number(state.push || 0)))}%">
+  const neutral = Number(state.scoreA || 0) === Number(state.scoreB || 0);
+  const centerIcon = neutral ? 'pk-duo-neutral.svg' : 'pk-duo-boost.svg';
+  const centerClass = neutral ? 'neutral' : (state.scoreB > state.scoreA ? 'flip' : '');
+  const barClass = neutral ? 'neutral' : (state.scoreA > state.scoreB ? 'lead-a' : 'lead-b');
+  const sweepDelay = -((Date.now() % 3000) / 1000).toFixed(3);
+  return `<div class="pkduo-board status-${escapeHtml(state.status || 'idle')}${urgent ? ' urgent' : ''}" style="--pk-a:${escapeHtml(state.teamA.color)};--pk-b:${escapeHtml(state.teamB.color)};--pk-bg:${pkDuoHexToRgb(state.bgColor)};--pk-bg-opacity:${(state.bgOpacity / 100).toFixed(2)};--pk-gift:${state.giftSize}px;--pk-text:${state.textSize}px;--pk-push:${state.push}%;--pk-a-width:${Math.max(8, Math.min(92, 50 + Number(state.push || 0)))}%;--pk-sweep-delay:${sweepDelay}s">
     <div class="pkduo-head"><b>${escapeHtml(state.teamA.name)}</b><span>${escapeHtml(status)}</span><b>${escapeHtml(state.teamB.name)}</b></div>
     <div class="pkduo-gifts"><div>${state.teamA.gifts.map(giftHtml).join('')}</div><i></i><div>${state.teamB.gifts.map(giftHtml).join('')}</div></div>
-    <div class="pkduo-bar"><strong class="score-a">${fmt(state.scoreA)}</strong><span class="pkduo-team-label a">HP MEDIA</span><em class="${state.scoreB > state.scoreA ? 'flip' : ''}"><img src="pk-duo-boost.svg" alt="" /></em><span class="pkduo-team-label b">HP MEDIA</span><strong class="score-b">${fmt(state.scoreB)}</strong></div>
+    <div class="pkduo-bar ${barClass}"><strong class="score-a">${fmt(state.scoreA)}</strong><span class="pkduo-team-label a">HP MEDIA</span><em class="${centerClass}"><img src="${centerIcon}" alt="" /></em><span class="pkduo-team-label b">HP MEDIA</span><strong class="score-b">${fmt(state.scoreB)}</strong></div>
   </div>`;
 }
 
@@ -5459,6 +5484,7 @@ function renderPkDuo() {
   const state = pkDuoPublicState();
   if (el.preview) el.preview.innerHTML = pkDuoBoardHtml(state);
   if (el.status) el.status.textContent = state.status === 'running' ? 'ĐANG PK' : (state.status === 'prestart' ? 'CHUẨN BỊ' : (state.status === 'finished' ? 'KẾT THÚC' : 'CHỜ'));
+  if (el.start) el.start.disabled = !!state.running || state.status === 'prestart' || state.status === 'running';
   if (window.bigo?.pkDuoUpdate) window.bigo.pkDuoUpdate(state).catch(() => {});
 }
 
@@ -5527,10 +5553,17 @@ function pkDuoHandleGift(ev) {
 }
 
 function pkDuoStart() {
-  const prep = normalizePkDuo().prepSeconds;
+  const current = normalizePkDuo();
+  if (current.running || current.status === 'prestart' || current.status === 'running') return;
+  persistPkDuoConfig();
+  const cfg = normalizePkDuo();
+  const prep = cfg.prepSeconds;
   appSettings.pkDuo.running = true;
   appSettings.pkDuo.status = prep > 0 ? 'prestart' : 'running';
-  appSettings.pkDuo.endsAt = Date.now() + (prep > 0 ? prep : normalizePkDuo().durationSeconds) * 1000;
+  appSettings.pkDuo.scoreA = 0;
+  appSettings.pkDuo.scoreB = 0;
+  appSettings.pkDuo.userTeams = {};
+  appSettings.pkDuo.endsAt = Date.now() + (prep > 0 ? prep : (cfg.durationSeconds + cfg.delaySeconds)) * 1000;
   pkDuoWarningSoundPlayed = false;
   pkDuoResultSoundPlayed = false;
   if (!prep) playPkDuoCue('start');
@@ -5562,7 +5595,7 @@ function pkDuoTick() {
   if (remaining > 0) return renderPkDuo();
   if (p.status === 'prestart') {
     appSettings.pkDuo.status = 'running';
-    appSettings.pkDuo.endsAt = Date.now() + p.durationSeconds * 1000;
+    appSettings.pkDuo.endsAt = Date.now() + (p.durationSeconds + p.delaySeconds) * 1000;
     playPkDuoCue('start');
   } else {
     appSettings.pkDuo.running = false;
@@ -5578,7 +5611,16 @@ function pkDuoTick() {
 function wirePkDuoUi() {
   const el = pkDuoEls();
   ['hours','minutes','seconds','prep','delay','bgColor','bgOpacity','giftSize','textSize','aName','bName','aColor','bColor','joinMode'].forEach(k => { if (el[k]) el[k].onchange = persistPkDuoConfig; });
-  ['bgOpacity','giftSize','textSize','content','aName','bName'].forEach(k => { if (el[k]) el[k].oninput = persistPkDuoConfig; });
+  ['bgOpacity','giftSize','textSize','aName','bName'].forEach(k => { if (el[k]) el[k].oninput = persistPkDuoConfig; });
+  if (el.content) {
+    el.content.oninput = () => {
+      appSettings.pkDuo.content = String(el.content.value || '').trim() || 'Vui lòng chờ';
+      const state = pkDuoPublicState();
+      if (el.preview) el.preview.innerHTML = pkDuoBoardHtml(state);
+      if (window.bigo?.pkDuoUpdate) window.bigo.pkDuoUpdate(state).catch(() => {});
+    };
+    el.content.onchange = persistPkDuoConfig;
+  }
   if (el.start) el.start.onclick = pkDuoStart;
   if (el.stop) el.stop.onclick = pkDuoStop;
   if (el.reset) el.reset.onclick = () => { appSettings.pkDuo.scoreA = 0; appSettings.pkDuo.scoreB = 0; appSettings.pkDuo.userTeams = {}; appSettings.pkDuo.running = false; appSettings.pkDuo.status = 'idle'; appSettings.pkDuo.endsAt = 0; saveAppSettings({ pkDuo: appSettings.pkDuo }).catch(() => {}); renderPkDuo(); };
@@ -6760,7 +6802,7 @@ function updateBgmSidebarIcon() {
     btn.classList.add('playing');
     btn.title = 'Đang phát nhạc nền — bấm để dừng';
   } else {
-    btn.textContent = '🎵';
+    btn.textContent = '♫';
     btn.classList.remove('playing');
     btn.title = els.bgmAudio.src ? 'Bấm để phát nhạc nền' : 'Chưa chọn nhạc nền (vào tab Cài đặt)';
   }

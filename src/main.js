@@ -19,8 +19,8 @@ const GIFT_MASTER_TTL = 24 * 3600 * 1000; // 24h
 const ICO_PATH = path.join(ROOT, 'logo-hp.ico');
 const PNG_PATH = path.join(ROOT, 'logo-hp.png');
 const APP_ICON = fs.existsSync(ICO_PATH) ? ICO_PATH : (fs.existsSync(PNG_PATH) ? PNG_PATH : null);
-app.setName('HP Action - Bigo LIVE');
-process.title = 'HP Action - Bigo LIVE';
+app.setName('Action - Bigo LIVE');
+process.title = 'Action - Bigo LIVE';
 
 // Windows: set AppUserModelID để taskbar group đúng và hiện icon
 if (process.platform === 'win32') {
@@ -28,6 +28,8 @@ if (process.platform === 'win32') {
 }
 
 let win;
+const MAIN_DEFAULT_SIZE = { width: 1580, height: 960 };
+const MAIN_MIN_SIZE = { width: 1120, height: 720 };
 let client = null;
 let listener = null;
 let overlayManager = null;
@@ -339,12 +341,16 @@ function hardExitApp() {
 }
 
 function createWindow() {
-  const saved = getSavedBounds('main', { width: 1280, height: 860 });
+  const saved = getSavedBounds('main', MAIN_DEFAULT_SIZE);
   win = new BrowserWindow({
-    width: saved.width || 1280,
-    height: saved.height || 860,
+    width: Math.max(saved.width || MAIN_DEFAULT_SIZE.width, MAIN_MIN_SIZE.width),
+    height: Math.max(saved.height || MAIN_DEFAULT_SIZE.height, MAIN_MIN_SIZE.height),
+    minWidth: MAIN_MIN_SIZE.width,
+    minHeight: MAIN_MIN_SIZE.height,
+    resizable: true,
+    maximizable: true,
     x: saved.x, y: saved.y,
-    title: 'HP Action - Bigo LIVE',
+    title: 'Action - Bigo LIVE',
     icon: APP_ICON || undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -352,6 +358,7 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
+  win.setMinimumSize(MAIN_MIN_SIZE.width, MAIN_MIN_SIZE.height);
   win.setMenuBarVisibility(false);
   win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
   win.webContents.once('did-finish-load', () => focusMainWindow());
@@ -365,7 +372,7 @@ function createWindow() {
       buttons: ['Hủy', 'Thoát'],
       defaultId: 0,
       cancelId: 0,
-      title: 'HP Action - BIGO LIVE',
+      title: 'Action - BIGO LIVE',
       message: 'Thoát ứng dụng?',
       detail: 'Mọi session/queue/chat đang chạy sẽ bị mất. Bạn chắc chắn muốn thoát?',
     });
@@ -378,6 +385,16 @@ function createWindow() {
   trackWindowBounds(win, 'main');
   if (process.argv.includes('--dev')) win.webContents.openDevTools({ mode: 'detach' });
 }
+
+ipcMain.handle('app:window-size-lock', (_e, locked) => {
+  if (!win || win.isDestroyed()) return { ok: false, error: 'Main window not ready' };
+  const shouldLock = locked !== false;
+  try { saveWindowBounds('main', win.getBounds()); } catch {}
+  win.setMinimumSize(MAIN_MIN_SIZE.width, MAIN_MIN_SIZE.height);
+  win.setResizable(!shouldLock);
+  win.setMaximizable(!shouldLock);
+  return { ok: true, locked: shouldLock };
+});
 
 // Single-instance lock: nếu đã có instance đang chạy, focus vào nó và quit instance mới.
 // Tránh conflict trên user-data cache + tránh nhiều cửa sổ trùng lặp.

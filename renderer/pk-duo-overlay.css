@@ -11,7 +11,12 @@ body { display:flex; justify-content:center; align-items:center; }
 .pkduo-gifts i { display:block; width:3px; height:38px; background:rgba(255,255,255,.45); }
 .pkduo-gift-icon { width:var(--pk-gift); height:var(--pk-gift); display:grid; place-items:center; font-size:calc(var(--pk-gift) * .7); }
 .pkduo-gift-icon img { width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 3px 5px rgba(0,0,0,.5)); }
-.pkduo-bar { position:relative; display:grid; grid-template-columns:72px minmax(0,1fr) minmax(0,1fr) 72px; align-items:center; height:36px; overflow:hidden; background:linear-gradient(90deg,var(--pk-a) 0,var(--pk-a) var(--pk-a-width),var(--pk-b) var(--pk-a-width),var(--pk-b) 100%); }
+.pkduo-bar { position:relative; display:grid; grid-template-columns:72px minmax(0,1fr) minmax(0,1fr) 72px; align-items:center; height:36px; overflow:hidden; background:linear-gradient(90deg,var(--pk-a) 0,var(--pk-a) calc(var(--pk-a-width) - 1.2%),var(--pk-b) calc(var(--pk-a-width) + 1.2%),var(--pk-b) 100%); }
+.pkduo-bar::before { content:''; position:absolute; left:var(--pk-a-width); top:0; z-index:1; width:26px; height:100%; transform:translateX(-50%); background:linear-gradient(90deg,var(--pk-a),rgba(255,255,255,.22),var(--pk-b)); filter:blur(3px); opacity:.88; pointer-events:none; }
+.pkduo-bar::after { content:''; position:absolute; top:-30%; z-index:3; width:230px; height:160%; left:-24%; opacity:0; transform:translateX(-50%) skewX(-16deg); pointer-events:none; background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),rgba(255,255,255,.7),rgba(255,246,170,.54),rgba(255,255,255,.18),transparent); filter:blur(.15px) drop-shadow(0 0 13px rgba(255,255,255,.62)); mix-blend-mode:screen; animation-duration:3s; animation-delay:var(--pk-sweep-delay,0s); animation-iteration-count:infinite; animation-timing-function:cubic-bezier(.16,.84,.22,1); }
+.pkduo-bar.lead-a::after { animation-name:pkDuoPowerSweepA; }
+.pkduo-bar.lead-b::after { animation-name:pkDuoPowerSweepB; }
+.pkduo-bar.neutral::after { animation:none; opacity:0; }
 .pkduo-bar strong { z-index:5; display:grid; place-items:center; height:100%; padding:0; font-size:20px; font-weight:950; text-align:center; background:transparent; }
 .pkduo-bar .score-a { grid-column:1; }
 .pkduo-bar .score-b { grid-column:4; }
@@ -21,8 +26,13 @@ body { display:flex; justify-content:center; align-items:center; }
 .pkduo-bar em { position:absolute; left:var(--pk-a-width); top:50%; z-index:4; display:grid; place-items:center; width:62px; height:38px; font-style:normal; pointer-events:none; transform:translate(-50%,-50%); transition:left .25s ease; filter:drop-shadow(0 2px 3px rgba(0,0,0,.55)); animation:pkDuoBoostPush .75s ease-in-out infinite; }
 .pkduo-bar em img { width:52px; height:auto; display:block; }
 .pkduo-bar em.flip img { transform:scaleX(-1); }
+.pkduo-bar em.neutral { animation:pkDuoNeutralPulse 1.15s ease-in-out infinite; }
+.pkduo-bar em.neutral img { width:56px; }
 .pkduo-board.status-prestart .pkduo-head span,.pkduo-board.urgent .pkduo-head span { animation:pkDuoBlink .5s ease-in-out infinite; color:#fff1a6; }
 .pkduo-board.urgent { box-shadow:0 0 0 2px rgba(255,255,255,.15),0 0 24px rgba(255,54,84,.45); }
 @keyframes pkDuoBlink { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.45;transform:scale(1.12)} }
 @keyframes pkDuoBoostPush { 0%,100%{transform:translate(-50%,-50%) scale(1)} 50%{transform:translate(calc(-50% + 5px),-50%) scale(1.1)} }
+@keyframes pkDuoNeutralPulse { 0%,100%{transform:translate(-50%,-50%) scale(1)} 50%{transform:translate(-50%,-50%) scale(1.1)} }
+@keyframes pkDuoPowerSweepA { 0%{left:-24%;opacity:0;transform:translateX(-50%) skewX(-16deg)} 6%{opacity:.95} 35%{left:124%;opacity:.9;transform:translateX(-50%) skewX(-16deg)} 44%,100%{left:124%;opacity:0;transform:translateX(-50%) skewX(-16deg)} }
+@keyframes pkDuoPowerSweepB { 0%{left:124%;opacity:0;transform:translateX(-50%) skewX(16deg)} 6%{opacity:.95} 35%{left:-24%;opacity:.9;transform:translateX(-50%) skewX(16deg)} 44%,100%{left:-24%;opacity:0;transform:translateX(-50%) skewX(16deg)} }
 @keyframes pkDuoWatermarkOnce { 0%{opacity:0;transform:translateY(2px)} 38%{opacity:.34;transform:translateY(0)} 100%{opacity:.2;transform:translateY(0)} }

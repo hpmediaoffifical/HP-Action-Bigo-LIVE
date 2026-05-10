@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <title>HP Action - Bigo LIVE</title>
+  <title>Action - Bigo LIVE</title>
   <link rel="icon" type="image/png" href="../logo-hp.png" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -10,7 +10,7 @@
   <section id="licenseGate" class="license-gate" aria-label="Nhập KEY bản quyền">
     <div class="license-card">
       <div class="license-logo-wrap"><img src="../logo-hp.png" alt="HP Action" /></div>
-      <h1>HP Action - BIGO LIVE</h1>
+      <h1>Action - BIGO LIVE</h1>
       <p class="license-subtitle">Nhập KEY bản quyền để sử dụng phần mềm trên thiết bị này.</p>
       <form id="licenseGateForm" class="license-form">
         <input id="licenseGateKey" type="password" autocomplete="off" placeholder="Nhập KEY bản quyền" />
@@ -18,16 +18,13 @@
       </form>
       <div id="licenseGateMessage" class="license-message">Đang kiểm tra KEY...</div>
       <div class="license-developer">
-        <div>HP Action - Bigo LIVE by HP Media</div>
+        <div>Action - Bigo LIVE by HP Media</div>
         <a href="https://www.facebook.com/hpvn.media" data-ext="https://www.facebook.com/hpvn.media">Liên hệ bản quyền</a>
       </div>
     </div>
   </section>
   <div class="app-layout">
     <aside class="sidebar">
-      <div class="sidebar-logo" title="BIGO Action">
-        <img src="../logo-hp.png" alt="logo" />
-      </div>
       <button class="tab sidebar-tab active" data-tab="embed" title="TƯƠNG TÁC" aria-label="TƯƠNG TÁC">💬</button>
       <button class="tab sidebar-tab" data-tab="queue" title="DANH SÁCH HIỆU ỨNG" aria-label="DANH SÁCH HIỆU ỨNG">🎬</button>
       <button class="tab sidebar-tab" data-tab="gifts" title="BẢNG QUÀ" aria-label="BẢNG QUÀ">🎁</button>
@@ -37,50 +34,48 @@
       <button class="tab sidebar-tab" data-tab="score" title="TÍNH ĐIỂM" aria-label="TÍNH ĐIỂM">🎯</button>
       <button class="tab sidebar-tab" data-tab="overlays" title="OVERLAY" aria-label="OVERLAY">🪟</button>
       <button class="tab sidebar-tab" data-tab="special" title="ĐẶC BIỆT" aria-label="ĐẶC BIỆT">✨</button>
-      <div class="sidebar-spacer"></div>
-      <button class="sidebar-tab" id="sidebarBgmToggle" title="MUSIC BACKGROUD" aria-label="MUSIC BACKGROUD">🎵</button>
-      <button class="sidebar-tab" id="sidebarLockSettings" title="KHÓA GIAO DIỆN" aria-label="KHÓA GIAO DIỆN">🔐</button>
       <button class="tab sidebar-tab" data-tab="settings" title="CÀI ĐẶT CHUNG" aria-label="CÀI ĐẶT CHUNG">⚙️</button>
       <button class="tab sidebar-tab" data-tab="info" title="NHÀ PHÁT HÀNH" aria-label="NHÀ PHÁT HÀNH">ℹ️</button>
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-utils" aria-label="Tiện ích nhanh">
+        <button class="sidebar-tab" id="sidebarBgmToggle" title="Nhạc nền" aria-label="Nhạc nền">♫</button>
+        <button class="sidebar-tab" id="sidebarLockSettings" title="Khóa kích thước cửa sổ" aria-label="Khóa kích thước cửa sổ">🔓</button>
+      </div>
     </aside>
 
     <div class="main-content">
-  <header>
-    <h1>HP Action - BIGO LIVE <span class="badge" id="status">disconnected</span></h1>
-    <div id="headerLiveInfo" class="header-live-info">Nhập ID rồi bấm Kết nối</div>
-    <div class="header-license" id="headerLicense" style="display:none">
-      <div class="hl-row" title="Khách hàng (theo key bản quyền)">
-        <span class="hl-icon">👤</span>
-        <span class="hl-value" id="hlCustomer">—</span>
+  <header class="app-header">
+    <div class="header-brand">
+      <img class="header-logo" src="../logo-hp.png" alt="HP" />
+      <h1>Action <span class="header-brand-sub">BIGO LIVE</span></h1>
+    </div>
+    <span class="header-separator" aria-hidden="true"></span>
+    <div class="connect-row header-connect">
+      <span class="status-dot" id="status" title="Chưa kết nối">disconnected</span>
+      <label class="bigo-id-label" for="embedBigoId">BIGO ID:</label>
+      <input id="embedBigoId" placeholder="vd: 1066691535" class="connect-input" />
+      <button id="btnConnect" class="primary">KẾT NỐI</button>
+      <button id="btnEmbedShow" disabled>👁 VIEW</button>
+      <span id="liveInfo" class="live-info-inline" style="display:none"></span>
+      <div class="connect-stats">
+        <span title="Số người xem LIVE hiện tại">👁️ <b id="csViewers">0</b></span>
+        <span title="Số lần đã phát hiệu ứng (kể cả phát thử)">🎵 <b id="csEffects">0</b></span>
+        <span title="Tổng đậu BIGO đã nhận từ live"><span class="bean-icon inline"></span><b id="csDiamond">0</b></span>
+        <span title="Số user khác nhau đã tặng quà">👤 <b id="csUsers">0</b></span>
+        <span title="Tổng số quà đã nhận từ live">🎁 <b id="csGifts">0</b></span>
+        <button id="btnResetStats" class="tiny cs-reset" title="Reset bộ đếm về 0">↺ Reset</button>
       </div>
-      <div class="hl-row" title="Hạn sử dụng key">
-        <span class="hl-icon">⏰</span>
-        <span class="hl-value" id="hlExpiry">—</span>
-      </div>
+    </div>
+    <div id="headerLiveInfo" class="header-live-info" hidden></div>
+    <div class="header-license" id="headerLicense" hidden>
+      <span class="hl-value" id="hlCustomer"></span>
+      <span class="hl-value" id="hlExpiry"></span>
     </div>
   </header>
 
   <main>
     <!-- =================== TAB: WEB LISTENER =================== -->
     <section class="tab-panel active" data-tab="embed">
-      <div class="panel panel-compact">
-        <div class="connect-row">
-          <label class="bigo-id-label" for="embedBigoId">BIGO ID:</label>
-          <input id="embedBigoId" placeholder="vd: 1066691535" class="connect-input" />
-          <button id="btnConnect" class="primary">KẾT NỐI</button>
-          <button id="btnEmbedShow" disabled>👁 VIEW</button>
-          <span id="liveInfo" class="live-info-inline" style="display:none"></span>
-          <div class="connect-stats">
-            <span title="Số người xem LIVE hiện tại">👁️ <b id="csViewers">0</b></span>
-            <span title="Số lần đã phát hiệu ứng (kể cả phát thử)">🎵 <b id="csEffects">0</b></span>
-            <span title="Tổng đậu BIGO đã nhận từ live"><span class="bean-icon inline"></span><b id="csDiamond">0</b></span>
-            <span title="Số user khác nhau đã tặng quà">👤 <b id="csUsers">0</b></span>
-            <span title="Tổng số quà đã nhận từ live">🎁 <b id="csGifts">0</b></span>
-            <button id="btnResetStats" class="tiny cs-reset" title="Reset bộ đếm về 0">↺ Reset</button>
-          </div>
-        </div>
-      </div>
-
       <div class="embed-layout">
         <div class="embed-center">
           <div class="panel">
@@ -896,7 +891,7 @@
       <div class="panel">
         <h2>👨‍💻 Thông tin Nhà Phát Triển</h2>
         <div class="dev-info">
-          <div class="dev-row"><span class="dev-key">Tên ứng dụng:</span><span class="dev-val"><b>HP Action - BIGO LIVE</b></span></div>
+          <div class="dev-row"><span class="dev-key">Tên ứng dụng:</span><span class="dev-val"><b>Action - BIGO LIVE</b></span></div>
           <div class="dev-row"><span class="dev-key">Phát triển bởi:</span><span class="dev-val"><b>HP Media</b></span></div>
           <div class="dev-row"><span class="dev-key">Người thực hiện:</span><span class="dev-val"><b>Nguyễn Hoàng Phụng</b></span></div>
           <div class="dev-row"><span class="dev-key">Website:</span><span class="dev-val"><a href="#" data-ext="https://hpvn.media" class="dev-link">https://hpvn.media</a></span></div>
