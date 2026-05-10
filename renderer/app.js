@@ -3712,7 +3712,7 @@ let appSettings = {
   bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
   gameplay: { groupId: '', useCommonGroup: true, orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', slotNumberColor: '#ffffff', countColor: '#ffffff', countSize: 12, uppercase: false, showName: true, showCount: true, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] },
-  ranking: { title: 'Ranking list', memberGroupId: '', rows: [], activeId: '', running: false, linkScoreTimer: true, roundSeconds: 60, streakSeconds: 12, streakColor: '#67e8f9', grayLosers: true, showRank: true, showAvatar: true, showGift: true, showRound: true, hideAllScores: false, rankStart: 1, rankEnd: 20 },
+  ranking: { title: 'Ranking list', memberGroupId: '', rows: [], activeId: '', running: false, linkScoreTimer: true, roundSeconds: 60, streakSeconds: 12, streakColor: '#67e8f9', grayLosers: true, showRank: true, showAvatar: true, showGift: true, showRound: true, hideAllScores: false, rankStart: 1, rankEnd: 20, gridRows: 3, gridCols: 3, gridFlow: 'row', nameMode: 'two-line', overlayBgColor: '#2a2d37', overlayBgOpacity: 74, showVerticalPreview: true, showGridPreview: true, compactPreview: true },
   scoreVote: { hours: 0, minutes: 3, seconds: 0, delaySeconds: 5, target: 30000, memberGroupId: '', memberId: '', content: 'Kêu gọi điểm ĐẬU', creatorName: 'Creator', creatorAvatar: '', timeColor: '#ffffff', contentColor: '#f0eef6', overColor: '#ff0000', barColor1: '#b93678', barColor2: '#ff8ed1', waveColor: '#ffffff', bigGiftThreshold: 500, prepSeconds: 3, themePreset: 'custom', barStyle: 'pill', overlaySize: 'medium', customMilestones: '', showGiftUser: true, showMissing: true, showTopUsers: true, showSpeed: true, compactMode: false, hideAvatar: false, hideCreator: false, startSound: '', startSoundName: '', warningSound: '', warningSoundName: '', goalSound: '', goalSoundName: '', successSound: '', successSoundName: '', failSound: '', failSoundName: '' },
   // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
   specialEffects: {
@@ -4633,14 +4633,17 @@ if (els.membersList) {
 
 // =================== Bảng xếp hạng (BXH) ===================
 let rankingTimer = null;
+let rankingGridSuggestSource = 'cols';
 
 function rankingEls() {
   return {
-    memberGroup: $('rankingMemberGroup'), member: $('rankingMember'), rows: $('rankingRows'), preview: $('rankingPreview'),
+    memberGroup: $('rankingMemberGroup'), member: $('rankingMember'), rows: $('rankingRows'), preview: $('rankingPreview'), gridPreview: $('rankingGridPreview'), verticalPreviewSection: $('rankingVerticalPreviewSection'), gridPreviewSection: $('rankingGridPreviewSection'),
     title: $('rankingTitle'), manualName: $('rankingManualName'), manualAvatar: $('rankingManualAvatar'), roundSeconds: $('rankingRoundSeconds'),
     streakSeconds: $('rankingStreakSeconds'), streakColor: $('rankingStreakColor'), grayLosers: $('rankingGrayLosers'),
-    showRank: $('rankingShowRank'), showAvatar: $('rankingShowAvatar'), showGift: $('rankingShowGift'), showRound: $('rankingShowRound'), hideAllScores: $('rankingHideAllScores'), linkScoreTimer: $('rankingLinkScoreTimer'), rankStart: $('rankingRankStart'), rankEnd: $('rankingRankEnd'),
-    btnAddMember: $('btnRankingAddMember'), btnAddManual: $('btnRankingAddManual'), btnSave: $('btnRankingSave'), btnCopyUrl: $('btnRankingCopyUrl'),
+    showRank: $('rankingShowRank'), showAvatar: $('rankingShowAvatar'), showGift: $('rankingShowGift'), showRound: $('rankingShowRound'), hideAllScores: $('rankingHideAllScores'), linkScoreTimer: $('rankingLinkScoreTimer'), rankStart: $('rankingRankStart'), rankEnd: $('rankingRankEnd'), nameMode: $('rankingNameMode'), overlayBgColor: $('rankingOverlayBgColor'), overlayBgOpacity: $('rankingOverlayBgOpacity'), overlayBgOpacityVal: $('rankingOverlayBgOpacityVal'),
+    gridRows: $('rankingGridRows'), gridCols: $('rankingGridCols'), gridFlow: $('rankingGridFlow'), gridRowsHint: $('rankingGridRowsHint'), gridColsHint: $('rankingGridColsHint'), gridSuggestionText: $('rankingGridSuggestionText'), btnGridApply: $('btnRankingGridApply'), btnGridUseSuggestion: $('btnRankingGridUseSuggestion'),
+    showVerticalPreview: $('rankingShowVerticalPreview'), showGridPreview: $('rankingShowGridPreview'), compactPreview: $('rankingCompactPreview'),
+    btnAddMember: $('btnRankingAddMember'), btnAddManual: $('btnRankingAddManual'), btnSave: $('btnRankingSave'), btnCopyUrl: $('btnRankingCopyUrl'), btnGridCopyUrl: $('btnRankingGridCopyUrl'),
     btnStartRound: $('btnRankingStartRound'), btnStopRound: $('btnRankingStopRound'), btnReset: $('btnRankingReset'),
   };
 }
@@ -4686,10 +4689,60 @@ function rankingConfig() {
     showGift: r.showGift !== false,
     showRound: r.showRound !== false,
     hideAllScores: !!r.hideAllScores,
-    rankStart: Math.max(1, parseInt(r.rankStart, 10) || 1),
-    rankEnd: Math.max(1, Math.min(100, parseInt(r.rankEnd ?? r.rankLimit, 10) || 20)),
+    rankStart: Math.max(0, parseInt(r.rankStart, 10) || 0),
+    rankEnd: Math.max(0, Math.min(100, parseInt(r.rankEnd ?? r.rankLimit, 10) || 0)),
+    gridRows: Math.max(1, Math.min(20, parseInt(r.gridRows, 10) || 3)),
+    gridCols: Math.max(1, Math.min(10, parseInt(r.gridCols, 10) || 3)),
+    gridFlow: r.gridFlow === 'column' ? 'column' : 'row',
+    nameMode: r.nameMode === 'marquee' ? 'marquee' : 'two-line',
+    overlayBgColor: /^#[0-9a-f]{6}$/i.test(String(r.overlayBgColor || '')) ? r.overlayBgColor : '#2a2d37',
+    overlayBgOpacity: Math.max(0, Math.min(100, parseInt(r.overlayBgOpacity, 10) || 74)),
+    showVerticalPreview: r.showVerticalPreview !== false,
+    showGridPreview: r.showGridPreview !== false,
+    compactPreview: r.compactPreview !== false,
     roundEndsAt: Math.max(0, Number(r.roundEndsAt) || 0),
   };
+}
+
+function rankingNextCreatorName() {
+  const rows = (appSettings.ranking?.rows || []).map(normalizeRankingRow);
+  const maxNamed = rows.reduce((max, row) => {
+    const m = String(row.name || '').trim().match(/^New Creator\s+(\d+)$/i);
+    return m ? Math.max(max, parseInt(m[1], 10) || 0) : max;
+  }, 0);
+  return `New Creator ${Math.max(maxNamed + 1, rows.length + 1)}`;
+}
+
+function rankingHexToRgb(hex, fallback = '42,45,55') {
+  const m = String(hex || '').trim().match(/^#([0-9a-f]{6})$/i);
+  if (!m) return fallback;
+  const n = parseInt(m[1], 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
+
+function rankingGridSuggestion() {
+  const cfg = rankingConfig();
+  const totalRows = rankingSortedRows(cfg.rows.filter(row => !row.excludeOverlay)).length;
+  const start = Math.max(1, cfg.rankStart || 1);
+  const end = cfg.rankEnd > 0 ? Math.max(start, cfg.rankEnd) : totalRows;
+  const total = Math.max(1, Math.min(totalRows, end) - start + 1);
+  const currentRows = Math.max(1, Math.min(20, parseInt(cfg.gridRows, 10) || 1));
+  const currentCols = Math.max(1, Math.min(10, parseInt(cfg.gridCols, 10) || 1));
+  const rows = rankingGridSuggestSource === 'rows' ? currentRows : Math.max(1, Math.min(20, Math.ceil(total / currentCols)));
+  const cols = rankingGridSuggestSource === 'rows' ? Math.max(1, Math.min(10, Math.ceil(total / currentRows))) : currentCols;
+  return {
+    rows,
+    cols,
+    total,
+  };
+}
+
+function updateRankingGridSuggestionUi() {
+  const el = rankingEls();
+  const s = rankingGridSuggestion();
+  if (el.gridRowsHint) el.gridRowsHint.textContent = `(${s.rows})`;
+  if (el.gridColsHint) el.gridColsHint.textContent = `(${s.cols})`;
+  if (el.gridSuggestionText) el.gridSuggestionText.textContent = `Đề xuất theo ${s.total} creator: nếu giữ số cột hiện tại thì ${s.rows} hàng; nếu giữ số hàng hiện tại thì ${s.cols} cột.`;
 }
 
 function rankingGiftItems() {
@@ -4727,10 +4780,10 @@ function rankingPublicState() {
     active: row.id === cfg.activeId,
     streakText: row.streakUntil > now ? row.streakText : '',
   }));
-  const start = Math.min(cfg.rankStart, cfg.rankEnd);
-  const end = Math.max(cfg.rankStart, cfg.rankEnd);
+  const start = Math.max(1, cfg.rankStart || 1);
+  const end = cfg.rankEnd > 0 ? Math.max(start, cfg.rankEnd) : rowsAll.length;
   const rows = rowsAll.slice(start - 1, end);
-  const active = rows.find(r => r.active) || null;
+  const active = rowsAll.find(r => r.active) || null;
   return { ...cfg, rows, totalRows: rowsAll.length, active, remainingMs: cfg.roundEndsAt ? Math.max(0, cfg.roundEndsAt - now) : 0 };
 }
 
@@ -4766,6 +4819,17 @@ function applyRankingSettingsUi() {
   if (el.linkScoreTimer) el.linkScoreTimer.checked = cfg.linkScoreTimer;
   if (el.rankStart) el.rankStart.value = cfg.rankStart;
   if (el.rankEnd) el.rankEnd.value = cfg.rankEnd;
+  if (el.gridRows) el.gridRows.value = cfg.gridRows;
+  if (el.gridCols) el.gridCols.value = cfg.gridCols;
+  if (el.gridFlow) el.gridFlow.value = cfg.gridFlow;
+  if (el.nameMode) el.nameMode.value = cfg.nameMode;
+  if (el.overlayBgColor) el.overlayBgColor.value = cfg.overlayBgColor;
+  if (el.overlayBgOpacity) el.overlayBgOpacity.value = cfg.overlayBgOpacity;
+  if (el.overlayBgOpacityVal) el.overlayBgOpacityVal.textContent = `${cfg.overlayBgOpacity}%`;
+  if (el.showVerticalPreview) el.showVerticalPreview.checked = cfg.showVerticalPreview;
+  if (el.showGridPreview) el.showGridPreview.checked = cfg.showGridPreview;
+  if (el.compactPreview) el.compactPreview.checked = cfg.compactPreview;
+  updateRankingGridSuggestionUi();
   if (cfg.roundEndsAt > Date.now() && !rankingTimer) rankingTimer = setInterval(rankingTick, 500);
   renderRankingEditor();
   pushRankingState();
@@ -4787,18 +4851,38 @@ function persistRankingConfig() {
     showRound: el.showRound ? el.showRound.checked : true,
     hideAllScores: el.hideAllScores ? el.hideAllScores.checked : false,
     linkScoreTimer: el.linkScoreTimer ? el.linkScoreTimer.checked : true,
-    rankStart: Math.max(1, parseInt(el.rankStart?.value, 10) || 1),
-    rankEnd: Math.max(1, Math.min(100, parseInt(el.rankEnd?.value, 10) || 20)),
+    rankStart: Math.max(0, parseInt(el.rankStart?.value, 10) || 0),
+    rankEnd: Math.max(0, Math.min(100, parseInt(el.rankEnd?.value, 10) || 0)),
+    gridRows: Math.max(1, Math.min(20, parseInt(el.gridRows?.value, 10) || 3)),
+    gridCols: Math.max(1, Math.min(10, parseInt(el.gridCols?.value, 10) || 3)),
+    gridFlow: el.gridFlow?.value === 'column' ? 'column' : 'row',
+    nameMode: el.nameMode?.value === 'marquee' ? 'marquee' : 'two-line',
+    overlayBgColor: /^#[0-9a-f]{6}$/i.test(String(el.overlayBgColor?.value || '')) ? el.overlayBgColor.value : '#2a2d37',
+    overlayBgOpacity: Math.max(0, Math.min(100, parseInt(el.overlayBgOpacity?.value, 10) || 0)),
+    showVerticalPreview: el.showVerticalPreview ? el.showVerticalPreview.checked : true,
+    showGridPreview: el.showGridPreview ? el.showGridPreview.checked : true,
+    compactPreview: el.compactPreview ? el.compactPreview.checked : true,
   };
   saveAppSettings({ ranking: appSettings.ranking }).catch(() => {});
+  updateRankingGridSuggestionUi();
   pushRankingState();
 }
 
 function pushRankingState() {
   const state = rankingPublicState();
   renderRankingPreview(state);
+  renderRankingGridPreview(state);
+  updateRankingPreviewVisibility(state);
   updateRankingButtons(state);
   if (window.bigo?.rankingUpdate) window.bigo.rankingUpdate(state).catch(() => {});
+}
+
+function updateRankingPreviewVisibility(state = rankingPublicState()) {
+  const el = rankingEls();
+  if (el.verticalPreviewSection) el.verticalPreviewSection.hidden = state.showVerticalPreview === false;
+  if (el.gridPreviewSection) el.gridPreviewSection.hidden = state.showGridPreview === false;
+  if (el.preview) el.preview.classList.toggle('compact', state.compactPreview !== false);
+  if (el.gridPreview) el.gridPreview.classList.toggle('compact', state.compactPreview !== false);
 }
 
 function updateRankingButtons(state = rankingPublicState()) {
@@ -4878,6 +4962,18 @@ function renderRankingPreview(state = rankingPublicState()) {
   el.preview.innerHTML = rankingBoardHtml(state);
 }
 
+function rankingNameHtml(name, className) {
+  const text = String(name || 'Idol');
+  const longClass = text.length > 12 ? ' long' : '';
+  return `<div class="${className}${longClass}" title="${escapeHtml(text)}"><span>${escapeHtml(text)}</span></div>`;
+}
+
+function renderRankingGridPreview(state = rankingPublicState()) {
+  const el = rankingEls();
+  if (!el.gridPreview) return;
+  el.gridPreview.innerHTML = rankingGridBoardHtml(state);
+}
+
 function rankingBoardHtml(state) {
   const rows = state.rows || [];
   const maxPoints = rows.length ? Math.max(...rows.map(r => r.points || 0)) : 0;
@@ -4886,7 +4982,7 @@ function rankingBoardHtml(state) {
   const activeName = state.active ? escapeHtml(state.active.name) : '';
   const activePoints = state.active ? Number(state.active.points || 0).toLocaleString('en-US') : '';
   const activeLong = state.active && `${state.active.name || ''} ${activePoints}`.length > 18;
-  return `<div class="ranking-board${loserClass}${compactClass}" style="--ranking-streak-color:${escapeHtml(state.streakColor || '#67e8f9')}">
+  return `<div class="ranking-board${loserClass}${compactClass} name-${state.nameMode === 'marquee' ? 'marquee' : 'two-line'}" style="--ranking-card-bg-rgb:${rankingHexToRgb(state.overlayBgColor)};--ranking-card-bg-opacity:${(Number(state.overlayBgOpacity ?? 74) / 100).toFixed(2)};--ranking-streak-color:${escapeHtml(state.streakColor || '#67e8f9')}">
     <div class="ranking-title">${escapeHtml(state.title || 'Ranking list')}</div>
     <div class="ranking-list">
       ${rows.map(row => rankingRowHtml(row, maxPoints, state)).join('') || '<div class="ranking-empty">Chưa có dữ liệu BXH</div>'}
@@ -4902,15 +4998,64 @@ function rankingRowHtml(row, maxPoints, state = rankingPublicState()) {
   const rankHtml = row.rank === 1 ? '🥇' : (row.rank === 2 ? '🥈' : (row.rank === 3 ? '🥉' : row.rank));
   const isLoser = !!row.lost;
   const gift = row.giftIcon ? `<img src="${escapeHtml(row.giftIcon)}" />` : (row.giftName ? '🎁' : '');
-    return `<div class="ranking-row ${row.active ? 'active' : ''} ${isLoser || row.lost ? 'loser' : ''}">
+  return `<div class="ranking-row top-${row.rank <= 3 ? row.rank : 0} ${row.active ? 'active' : ''} ${isLoser || row.lost ? 'loser' : ''}">
     ${stateFlag('rank', state) ? `<div class="ranking-rank rank-${row.rank}">${rankHtml}</div>` : ''}
     ${stateFlag('avatar', state) ? `<div class="ranking-avatar">${row.avatar ? `<img src="${escapeHtml(row.avatar)}" />` : escapeHtml(row.initials || rankingInitials(row.name))}</div>` : ''}
     <div class="ranking-main">
-      <div class="ranking-name">${escapeHtml(row.name)}</div>
+      ${rankingNameHtml(row.name, 'ranking-name')}
       ${row.hideScore || state.hideAllScores ? '' : `<div class="ranking-points">${Number(row.points || 0).toLocaleString('en-US')}</div>`}
     </div>
     ${stateFlag('gift', state) ? `<div class="ranking-gift">${gift}</div>` : ''}
     ${stateFlag('round', state) ? `<div class="ranking-round">R${Number(row.round || 0)}</div>` : ''}
+  </div>`;
+}
+
+function rankingGridRows(state) {
+  const rows = Array.isArray(state.rows) ? state.rows : [];
+  const gridRows = Math.max(1, Math.min(20, parseInt(state.gridRows, 10) || 3));
+  const gridCols = Math.max(1, Math.min(10, parseInt(state.gridCols, 10) || 3));
+  const capacity = gridRows * gridCols;
+  const visible = rows.slice(0, capacity);
+  const cells = [];
+  for (let r = 0; r < gridRows; r++) {
+    const line = [];
+    for (let c = 0; c < gridCols; c++) {
+      const index = state.gridFlow === 'column' ? c * gridRows + r : r * gridCols + c;
+      line.push(visible[index] || null);
+    }
+    cells.push(line);
+  }
+  return { cells, gridRows, gridCols };
+}
+
+function rankingGridBoardHtml(state) {
+  const { cells, gridCols } = rankingGridRows(state);
+  const compactClass = `${state.showRank === false ? ' hide-rank' : ''}${state.showAvatar === false ? ' hide-avatar' : ''}${state.showGift === false ? ' hide-gift' : ''}${state.showRound === false ? ' hide-round' : ''}`;
+  const activePoints = state.active ? Number(state.active.points || 0).toLocaleString('en-US') : '';
+  return `<div class="ranking-grid-board${compactClass} name-${state.nameMode === 'marquee' ? 'marquee' : 'two-line'}" style="--ranking-grid-cols:${gridCols};--ranking-card-bg-rgb:${rankingHexToRgb(state.overlayBgColor)};--ranking-card-bg-opacity:${(Number(state.overlayBgOpacity ?? 74) / 100).toFixed(2)};--ranking-streak-color:${escapeHtml(state.streakColor || '#67e8f9')}">
+    <div class="ranking-grid-title">${escapeHtml(state.title || 'Ranking list')}</div>
+    <div class="ranking-grid-list">
+      ${cells.flat().some(Boolean) ? cells.map(line => line.map(row => row ? rankingGridCellHtml(row, state) : '<div class="ranking-grid-cell empty"></div>').join('')).join('') : '<div class="ranking-empty">Chưa có dữ liệu BXH</div>'}
+    </div>
+    ${state.active ? `<div class="ranking-grid-active-name">
+      <div class="ranking-grid-active-avatar">${state.active.avatar ? `<img src="${escapeHtml(state.active.avatar)}" />` : escapeHtml(state.active.initials || rankingInitials(state.active.name))}</div>
+      <div class="ranking-grid-active-main"><div>${escapeHtml(state.active.name)}</div><b>${activePoints}</b></div>
+    </div>` : ''}
+  </div>`;
+}
+
+function rankingGridCellHtml(row, state) {
+  const rankHtml = row.rank === 1 ? '🥇' : (row.rank === 2 ? '🥈' : (row.rank === 3 ? '🥉' : row.rank));
+  const gift = row.giftIcon ? `<img src="${escapeHtml(row.giftIcon)}" />` : (row.giftName ? '🎁' : '');
+  return `<div class="ranking-grid-cell top-${row.rank <= 3 ? row.rank : 0} ${row.active ? 'active' : ''} ${row.lost ? 'loser' : ''}">
+    ${stateFlag('rank', state) ? `<div class="ranking-grid-rank rank-${row.rank}">${rankHtml}</div>` : ''}
+    ${stateFlag('avatar', state) ? `<div class="ranking-grid-avatar">${row.avatar ? `<img src="${escapeHtml(row.avatar)}" />` : escapeHtml(row.initials || rankingInitials(row.name))}</div>` : ''}
+    <div class="ranking-grid-main">
+      ${rankingNameHtml(row.name, 'ranking-grid-name')}
+      ${row.hideScore || state.hideAllScores ? '' : `<div class="ranking-grid-points">${Number(row.points || 0).toLocaleString('en-US')}</div>`}
+    </div>
+    ${stateFlag('gift', state) ? `<div class="ranking-grid-gift">${gift}</div>` : ''}
+    ${stateFlag('round', state) ? `<div class="ranking-grid-round">R${Number(row.round || 0)}</div>` : ''}
   </div>`;
 }
 
@@ -5027,12 +5172,24 @@ function wireRankingUi() {
     rankingAddRow({ memberGroupId: el.memberGroup?.value || '', memberId: member.id, name: member.name, avatar: member.avatar });
   };
   if (el.btnAddManual) el.btnAddManual.onclick = () => {
-    rankingAddRow({ name: 'Idol mới', avatar: '' });
+    rankingAddRow({ name: rankingNextCreatorName(), avatar: '' });
   };
-  ['title','roundSeconds','streakSeconds','streakColor','grayLosers','showRank','showAvatar','showGift','showRound','hideAllScores','linkScoreTimer','rankStart','rankEnd'].forEach(k => { if (el[k]) el[k].onchange = persistRankingConfig; });
+  ['title','roundSeconds','streakSeconds','streakColor','grayLosers','showRank','showAvatar','showGift','showRound','hideAllScores','linkScoreTimer','rankStart','rankEnd','gridFlow','nameMode','showVerticalPreview','showGridPreview','compactPreview'].forEach(k => { if (el[k]) el[k].onchange = persistRankingConfig; });
+  if (el.overlayBgColor) el.overlayBgColor.oninput = persistRankingConfig;
+  if (el.overlayBgOpacity) el.overlayBgOpacity.oninput = () => { if (el.overlayBgOpacityVal) el.overlayBgOpacityVal.textContent = `${el.overlayBgOpacity.value}%`; persistRankingConfig(); };
+  if (el.gridRows) el.gridRows.onchange = () => { rankingGridSuggestSource = 'rows'; persistRankingConfig(); };
+  if (el.gridCols) el.gridCols.onchange = () => { rankingGridSuggestSource = 'cols'; persistRankingConfig(); };
   if (el.title) el.title.oninput = persistRankingConfig;
   if (el.btnSave) el.btnSave.onclick = () => { persistRankingConfig(); appendLog('[ranking] đã lưu và cập nhật OBS overlay'); };
   if (el.btnCopyUrl) el.btnCopyUrl.onclick = async () => { const r = await window.bigo.rankingCopyUrl(); if (!r.ok) alert(r.error || 'Không copy được link BXH'); };
+  if (el.btnGridCopyUrl) el.btnGridCopyUrl.onclick = async () => { const r = await window.bigo.rankingGridCopyUrl(); if (!r.ok) alert(r.error || 'Không copy được link BXH ngang'); };
+  if (el.btnGridApply) el.btnGridApply.onclick = () => { persistRankingConfig(); appendLog('[ranking] đã xác nhận lưới BXH ngang và cập nhật OBS overlay riêng'); };
+  if (el.btnGridUseSuggestion) el.btnGridUseSuggestion.onclick = () => {
+    const s = rankingGridSuggestion();
+    if (el.gridRows) el.gridRows.value = s.rows;
+    if (el.gridCols) el.gridCols.value = s.cols;
+    persistRankingConfig();
+  };
   if (el.btnStartRound) el.btnStartRound.onclick = rankingToggleVote;
   if (el.btnStopRound) el.btnStopRound.onclick = () => rankingStopVote();
   if (el.btnReset) el.btnReset.onclick = async () => {

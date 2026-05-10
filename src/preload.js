@@ -89,6 +89,7 @@ contextBridge.exposeInMainWorld('bigo', {
   gameplayCounts: (counts) => ipcRenderer.invoke('gameplay:counts', counts),
   gameplayEvent: (ev) => ipcRenderer.invoke('gameplay:event', ev),
   rankingCopyUrl: () => ipcRenderer.invoke('ranking:copy-url'),
+  rankingGridCopyUrl: () => ipcRenderer.invoke('ranking:grid-copy-url'),
   rankingUpdate: (state) => ipcRenderer.invoke('ranking:update', state),
   scoreCopyUrl: () => ipcRenderer.invoke('score:copy-url'),
   scoreUpdate: (state) => ipcRenderer.invoke('score:update', state),

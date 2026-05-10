@@ -1,25 +1,31 @@
 html, body { margin:0; width:100%; height:100%; background:transparent; overflow:hidden; font-family:'Segoe UI', Arial, sans-serif; }
 body { display:flex; justify-content:center; align-items:flex-start; }
 #rankingRoot { width:max-content; max-width:100vw; padding-top:18px; box-sizing:border-box; }
-.ranking-board { display:inline-grid; grid-template-columns:max-content; width:auto; min-width:0; padding:12px 0 0; border-radius:16px; overflow:visible; color:#fff; background:linear-gradient(180deg,rgba(67,64,78,.9),rgba(78,76,88,.86)); box-shadow:0 12px 32px rgba(0,0,0,.35); text-shadow:0 2px 4px rgba(0,0,0,.55); }
+.ranking-board { display:inline-grid; grid-template-columns:max-content; width:auto; min-width:0; padding:12px 0 0; border-radius:16px; overflow:visible; color:#fff; background:linear-gradient(180deg,rgba(31,36,48,.9),rgba(25,29,40,.86)); box-shadow:0 12px 32px rgba(0,0,0,.35); text-shadow:0 2px 4px rgba(0,0,0,.55); }
 .ranking-list { overflow:visible; }
 .ranking-title { max-width:210px; padding:12px 14px 11px; margin-top:-12px; border-radius:16px 16px 0 0; font-size:24px; font-weight:900; letter-spacing:.02em; text-align:center; white-space:normal; line-height:1.08; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; background:linear-gradient(180deg,rgba(31,29,39,.96),rgba(18,17,24,.92)); }
 .ranking-list { display:grid; gap:0; }
 .ranking-empty { padding:24px; color:#d5dae7; font-size:16px; text-align:center; }
-.ranking-row { position:relative; display:flex; gap:4px; align-items:center; min-height:62px; padding:4px 7px; transition:transform .18s, filter .18s, opacity .18s, background .18s; }
-.ranking-row:nth-child(odd) { background:rgba(74,152,160,.12); }
-.ranking-row:nth-child(even) { background:rgba(219,108,153,.1); }
+.ranking-row { position:relative; display:flex; gap:3px; align-items:center; min-height:62px; padding:4px 4px 4px 6px; transition:transform .18s, filter .18s, opacity .18s, background .18s; }
+.ranking-row { background:rgba(var(--ranking-card-bg-rgb,42,45,55),var(--ranking-card-bg-opacity,.74)); }
+.ranking-row.top-1 { background:linear-gradient(90deg,rgba(117,86,22,.86),rgba(37,31,22,.76)); box-shadow:inset 0 0 0 1px rgba(255,218,95,.38); }
+.ranking-row.top-2 { background:linear-gradient(90deg,rgba(104,112,126,.82),rgba(33,36,43,.76)); box-shadow:inset 0 0 0 1px rgba(226,232,240,.34); }
+.ranking-row.top-3 { background:linear-gradient(90deg,rgba(126,78,38,.82),rgba(39,31,25,.76)); box-shadow:inset 0 0 0 1px rgba(251,146,60,.32); }
 .ranking-row.loser { filter:grayscale(.7); opacity:.48; }
 .ranking-row.active { z-index:5; transform:scale(1.07); transform-origin:center; margin:3px -3px; border-radius:12px; background:linear-gradient(90deg,rgba(31,22,17,.98),rgba(12,10,10,.99)); border-top:1px solid #d6a84b; border-bottom:1px solid #f7df8a; box-shadow:0 -1px 7px rgba(247,223,138,.66),0 1px 7px rgba(190,135,38,.58),0 0 22px rgba(255,206,86,.25), inset 0 1px 0 rgba(255,241,170,.2), inset 0 -1px 0 rgba(180,119,31,.3); opacity:1; filter:none; }
-.ranking-rank { position:relative; width:30px; height:34px; display:grid; place-items:center; flex:0 0 30px; font-size:23px; font-weight:850; text-align:center; }
+.ranking-rank { position:relative; width:27px; height:34px; display:grid; place-items:center; flex:0 0 27px; font-size:22px; font-weight:850; text-align:center; }
 .ranking-avatar { width:38px; height:38px; display:grid; place-items:center; border-radius:50%; overflow:hidden; background:rgba(255,255,255,.22); color:#fff; font-size:15px; font-weight:950; flex:0 0 38px; }
 .ranking-avatar img { width:100%; height:100%; object-fit:cover; }
-.ranking-main { min-width:76px; max-width:98px; flex:0 1 auto; }
-.ranking-name { min-width:0; color:#f3f4f6; font-size:21px; font-weight:850; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ranking-main { min-width:112px; max-width:172px; flex:1 1 150px; overflow:hidden; }
+.ranking-name { min-width:0; color:#f3f4f6; font-size:20px; font-weight:850; line-height:1.03; overflow:hidden; }
+.ranking-name span { display:block; }
+.name-two-line .ranking-name span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; white-space:normal; overflow:hidden; }
+.name-marquee .ranking-name { white-space:nowrap; }
+.name-marquee .ranking-name.long span { width:max-content; min-width:100%; animation:rankingNameMarquee 7s linear infinite; }
 .ranking-points { color:#fff; font-size:14px; font-weight:700; line-height:1.05; }
-.ranking-gift { display:grid; place-items:center; width:24px; flex:0 0 24px; font-size:20px; }
+.ranking-gift { display:grid; place-items:center; width:20px; flex:0 0 20px; font-size:18px; }
 .ranking-gift img { width:28px; height:28px; object-fit:contain; filter:drop-shadow(0 2px 4px rgba(0,0,0,.45)); }
-.ranking-round { align-self:flex-start; min-width:24px; padding:2px 4px; border-radius:6px; background:rgba(24,24,30,.35); color:#e8e8ef; font-size:13px; font-weight:600; text-align:center; }
+.ranking-round { align-self:flex-start; min-width:22px; padding:2px 2px; border-radius:6px; background:rgba(24,24,30,.35); color:#e8e8ef; font-size:12px; font-weight:600; text-align:center; }
 .ranking-active-name { margin-top:8px; display:flex; align-items:center; justify-content:flex-start; gap:10px; min-height:58px; padding:9px 14px; border-radius:0 0 16px 16px; background:linear-gradient(90deg,rgba(38,183,185,.86),rgba(45,133,154,.9)); color:#eaffff; line-height:1.08; }
 .ranking-active-avatar { width:42px; height:42px; flex:0 0 42px; display:grid; place-items:center; border-radius:50%; overflow:hidden; background:rgba(255,255,255,.24); color:#eaffff; font-size:18px; font-weight:950; }
 .ranking-active-avatar img { width:100%; height:100%; object-fit:cover; }
@@ -27,3 +33,4 @@ body { display:flex; justify-content:center; align-items:flex-start; }
 .ranking-active-main div { overflow:hidden; text-overflow:ellipsis; }
 .ranking-active-main b { font-size:26px; font-weight:950; line-height:1; }
 .ranking-active-name.long { justify-content:center; text-align:left; }
+@keyframes rankingNameMarquee { 0%,12% { transform:translateX(0); } 88%,100% { transform:translateX(calc(-100% + 100px)); } }

@@ -69,6 +69,10 @@ class ObsOverlayServer {
     return `http://127.0.0.1:${this.port}/ranking?token=${encodeURIComponent(this.token)}`;
   }
 
+  getRankingGridUrl() {
+    return `http://127.0.0.1:${this.port}/ranking-grid?token=${encodeURIComponent(this.token)}`;
+  }
+
   setGameplayConfig(cfg) {
     this.gameplayConfig = cfg || { items: [], orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, slots: [] };
     this._sendGameplay('config', this.gameplayConfig);
@@ -156,6 +160,8 @@ class ObsOverlayServer {
     if (req.method === 'GET' && reqUrl.pathname === '/gameplay-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'gameplay-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'ranking-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'ranking-overlay.css'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/ranking-grid-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'ranking-grid-overlay.js'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/ranking-grid-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'ranking-grid-overlay.css'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/score-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/score-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.css'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/logo-hp.png') return this._serveFile(path.join(this.root, 'logo-hp.png'), res);
@@ -167,6 +173,7 @@ class ObsOverlayServer {
     if (req.method === 'GET' && reqUrl.pathname === '/gameplay') return this._serveFile(path.join(this.root, 'renderer', 'gameplay-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/gameplay-events') return this._serveGameplayEvents(req, res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking') return this._serveFile(path.join(this.root, 'renderer', 'ranking-overlay.html'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/ranking-grid') return this._serveFile(path.join(this.root, 'renderer', 'ranking-grid-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-events') return this._serveRankingEvents(req, res);
     if (req.method === 'GET' && reqUrl.pathname === '/score') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/score-events') return this._serveScoreEvents(req, res);

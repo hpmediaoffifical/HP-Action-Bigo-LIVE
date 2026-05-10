@@ -33,7 +33,7 @@
       <button class="tab sidebar-tab" data-tab="gifts" title="BẢNG QUÀ" aria-label="BẢNG QUÀ">🎁</button>
       <button class="tab sidebar-tab" data-tab="gameplay" title="GROUP DANCE" aria-label="GROUP DANCE">👯</button>
       <button class="tab sidebar-tab" data-tab="ranking" title="BẢNG XẾP HẠNG" aria-label="BẢNG XẾP HẠNG">👑</button>
-      <button class="tab sidebar-tab" data-tab="score" title="TÍNH ĐIỂM" aria-label="TÍNH ĐIỂM">🏁</button>
+      <button class="tab sidebar-tab" data-tab="score" title="TÍNH ĐIỂM" aria-label="TÍNH ĐIỂM">🎯</button>
       <button class="tab sidebar-tab" data-tab="overlays" title="OVERLAY" aria-label="OVERLAY">🪟</button>
       <button class="tab sidebar-tab" data-tab="special" title="ĐẶC BIỆT" aria-label="ĐẶC BIỆT">✨</button>
       <div class="sidebar-spacer"></div>
@@ -300,43 +300,81 @@
           <div style="display:flex;gap:8px">
             <button id="btnRankingSave" class="primary">💾 LƯU</button>
             <button id="btnRankingCopyUrl" class="primary">🔗 Copy link OBS</button>
+            <button id="btnRankingGridCopyUrl" class="primary">🔗 Copy OBS ngang</button>
           </div>
         </div>
         <div class="hint small" style="margin-bottom:10px">
           Chọn idol từ nhóm thành viên đã lưu, chọn quà cho từng idol, chọn người đang biểu diễn để LIVE lên quà tự cộng KC và làm nổi bật trên OBS.
         </div>
+        <div class="ranking-top-actions">
+          <button id="btnRankingStartRound" class="primary" type="button">BẮT ĐẦU</button>
+          <button id="btnRankingReset" class="danger" type="button">Reset BXH</button>
+          <button id="btnRankingStopRound" type="button" hidden>⏹ Dừng lượt</button>
+        </div>
         <div class="ranking-layout">
           <div class="ranking-controls">
-            <details class="score-config-group" open>
-              <summary>Danh sách & vận hành</summary>
-              <div class="ranking-control-grid">
-                <button id="btnRankingAddManual" class="primary" type="button">+ Tạo dòng idol</button>
-                <label>Tiêu đề BXH<input id="rankingTitle" value="Ranking list" /></label>
-              </div>
-              <div class="ranking-actions">
-                <button id="btnRankingStartRound" class="primary" type="button">BẮT ĐẦU</button>
-                <button id="btnRankingStopRound" type="button">⏹ Dừng lượt</button>
-                <button id="btnRankingReset" class="danger" type="button">Reset BXH</button>
-              </div>
-            </details>
             <details class="score-config-group">
               <summary>Cài đặt chung BXH</summary>
               <div class="ranking-display-grid">
+                <label class="ranking-title-setting">Tiêu đề BXH<input id="rankingTitle" value="Ranking list" /></label>
                 <label class="ranking-toggle"><span>STT</span><input id="rankingShowRank" type="checkbox" checked /></label>
                 <label class="ranking-toggle"><span>Avatar</span><input id="rankingShowAvatar" type="checkbox" checked /></label>
                 <label class="ranking-toggle"><span>Icon Quà</span><input id="rankingShowGift" type="checkbox" checked /></label>
                 <label class="ranking-toggle"><span>Round</span><input id="rankingShowRound" type="checkbox" checked /></label>
                 <label class="ranking-toggle"><span>Ẩn điểm hàng loạt</span><input id="rankingHideAllScores" type="checkbox" /></label>
                 <label class="ranking-toggle"><span>Liên kết TÍNH ĐIỂM</span><input id="rankingLinkScoreTimer" type="checkbox" checked /></label>
-                <label>Từ hạng<input id="rankingRankStart" type="number" min="1" value="1" /></label>
-                <label>Đến hạng<input id="rankingRankEnd" type="number" min="1" max="100" value="20" /></label>
+                <label>Từ hạng<input id="rankingRankStart" type="number" min="0" value="1" /></label>
+                <label>Đến hạng<input id="rankingRankEnd" type="number" min="0" max="100" value="20" /></label>
+                <label>Tên dài
+                  <select id="rankingNameMode">
+                    <option value="two-line">Xuống 2 hàng</option>
+                    <option value="marquee">Chạy phải qua trái</option>
+                  </select>
+                </label>
+                <label>Màu nền card creator<input id="rankingOverlayBgColor" type="color" value="#2a2d37" /></label>
+                <label>Trong suốt card <span id="rankingOverlayBgOpacityVal">74%</span><input id="rankingOverlayBgOpacity" type="range" min="0" max="100" value="74" /></label>
+                <label class="ranking-toggle"><span>Hiện review dọc</span><input id="rankingShowVerticalPreview" type="checkbox" checked /></label>
+                <label class="ranking-toggle"><span>Hiện review ngang</span><input id="rankingShowGridPreview" type="checkbox" checked /></label>
+                <label class="ranking-toggle"><span>Rút gọn review</span><input id="rankingCompactPreview" type="checkbox" checked /></label>
               </div>
             </details>
+            <details class="score-config-group" open>
+              <summary>BXH ngang / lưới OBS riêng</summary>
+              <div class="ranking-grid-settings">
+                <label>Số hàng <span id="rankingGridRowsHint" class="ranking-suggest-number">(3)</span><input id="rankingGridRows" type="number" min="1" max="20" value="3" /></label>
+                <label>Số cột <span id="rankingGridColsHint" class="ranking-suggest-number">(3)</span><input id="rankingGridCols" type="number" min="1" max="10" value="3" /></label>
+                <label>Chế độ xếp
+                  <select id="rankingGridFlow">
+                    <option value="row">Theo hàng ngang: 1 2 3 / 4 5 6</option>
+                    <option value="column">Theo hàng dọc: 1 4 7 / 2 5 8</option>
+                  </select>
+                </label>
+                <button id="btnRankingGridApply" class="primary" type="button">Xác nhận lưới</button>
+              </div>
+              <div class="ranking-grid-suggestion">
+                <span id="rankingGridSuggestionText">Đề xuất: 3 hàng x 3 cột</span>
+                <button id="btnRankingGridUseSuggestion" class="tiny" type="button">Dùng đề xuất</button>
+              </div>
+              <div class="hint small" style="padding:0 12px 12px">Overlay riêng dùng cùng điểm, VOTE và liên kết TÍNH ĐIỂM. Từ hạng - Đến hạng vẫn lọc trước khi xếp vào lưới.</div>
+            </details>
+            <div class="ranking-list-head">
+              <div>
+                <b>Danh sách creator</b>
+                <small>Creator đã tạo, cuộn chuột để xem thêm</small>
+              </div>
+              <button id="btnRankingAddManual" class="primary" type="button">TẠO MỚI</button>
+            </div>
             <div id="rankingRows" class="ranking-editor-list"></div>
           </div>
           <div class="ranking-preview-wrap">
-            <h3 class="gameplay-section-title">Review xem trực tiếp</h3>
-            <div id="rankingPreview" class="ranking-board-preview"></div>
+            <div id="rankingVerticalPreviewSection">
+              <h3 class="gameplay-section-title">Review BXH dọc</h3>
+              <div id="rankingPreview" class="ranking-board-preview"></div>
+            </div>
+            <div id="rankingGridPreviewSection">
+              <h3 class="gameplay-section-title ranking-grid-preview-title">Review BXH ngang / lưới</h3>
+              <div id="rankingGridPreview" class="ranking-grid-board-preview"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -346,7 +384,7 @@
     <section class="tab-panel" data-tab="score">
       <div class="panel score-panel">
         <div class="panel-head">
-          <h2>🏁 TÍNH ĐIỂM</h2>
+          <h2>🎯 TÍNH ĐIỂM</h2>
           <div style="display:flex;gap:8px">
             <button id="btnScoreCopyUrl" class="primary">🔗 Copy link OBS</button>
           </div>

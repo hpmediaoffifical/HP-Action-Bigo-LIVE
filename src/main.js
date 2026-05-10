@@ -1329,6 +1329,12 @@ ipcMain.handle('ranking:copy-url', () => {
   clipboard.writeText(url);
   return { ok: true, url };
 });
+ipcMain.handle('ranking:grid-copy-url', () => {
+  if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
+  const url = obsOverlayServer.getRankingGridUrl();
+  clipboard.writeText(url);
+  return { ok: true, url };
+});
 ipcMain.handle('ranking:update', (_e, state) => {
   if (obsOverlayServer) obsOverlayServer.sendRankingState(state || {});
   return { ok: true };
