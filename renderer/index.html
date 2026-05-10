@@ -32,6 +32,7 @@
       <button class="tab sidebar-tab" data-tab="queue" title="DANH SÁCH HIỆU ỨNG" aria-label="DANH SÁCH HIỆU ỨNG">🎬</button>
       <button class="tab sidebar-tab" data-tab="gifts" title="BẢNG QUÀ" aria-label="BẢNG QUÀ">🎁</button>
       <button class="tab sidebar-tab" data-tab="gameplay" title="GROUP DANCE" aria-label="GROUP DANCE">👯</button>
+      <button class="tab sidebar-tab" data-tab="ranking" title="BẢNG XẾP HẠNG" aria-label="BẢNG XẾP HẠNG">👑</button>
       <button class="tab sidebar-tab" data-tab="score" title="TÍNH ĐIỂM" aria-label="TÍNH ĐIỂM">🏁</button>
       <button class="tab sidebar-tab" data-tab="overlays" title="OVERLAY" aria-label="OVERLAY">🪟</button>
       <button class="tab sidebar-tab" data-tab="special" title="ĐẶC BIỆT" aria-label="ĐẶC BIỆT">✨</button>
@@ -288,6 +289,56 @@
           </div>
         </div>
         <div id="gameplayItems" class="gameplay-items"></div>
+      </div>
+    </section>
+
+    <!-- =================== TAB: RANKING OVERLAY =================== -->
+    <section class="tab-panel" data-tab="ranking">
+      <div class="panel ranking-panel">
+        <div class="panel-head">
+          <h2>👑 BẢNG XẾP HẠNG (BXH)</h2>
+          <div style="display:flex;gap:8px">
+            <button id="btnRankingSave" class="primary">💾 LƯU</button>
+            <button id="btnRankingCopyUrl" class="primary">🔗 Copy link OBS</button>
+          </div>
+        </div>
+        <div class="hint small" style="margin-bottom:10px">
+          Chọn idol từ nhóm thành viên đã lưu, chọn quà cho từng idol, chọn người đang biểu diễn để LIVE lên quà tự cộng KC và làm nổi bật trên OBS.
+        </div>
+        <div class="ranking-layout">
+          <div class="ranking-controls">
+            <details class="score-config-group" open>
+              <summary>Danh sách & vận hành</summary>
+              <div class="ranking-control-grid">
+                <button id="btnRankingAddManual" class="primary" type="button">+ Tạo dòng idol</button>
+                <label>Tiêu đề BXH<input id="rankingTitle" value="Ranking list" /></label>
+              </div>
+              <div class="ranking-actions">
+                <button id="btnRankingStartRound" class="primary" type="button">BẮT ĐẦU</button>
+                <button id="btnRankingStopRound" type="button">⏹ Dừng lượt</button>
+                <button id="btnRankingReset" class="danger" type="button">Reset BXH</button>
+              </div>
+            </details>
+            <details class="score-config-group">
+              <summary>Cài đặt chung BXH</summary>
+              <div class="ranking-display-grid">
+                <label class="ranking-toggle"><span>STT</span><input id="rankingShowRank" type="checkbox" checked /></label>
+                <label class="ranking-toggle"><span>Avatar</span><input id="rankingShowAvatar" type="checkbox" checked /></label>
+                <label class="ranking-toggle"><span>Icon Quà</span><input id="rankingShowGift" type="checkbox" checked /></label>
+                <label class="ranking-toggle"><span>Round</span><input id="rankingShowRound" type="checkbox" checked /></label>
+                <label class="ranking-toggle"><span>Ẩn điểm hàng loạt</span><input id="rankingHideAllScores" type="checkbox" /></label>
+                <label class="ranking-toggle"><span>Liên kết TÍNH ĐIỂM</span><input id="rankingLinkScoreTimer" type="checkbox" checked /></label>
+                <label>Từ hạng<input id="rankingRankStart" type="number" min="1" value="1" /></label>
+                <label>Đến hạng<input id="rankingRankEnd" type="number" min="1" max="100" value="20" /></label>
+              </div>
+            </details>
+            <div id="rankingRows" class="ranking-editor-list"></div>
+          </div>
+          <div class="ranking-preview-wrap">
+            <h3 class="gameplay-section-title">Review xem trực tiếp</h3>
+            <div id="rankingPreview" class="ranking-board-preview"></div>
+          </div>
+        </div>
       </div>
     </section>
 

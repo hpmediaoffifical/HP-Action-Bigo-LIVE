@@ -1550,6 +1550,9 @@ async function init() {
   renderQueueCards();
   renderSettingsGroupsList();
   renderGameplayUi();
+  renderRankingMemberSelectors();
+  renderRankingEditor();
+  pushRankingState();
   // Chat font size slider — persist localStorage
   const chatFont = document.getElementById('chatFontSize');
   if (chatFont) {
@@ -3420,6 +3423,7 @@ function addReceivedGift(ev) {
   if (receivedGifts.length > RECEIVED_MAX) receivedGifts.length = RECEIVED_MAX;
   renderReceivedGifts();
   forwardReceivedGiftsSnapshot();
+  rankingHandleGift(ev);
   scoreHandleGift(ev);
 }
 
@@ -3708,6 +3712,7 @@ let appSettings = {
   bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
   gameplay: { groupId: '', useCommonGroup: true, orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', slotNumberColor: '#ffffff', countColor: '#ffffff', countSize: 12, uppercase: false, showName: true, showCount: true, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] },
+  ranking: { title: 'Ranking list', memberGroupId: '', rows: [], activeId: '', running: false, linkScoreTimer: true, roundSeconds: 60, streakSeconds: 12, streakColor: '#67e8f9', grayLosers: true, showRank: true, showAvatar: true, showGift: true, showRound: true, hideAllScores: false, rankStart: 1, rankEnd: 20 },
   scoreVote: { hours: 0, minutes: 3, seconds: 0, delaySeconds: 5, target: 30000, memberGroupId: '', memberId: '', content: 'Kêu gọi điểm ĐẬU', creatorName: 'Creator', creatorAvatar: '', timeColor: '#ffffff', contentColor: '#f0eef6', overColor: '#ff0000', barColor1: '#b93678', barColor2: '#ff8ed1', waveColor: '#ffffff', bigGiftThreshold: 500, prepSeconds: 3, themePreset: 'custom', barStyle: 'pill', overlaySize: 'medium', customMilestones: '', showGiftUser: true, showMissing: true, showTopUsers: true, showSpeed: true, compactMode: false, hideAvatar: false, hideCreator: false, startSound: '', startSoundName: '', warningSound: '', warningSoundName: '', goalSound: '', goalSoundName: '', successSound: '', successSoundName: '', failSound: '', failSoundName: '' },
   // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
   specialEffects: {
@@ -3732,6 +3737,7 @@ async function saveAppSettings(patch) {
     if (patch.bgm) s.bgm = { ...(s.bgm || {}), ...patch.bgm };
     if (patch.preFx) s.preFx = { ...(s.preFx || {}), ...patch.preFx };
     if (patch.gameplay) s.gameplay = { ...(s.gameplay || {}), ...patch.gameplay };
+    if (patch.ranking) s.ranking = { ...(s.ranking || {}), ...patch.ranking };
     if (patch.scoreVote) s.scoreVote = { ...(s.scoreVote || {}), ...patch.scoreVote };
     if (patch.members) s.members = Array.isArray(patch.members) ? patch.members : [];
     if (patch.specialEffects) {
@@ -3814,6 +3820,8 @@ async function initAppSettings(s) {
   appSettings.bgm = { ...appSettings.bgm, ...(s.bgm || {}) };
   appSettings.preFx = { ...appSettings.preFx, ...(s.preFx || {}) };
   appSettings.gameplay = { ...appSettings.gameplay, ...(s.gameplay || {}) };
+  appSettings.ranking = { ...appSettings.ranking, ...(s.ranking || {}) };
+  appSettings.ranking.rows = Array.isArray(appSettings.ranking.rows) ? appSettings.ranking.rows : [];
   appSettings.scoreVote = { ...appSettings.scoreVote, ...(s.scoreVote || {}) };
   appSettings.members = Array.isArray(s.members) ? s.members : [];
   // Migrate old clearGift → specialEffects.clearQueue (backward compat)
@@ -3860,6 +3868,7 @@ async function initAppSettings(s) {
   if (els.fxVol) { els.fxVol.value = appSettings.fxVolume; els.fxVolVal.textContent = appSettings.fxVolume; }
   if (els.maxListItems) els.maxListItems.value = appSettings.maxListItems;
   renderMembersList();
+  applyRankingSettingsUi();
   applyScoreSettingsUi();
   // Devices
   await refreshAudioDevices();
@@ -4616,10 +4625,467 @@ if (els.membersList) {
       await persistMapping();
       await persistMembers();
       renderScoreMemberSelectors();
+      renderRankingMemberSelectors();
       clearMemberForm();
     }
   };
 }
+
+// =================== Bảng xếp hạng (BXH) ===================
+let rankingTimer = null;
+
+function rankingEls() {
+  return {
+    memberGroup: $('rankingMemberGroup'), member: $('rankingMember'), rows: $('rankingRows'), preview: $('rankingPreview'),
+    title: $('rankingTitle'), manualName: $('rankingManualName'), manualAvatar: $('rankingManualAvatar'), roundSeconds: $('rankingRoundSeconds'),
+    streakSeconds: $('rankingStreakSeconds'), streakColor: $('rankingStreakColor'), grayLosers: $('rankingGrayLosers'),
+    showRank: $('rankingShowRank'), showAvatar: $('rankingShowAvatar'), showGift: $('rankingShowGift'), showRound: $('rankingShowRound'), hideAllScores: $('rankingHideAllScores'), linkScoreTimer: $('rankingLinkScoreTimer'), rankStart: $('rankingRankStart'), rankEnd: $('rankingRankEnd'),
+    btnAddMember: $('btnRankingAddMember'), btnAddManual: $('btnRankingAddManual'), btnSave: $('btnRankingSave'), btnCopyUrl: $('btnRankingCopyUrl'),
+    btnStartRound: $('btnRankingStartRound'), btnStopRound: $('btnRankingStopRound'), btnReset: $('btnRankingReset'),
+  };
+}
+
+function normalizeRankingRow(row = {}) {
+  return {
+    id: row.id || uid('rank_'),
+    memberGroupId: row.memberGroupId || '',
+    memberId: row.memberId || '',
+    name: String(row.name || '').trim() || 'Idol',
+    avatar: String(row.avatar || '').trim(),
+    points: Math.max(0, Math.round(Number(row.points) || 0)),
+    giftItemId: row.giftItemId || '',
+    giftName: row.giftName || '',
+    giftIcon: row.giftIcon || '',
+    giftIconId: row.giftIconId || '',
+    round: Math.max(0, Math.round(Number(row.round) || 0)),
+    activePoints: Math.max(0, Math.round(Number(row.activePoints) || 0)),
+    hideScore: !!row.hideScore,
+    lost: !!row.lost,
+    excludeOverlay: !!row.excludeOverlay,
+    settingsOpen: !!row.settingsOpen,
+    streakText: row.streakText || '',
+    streakUntil: Math.max(0, Number(row.streakUntil) || 0),
+  };
+}
+
+function rankingConfig() {
+  const r = appSettings.ranking || {};
+  return {
+    memberGroupId: String(r.memberGroupId || '').trim(),
+    title: String(r.title || 'Ranking list').trim() || 'Ranking list',
+    rows: (r.rows || []).map(normalizeRankingRow),
+    activeId: String(r.activeId || '').trim(),
+    running: !!r.running,
+    linkScoreTimer: r.linkScoreTimer !== false,
+    roundSeconds: Math.max(5, Math.min(7200, parseInt(r.roundSeconds, 10) || 60)),
+    streakSeconds: Math.max(1, Math.min(300, parseInt(r.streakSeconds, 10) || 12)),
+    streakColor: /^#[0-9a-f]{6}$/i.test(String(r.streakColor || '')) ? r.streakColor : '#67e8f9',
+    grayLosers: r.grayLosers !== false,
+    showRank: r.showRank !== false,
+    showAvatar: r.showAvatar !== false,
+    showGift: r.showGift !== false,
+    showRound: r.showRound !== false,
+    hideAllScores: !!r.hideAllScores,
+    rankStart: Math.max(1, parseInt(r.rankStart, 10) || 1),
+    rankEnd: Math.max(1, Math.min(100, parseInt(r.rankEnd ?? r.rankLimit, 10) || 20)),
+    roundEndsAt: Math.max(0, Number(r.roundEndsAt) || 0),
+  };
+}
+
+function rankingGiftItems() {
+  return getAllItems().filter(item => item.type !== 'comment');
+}
+
+function rankingGiftInfo(itemId) {
+  const found = findItemById(itemId)?.item;
+  if (!found) return { giftName: '', giftIcon: '', giftIconId: '' };
+  return { giftName: getGameplayItemName(found), giftIcon: getGameplayItemIcon(found), giftIconId: getGameplayItemIconId(found) };
+}
+
+function rankingGiftMatches(row, ev) {
+  if (!row.giftItemId || !ev) return false;
+  const found = findItemById(row.giftItemId)?.item;
+  if (!found) return false;
+  return itemMatchesGameplayGift(found, ev);
+}
+
+function rankingInitials(name) {
+  return String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase() || '?';
+}
+
+function rankingSortedRows(rows = rankingConfig().rows) {
+  return [...rows].sort((a, b) => b.points - a.points || b.activePoints - a.activePoints || a.name.localeCompare(b.name));
+}
+
+function rankingPublicState() {
+  const cfg = rankingConfig();
+  const now = Date.now();
+  const rowsAll = rankingSortedRows(cfg.rows.filter(row => !row.excludeOverlay)).map((row, idx) => ({
+    ...row,
+    rank: idx + 1,
+    initials: rankingInitials(row.name),
+    active: row.id === cfg.activeId,
+    streakText: row.streakUntil > now ? row.streakText : '',
+  }));
+  const start = Math.min(cfg.rankStart, cfg.rankEnd);
+  const end = Math.max(cfg.rankStart, cfg.rankEnd);
+  const rows = rowsAll.slice(start - 1, end);
+  const active = rows.find(r => r.active) || null;
+  return { ...cfg, rows, totalRows: rowsAll.length, active, remainingMs: cfg.roundEndsAt ? Math.max(0, cfg.roundEndsAt - now) : 0 };
+}
+
+function renderRankingMemberSelectors() {
+  const el = rankingEls();
+  if (!el.memberGroup || !el.member) return;
+  const groups = (mapping.groups || []).filter(g => !g.isCommon && getGroupMembers(g).length);
+  const currentGroupId = el.memberGroup.value || appSettings.ranking?.memberGroupId || '';
+  el.memberGroup.innerHTML = '<option value="">Không chọn nhóm</option>' + groups.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)} (${getGroupMembers(g).length})</option>`).join('');
+  if (groups.some(g => g.id === currentGroupId)) el.memberGroup.value = currentGroupId;
+  const group = (mapping.groups || []).find(g => g.id === el.memberGroup.value);
+  const members = group ? getGroupMembers(group) : [];
+  el.member.innerHTML = '<option value="">Không chọn thành viên</option>' + members.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)}</option>`).join('');
+}
+
+function applyRankingSettingsUi() {
+  const cfg = rankingConfig();
+  appSettings.ranking = { ...appSettings.ranking, ...cfg };
+  const el = rankingEls();
+  renderRankingMemberSelectors();
+  if (el.memberGroup) el.memberGroup.value = cfg.memberGroupId || '';
+  renderRankingMemberSelectors();
+  if (el.roundSeconds) el.roundSeconds.value = cfg.roundSeconds;
+  if (el.title) el.title.value = cfg.title;
+  if (el.streakSeconds) el.streakSeconds.value = cfg.streakSeconds;
+  if (el.streakColor) el.streakColor.value = cfg.streakColor;
+  if (el.grayLosers) el.grayLosers.checked = cfg.grayLosers;
+  if (el.showRank) el.showRank.checked = cfg.showRank;
+  if (el.showAvatar) el.showAvatar.checked = cfg.showAvatar;
+  if (el.showGift) el.showGift.checked = cfg.showGift;
+  if (el.showRound) el.showRound.checked = cfg.showRound;
+  if (el.hideAllScores) el.hideAllScores.checked = cfg.hideAllScores;
+  if (el.linkScoreTimer) el.linkScoreTimer.checked = cfg.linkScoreTimer;
+  if (el.rankStart) el.rankStart.value = cfg.rankStart;
+  if (el.rankEnd) el.rankEnd.value = cfg.rankEnd;
+  if (cfg.roundEndsAt > Date.now() && !rankingTimer) rankingTimer = setInterval(rankingTick, 500);
+  renderRankingEditor();
+  pushRankingState();
+}
+
+function persistRankingConfig() {
+  const el = rankingEls();
+  appSettings.ranking = {
+    ...appSettings.ranking,
+    memberGroupId: el.memberGroup?.value || '',
+    title: String(el.title?.value || 'Ranking list').trim() || 'Ranking list',
+    roundSeconds: Math.max(5, Math.min(7200, parseInt(el.roundSeconds?.value, 10) || 60)),
+    streakSeconds: Math.max(1, Math.min(300, parseInt(el.streakSeconds?.value, 10) || 12)),
+    streakColor: el.streakColor?.value || '#67e8f9',
+    grayLosers: el.grayLosers ? el.grayLosers.checked : true,
+    showRank: el.showRank ? el.showRank.checked : true,
+    showAvatar: el.showAvatar ? el.showAvatar.checked : true,
+    showGift: el.showGift ? el.showGift.checked : true,
+    showRound: el.showRound ? el.showRound.checked : true,
+    hideAllScores: el.hideAllScores ? el.hideAllScores.checked : false,
+    linkScoreTimer: el.linkScoreTimer ? el.linkScoreTimer.checked : true,
+    rankStart: Math.max(1, parseInt(el.rankStart?.value, 10) || 1),
+    rankEnd: Math.max(1, Math.min(100, parseInt(el.rankEnd?.value, 10) || 20)),
+  };
+  saveAppSettings({ ranking: appSettings.ranking }).catch(() => {});
+  pushRankingState();
+}
+
+function pushRankingState() {
+  const state = rankingPublicState();
+  renderRankingPreview(state);
+  updateRankingButtons(state);
+  if (window.bigo?.rankingUpdate) window.bigo.rankingUpdate(state).catch(() => {});
+}
+
+function updateRankingButtons(state = rankingPublicState()) {
+  const el = rankingEls();
+  if (el.btnStartRound) {
+    el.btnStartRound.textContent = state.running ? 'KẾT THÚC' : 'BẮT ĐẦU';
+    el.btnStartRound.classList.toggle('danger', !!state.running);
+  }
+  if (el.btnStopRound) el.btnStopRound.style.display = 'none';
+  if (el.linkScoreTimer) el.linkScoreTimer.disabled = !!state.running;
+}
+
+function rankingGiftOptions(selectedId = '') {
+  return '<option value="">Chọn quà</option>' + rankingGiftItems().map(item => {
+    const name = getGameplayItemName(item);
+    return `<option value="${escapeHtml(item.id)}" ${item.id === selectedId ? 'selected' : ''}>${escapeHtml(name)}</option>`;
+  }).join('');
+}
+
+function rankingMemberGroupOptions(selectedId = '') {
+  const groups = (mapping.groups || []).filter(g => !g.isCommon && getGroupMembers(g).length);
+  return '<option value="">Chọn nhóm</option>' + groups.map(g => `<option value="${escapeHtml(g.id)}" ${g.id === selectedId ? 'selected' : ''}>${escapeHtml(g.name)} (${getGroupMembers(g).length})</option>`).join('');
+}
+
+function rankingMemberOptions(groupId = '', selectedId = '') {
+  const group = (mapping.groups || []).find(g => g.id === groupId);
+  const members = group ? getGroupMembers(group) : [];
+  return '<option value="">Chọn thành viên</option>' + members.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === selectedId ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
+}
+
+function renderRankingEditor() {
+  const el = rankingEls();
+  if (!el.rows) return;
+  const rows = rankingSortedRows(rankingConfig().rows);
+  if (!rows.length) {
+    el.rows.innerHTML = '<div class="score-log-empty">Chưa có idol nào trong BXH.</div>';
+    return;
+  }
+  el.rows.innerHTML = rows.map(row => {
+    const active = row.id === appSettings.ranking.activeId;
+    const badges = [active ? 'VOTE' : '', row.lost ? 'THUA' : '', row.hideScore ? 'Ẩn điểm' : '', row.excludeOverlay ? 'Ẩn OBS' : ''].filter(Boolean).map(t => `<span>${escapeHtml(t)}</span>`).join('');
+    return `<div class="ranking-editor-row ${active ? 'active' : ''} ${row.lost ? 'lost' : ''}" data-rank-id="${escapeHtml(row.id)}">
+      <div class="ranking-editor-summary">
+        <div class="ranking-editor-avatar">${row.avatar ? `<img src="${escapeHtml(row.avatar)}" loading="lazy" />` : escapeHtml(rankingInitials(row.name))}</div>
+        <div class="ranking-summary-main"><b>${escapeHtml(row.name)}</b><small>${Number(row.points || 0).toLocaleString('en-US')} Đậu · R${Number(row.round || 0)}</small></div>
+        <div class="ranking-summary-gift">${row.giftIcon ? `<img src="${escapeHtml(row.giftIcon)}" loading="lazy" />` : '🎁'}<span>${escapeHtml(row.giftName || 'Chưa chọn quà')}</span></div>
+        <label class="ranking-summary-vote"><span>VOTE</span><input data-rank-active type="checkbox" ${active ? 'checked' : ''} /></label>
+        <div class="ranking-summary-badges">${badges}</div>
+        <button type="button" class="tiny" data-rank-toggle-settings>${row.settingsOpen ? 'Ẩn cài đặt' : 'Cài đặt'}</button>
+        <button type="button" class="tiny danger" data-rank-delete>Xoá</button>
+      </div>
+      <div class="ranking-editor-details" ${row.settingsOpen ? '' : 'hidden'}>
+      <div class="ranking-editor-mainline">
+        <label>Chọn thành viên<select data-rank-group>${rankingMemberGroupOptions(row.memberGroupId)}</select></label>
+        <label>Thành viên<select data-rank-member>${rankingMemberOptions(row.memberGroupId, row.memberId)}</select></label>
+        <div class="ranking-editor-avatar">${row.avatar ? `<img src="${escapeHtml(row.avatar)}" loading="lazy" />` : escapeHtml(rankingInitials(row.name))}</div>
+        <label>Tên thành viên<input class="ranking-name-input" data-rank-name value="${escapeHtml(row.name)}" /></label>
+        <label>Quà tặng<div class="ranking-gift-select-row"><span class="ranking-editor-gift-icon">${row.giftIcon ? `<img src="${escapeHtml(row.giftIcon)}" loading="lazy" />` : '🎁'}</span><select data-rank-gift>${rankingGiftOptions(row.giftItemId)}</select></div></label>
+        <button type="button" class="tiny danger" data-rank-delete>Xoá</button>
+      </div>
+      <div class="ranking-editor-subline">
+        <label>Điểm Đậu<input data-rank-points type="number" min="0" value="${row.points}" /></label>
+        <label class="ranking-round-edit">Round<input data-rank-round type="number" min="0" value="${row.round}" /></label>
+        <label class="ranking-toggle"><span>Ẩn điểm</span><input data-rank-hide-score type="checkbox" ${row.hideScore ? 'checked' : ''} /></label>
+        <label class="ranking-toggle vote"><span>VOTE</span><input data-rank-active type="checkbox" ${active ? 'checked' : ''} /></label>
+        <label class="ranking-toggle lost"><span>THUA</span><input data-rank-lost type="checkbox" ${row.lost ? 'checked' : ''} /></label>
+        <label class="ranking-toggle"><span>Ẩn OBS</span><input data-rank-exclude-overlay type="checkbox" ${row.excludeOverlay ? 'checked' : ''} /></label>
+      </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderRankingPreview(state = rankingPublicState()) {
+  const el = rankingEls();
+  if (!el.preview) return;
+  el.preview.innerHTML = rankingBoardHtml(state);
+}
+
+function rankingBoardHtml(state) {
+  const rows = state.rows || [];
+  const maxPoints = rows.length ? Math.max(...rows.map(r => r.points || 0)) : 0;
+  const loserClass = state.grayLosers ? ' gray-losers' : '';
+  const compactClass = `${state.showRank === false ? ' hide-rank' : ''}${state.showAvatar === false ? ' hide-avatar' : ''}${state.showGift === false ? ' hide-gift' : ''}${state.showRound === false ? ' hide-round' : ''}`;
+  const activeName = state.active ? escapeHtml(state.active.name) : '';
+  const activePoints = state.active ? Number(state.active.points || 0).toLocaleString('en-US') : '';
+  const activeLong = state.active && `${state.active.name || ''} ${activePoints}`.length > 18;
+  return `<div class="ranking-board${loserClass}${compactClass}" style="--ranking-streak-color:${escapeHtml(state.streakColor || '#67e8f9')}">
+    <div class="ranking-title">${escapeHtml(state.title || 'Ranking list')}</div>
+    <div class="ranking-list">
+      ${rows.map(row => rankingRowHtml(row, maxPoints, state)).join('') || '<div class="ranking-empty">Chưa có dữ liệu BXH</div>'}
+    </div>
+    ${state.active ? `<div class="ranking-active-name ${activeLong ? 'long' : ''}">
+      <div class="ranking-active-avatar">${state.active.avatar ? `<img src="${escapeHtml(state.active.avatar)}" />` : escapeHtml(state.active.initials || rankingInitials(state.active.name))}</div>
+      <div class="ranking-active-main"><div>${activeName}</div><b>${activePoints}</b></div>
+    </div>` : ''}
+  </div>`;
+}
+
+function rankingRowHtml(row, maxPoints, state = rankingPublicState()) {
+  const rankHtml = row.rank === 1 ? '🥇' : (row.rank === 2 ? '🥈' : (row.rank === 3 ? '🥉' : row.rank));
+  const isLoser = !!row.lost;
+  const gift = row.giftIcon ? `<img src="${escapeHtml(row.giftIcon)}" />` : (row.giftName ? '🎁' : '');
+    return `<div class="ranking-row ${row.active ? 'active' : ''} ${isLoser || row.lost ? 'loser' : ''}">
+    ${stateFlag('rank', state) ? `<div class="ranking-rank rank-${row.rank}">${rankHtml}</div>` : ''}
+    ${stateFlag('avatar', state) ? `<div class="ranking-avatar">${row.avatar ? `<img src="${escapeHtml(row.avatar)}" />` : escapeHtml(row.initials || rankingInitials(row.name))}</div>` : ''}
+    <div class="ranking-main">
+      <div class="ranking-name">${escapeHtml(row.name)}</div>
+      ${row.hideScore || state.hideAllScores ? '' : `<div class="ranking-points">${Number(row.points || 0).toLocaleString('en-US')}</div>`}
+    </div>
+    ${stateFlag('gift', state) ? `<div class="ranking-gift">${gift}</div>` : ''}
+    ${stateFlag('round', state) ? `<div class="ranking-round">R${Number(row.round || 0)}</div>` : ''}
+  </div>`;
+}
+
+function stateFlag(kind, state = rankingPublicState()) {
+  if (kind === 'rank') return state.showRank !== false;
+  if (kind === 'avatar') return state.showAvatar !== false;
+  if (kind === 'gift') return state.showGift !== false;
+  if (kind === 'round') return state.showRound !== false;
+  return true;
+}
+
+function rankingAddRow(row) {
+  const next = normalizeRankingRow(row);
+  appSettings.ranking.rows = [...(appSettings.ranking.rows || []).map(normalizeRankingRow), next];
+  if (!appSettings.ranking.activeId) appSettings.ranking.activeId = next.id;
+  persistRankingConfig();
+  renderRankingEditor();
+}
+
+function rankingApplyRow(id, patch) {
+  appSettings.ranking.rows = (appSettings.ranking.rows || []).map(row => {
+    if (row.id !== id) return normalizeRankingRow(row);
+    const next = normalizeRankingRow({ ...row, ...patch });
+    if (patch.giftItemId != null) Object.assign(next, rankingGiftInfo(next.giftItemId));
+    return next;
+  });
+  saveAppSettings({ ranking: appSettings.ranking }).catch(() => {});
+  renderRankingEditor();
+  pushRankingState();
+}
+
+function rankingHandleGift(ev) {
+  if (!ev || ev.type !== 'gift') return;
+  const cfg = rankingConfig();
+  if (!cfg.running || !cfg.rows.length || !cfg.activeId) return;
+  if (cfg.linkScoreTimer && ['prestart', 'success', 'failed', 'idle'].includes(scoreState.status)) return;
+  const activeId = cfg.activeId;
+  const matched = cfg.rows.find(r => r.id === activeId);
+  if (!matched) return;
+  const points = giftDiamondPointsFromEvent(ev) || giftTotalCountFromEvent(ev) || 1;
+  const until = Date.now() + cfg.streakSeconds * 1000;
+  appSettings.ranking.rows = cfg.rows.map(row => {
+    if (row.id !== matched.id) return row;
+    const n = normalizeRankingRow(row);
+    n.points += points;
+    if (n.id === activeId) n.activePoints += points;
+    n.streakText = `${ev.gift_name || n.giftName || 'Quà'} x${giftTotalCountFromEvent(ev) || 1}`;
+    n.streakUntil = until;
+    return n;
+  });
+  saveAppSettings({ ranking: appSettings.ranking }).catch(() => {});
+  renderRankingEditor();
+  pushRankingState();
+}
+
+function rankingStartVote({ syncScore = true } = {}) {
+  if (!appSettings.ranking.activeId) { alert('Vui lòng chọn idol VOTE trước'); return false; }
+  appSettings.ranking.running = true;
+  const cfg = rankingConfig();
+  if (syncScore && cfg.linkScoreTimer && !['prestart', 'running', 'grace'].includes(scoreState.status)) {
+    if (!isConnected) { alert('Vui lòng kết nối LIVE để sử dụng tính năng'); return false; }
+    scoreReset({ silent: true });
+    scoreStart({ fromRanking: true });
+  }
+  persistRankingConfig();
+  pushRankingState();
+  return true;
+}
+
+function rankingStopVote({ incrementRound = false } = {}) {
+  const cfg = rankingConfig();
+  if (incrementRound && cfg.running && cfg.activeId) {
+    appSettings.ranking.rows = cfg.rows.map(row => row.id === cfg.activeId ? { ...row, round: (Number(row.round) || 0) + 1 } : row);
+  }
+  appSettings.ranking.running = false;
+  appSettings.ranking.roundEndsAt = 0;
+  if (rankingTimer) clearInterval(rankingTimer);
+  rankingTimer = null;
+  saveAppSettings({ ranking: appSettings.ranking }).catch(() => {});
+  renderRankingEditor();
+  pushRankingState();
+}
+
+function rankingToggleVote() {
+  if (rankingConfig().running) {
+    rankingStopVote();
+    if (rankingConfig().linkScoreTimer && ['prestart', 'running', 'grace'].includes(scoreState.status)) scoreStop({ fromRanking: true });
+  } else {
+    rankingStartVote();
+  }
+}
+
+function rankingTick() {
+  const cfg = rankingConfig();
+  if (!cfg.roundEndsAt) return pushRankingState();
+  if (Date.now() < cfg.roundEndsAt) return pushRankingState();
+  if (cfg.activeId) {
+    appSettings.ranking.rows = cfg.rows.map(row => row.id === cfg.activeId ? { ...row, round: (Number(row.round) || 0) + 1 } : row);
+  }
+  appSettings.ranking.roundEndsAt = 0;
+  if (rankingTimer) clearInterval(rankingTimer);
+  rankingTimer = null;
+  saveAppSettings({ ranking: appSettings.ranking }).catch(() => {});
+  renderRankingEditor();
+  pushRankingState();
+}
+
+function wireRankingUi() {
+  const el = rankingEls();
+  if (el.memberGroup) el.memberGroup.onchange = () => { appSettings.ranking.memberGroupId = el.memberGroup.value; renderRankingMemberSelectors(); persistRankingConfig(); };
+  if (el.btnAddMember) el.btnAddMember.onclick = () => {
+    const member = getMemberById(el.member?.value);
+    if (!member) return alert('Vui lòng chọn thành viên');
+    rankingAddRow({ memberGroupId: el.memberGroup?.value || '', memberId: member.id, name: member.name, avatar: member.avatar });
+  };
+  if (el.btnAddManual) el.btnAddManual.onclick = () => {
+    rankingAddRow({ name: 'Idol mới', avatar: '' });
+  };
+  ['title','roundSeconds','streakSeconds','streakColor','grayLosers','showRank','showAvatar','showGift','showRound','hideAllScores','linkScoreTimer','rankStart','rankEnd'].forEach(k => { if (el[k]) el[k].onchange = persistRankingConfig; });
+  if (el.title) el.title.oninput = persistRankingConfig;
+  if (el.btnSave) el.btnSave.onclick = () => { persistRankingConfig(); appendLog('[ranking] đã lưu và cập nhật OBS overlay'); };
+  if (el.btnCopyUrl) el.btnCopyUrl.onclick = async () => { const r = await window.bigo.rankingCopyUrl(); if (!r.ok) alert(r.error || 'Không copy được link BXH'); };
+  if (el.btnStartRound) el.btnStartRound.onclick = rankingToggleVote;
+  if (el.btnStopRound) el.btnStopRound.onclick = () => rankingStopVote();
+  if (el.btnReset) el.btnReset.onclick = async () => {
+    const ok = await appConfirm({ title: 'Reset BXH?', message: 'Đưa toàn bộ KC, round và chuỗi quà về 0?', okText: 'Reset', cancelText: 'Không', danger: true });
+    if (!ok) return;
+    appSettings.ranking.rows = (appSettings.ranking.rows || []).map(row => ({ ...row, points: 0, round: 0, activePoints: 0, streakText: '', streakUntil: 0 }));
+    appSettings.ranking.roundEndsAt = 0;
+    appSettings.ranking.running = false;
+    persistRankingConfig(); renderRankingEditor();
+  };
+  if (el.rows) el.rows.onchange = e => {
+    const rowEl = e.target.closest('[data-rank-id]');
+    if (!rowEl) return;
+    const id = rowEl.dataset.rankId;
+    if (e.target.matches('[data-rank-group]')) rankingApplyRow(id, { memberGroupId: e.target.value, memberId: '' });
+    if (e.target.matches('[data-rank-member]')) {
+      const member = getMemberById(e.target.value);
+      rankingApplyRow(id, { memberId: e.target.value, name: member?.name || '', avatar: member?.avatar || '' });
+    }
+    if (e.target.matches('[data-rank-name]')) rankingApplyRow(id, { name: e.target.value });
+    if (e.target.matches('[data-rank-avatar]')) rankingApplyRow(id, { avatar: e.target.value });
+    if (e.target.matches('[data-rank-gift]')) rankingApplyRow(id, { giftItemId: e.target.value });
+    if (e.target.matches('[data-rank-points]')) rankingApplyRow(id, { points: e.target.value });
+    if (e.target.matches('[data-rank-round]')) rankingApplyRow(id, { round: e.target.value });
+    if (e.target.matches('[data-rank-hide-score]')) rankingApplyRow(id, { hideScore: e.target.checked });
+    if (e.target.matches('[data-rank-lost]')) rankingApplyRow(id, { lost: e.target.checked });
+    if (e.target.matches('[data-rank-exclude-overlay]')) rankingApplyRow(id, { excludeOverlay: e.target.checked });
+    if (e.target.matches('[data-rank-active]')) { appSettings.ranking.activeId = e.target.checked ? id : ''; persistRankingConfig(); renderRankingEditor(); }
+  };
+  if (el.rows) el.rows.onclick = async e => {
+    const rowEl = e.target.closest('[data-rank-id]');
+    if (!rowEl) return;
+    const id = rowEl.dataset.rankId;
+    if (e.target.matches('[data-rank-toggle-settings]')) {
+      const row = (appSettings.ranking.rows || []).find(r => r.id === id);
+      rankingApplyRow(id, { settingsOpen: !row?.settingsOpen });
+    }
+    if (e.target.matches('[data-rank-delete]')) {
+      const row = (appSettings.ranking.rows || []).find(r => r.id === id);
+      const ok = await appConfirm({ title: 'Xoá idol khỏi BXH?', message: `Xoá ${row?.name || 'idol này'} khỏi danh sách BXH?`, okText: 'Xoá', cancelText: 'Không', danger: true });
+      if (!ok) return;
+      appSettings.ranking.rows = (appSettings.ranking.rows || []).filter(row => row.id !== id);
+      if (appSettings.ranking.activeId === id) appSettings.ranking.activeId = '';
+      persistRankingConfig(); renderRankingEditor();
+    }
+    if (e.target.matches('[data-rank-delta]')) {
+      const row = (appSettings.ranking.rows || []).find(r => r.id === id);
+      if (!row) return;
+      rankingApplyRow(id, { points: Math.max(0, (Number(row.points) || 0) + (Number(e.target.dataset.rankDelta) || 0)) });
+    }
+  };
+}
+wireRankingUi();
 
 if (els.gameplayGroup) {
   els.gameplayGroup.addEventListener('change', () => {
@@ -5024,6 +5490,7 @@ function setScoreStatus(status) {
   if (status === 'success' || status === 'failed') {
     scoreState.resultAt = Date.now();
     playScoreResultSound(status);
+    rankingStopVote({ incrementRound: true });
   }
 }
 
@@ -5281,7 +5748,7 @@ function scoreBeginRunning(now = Date.now()) {
   scoreState.timeText = formatScoreTime(durationMs);
   playScoreCue('start');
 }
-function scoreStart() {
+function scoreStart(opts = {}) {
   if (!isConnected) {
     alert('Vui lòng kết nối LIVE để sử dụng tính năng');
     return;
@@ -5317,17 +5784,19 @@ function scoreStart() {
   if (!prepMs) playScoreCue('start');
   if (scoreTimer) clearInterval(scoreTimer);
   scoreTimer = setInterval(scoreTick, 250);
+  if (!opts.fromRanking && appSettings.ranking?.activeId) rankingStartVote({ syncScore: false });
   scoreTick();
 }
-function scoreStop() {
+function scoreStop(opts = {}) {
   setScoreStatus('idle');
   if (scoreTimer) clearInterval(scoreTimer);
   if (scoreAutoResetTimer) clearTimeout(scoreAutoResetTimer);
   scoreTimer = null;
   scoreState.timeText = formatScoreTime(scoreDurationMs(scoreReadConfig()));
+  if (!opts.fromRanking) rankingStopVote();
   pushScoreState();
 }
-function scoreReset() {
+function scoreReset(opts = {}) {
   if (scoreAutoResetTimer) clearTimeout(scoreAutoResetTimer);
   scoreState.score = 0;
   scoreState.lastAdd = 0;
@@ -5347,7 +5816,7 @@ function scoreReset() {
   scoreTimer = null;
   scoreState.timeText = formatScoreTime(scoreDurationMs(scoreReadConfig()));
   scoreState.resultAt = 0;
-  pushScoreState();
+  if (!opts.silent) pushScoreState();
 }
 function scoreAdd(points, ev = null) {
   const n = Math.max(0, Math.round(Number(points) || 0));
@@ -5521,6 +5990,7 @@ if (grpDlgSave) {
     renderSettingsGroupsList();
     applyActiveBgm();
     renderScoreMemberSelectors();
+    renderRankingMemberSelectors();
     renderGiftTable();
   };
 }

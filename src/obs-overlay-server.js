@@ -19,9 +19,11 @@ class ObsOverlayServer {
     this.server = null;
     this.clients = new Map(); // overlayId -> Set(res)
     this.gameplayClients = new Set();
+    this.rankingClients = new Set();
     this.scoreClients = new Set();
     this.gameplayConfig = { items: [], orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, slots: [] };
     this.gameplayCounts = {};
+    this.rankingState = {};
     this.scoreState = {};
     this.media = new Map();   // mediaId -> absolute file path
   }
@@ -43,6 +45,8 @@ class ObsOverlayServer {
     this.clients.clear();
     for (const res of this.gameplayClients) { try { res.end(); } catch {} }
     this.gameplayClients.clear();
+    for (const res of this.rankingClients) { try { res.end(); } catch {} }
+    this.rankingClients.clear();
     for (const res of this.scoreClients) { try { res.end(); } catch {} }
     this.scoreClients.clear();
     if (this.server) { try { this.server.close(); } catch {} }
@@ -59,6 +63,10 @@ class ObsOverlayServer {
 
   getScoreUrl() {
     return `http://127.0.0.1:${this.port}/score?token=${encodeURIComponent(this.token)}`;
+  }
+
+  getRankingUrl() {
+    return `http://127.0.0.1:${this.port}/ranking?token=${encodeURIComponent(this.token)}`;
   }
 
   setGameplayConfig(cfg) {
@@ -78,6 +86,11 @@ class ObsOverlayServer {
   sendScoreState(state) {
     this.scoreState = state || {};
     this._sendScore('score', this.scoreState);
+  }
+
+  sendRankingState(state) {
+    this.rankingState = state || {};
+    this._sendRanking('ranking', this.rankingState);
   }
 
   hasClients(overlayId) {
@@ -121,6 +134,11 @@ class ObsOverlayServer {
     for (const res of this.scoreClients) { try { res.write(body); } catch {} }
   }
 
+  _sendRanking(event, data) {
+    const body = `event: ${event}\ndata: ${JSON.stringify(data || {})}\n\n`;
+    for (const res of this.rankingClients) { try { res.write(body); } catch {} }
+  }
+
   _okToken(reqUrl) {
     return reqUrl.searchParams.get('token') === this.token;
   }
@@ -136,6 +154,8 @@ class ObsOverlayServer {
     if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remote)) return this._reject(res, 403, 'localhost only');
     if (req.method === 'GET' && reqUrl.pathname === '/obs-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'obs-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/gameplay-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'gameplay-overlay.js'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/ranking-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'ranking-overlay.js'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/ranking-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'ranking-overlay.css'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/score-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/score-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.css'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/logo-hp.png') return this._serveFile(path.join(this.root, 'logo-hp.png'), res);
@@ -146,6 +166,8 @@ class ObsOverlayServer {
     if (req.method === 'GET' && reqUrl.pathname.startsWith('/overlay/')) return this._serveOverlay(reqUrl, res);
     if (req.method === 'GET' && reqUrl.pathname === '/gameplay') return this._serveFile(path.join(this.root, 'renderer', 'gameplay-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/gameplay-events') return this._serveGameplayEvents(req, res);
+    if (req.method === 'GET' && reqUrl.pathname === '/ranking') return this._serveFile(path.join(this.root, 'renderer', 'ranking-overlay.html'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/ranking-events') return this._serveRankingEvents(req, res);
     if (req.method === 'GET' && reqUrl.pathname === '/score') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/score-events') return this._serveScoreEvents(req, res);
     if (req.method === 'GET' && reqUrl.pathname.startsWith('/gift-icon/')) return this._serveGiftIcon(reqUrl, res);
@@ -190,6 +212,16 @@ class ObsOverlayServer {
     res.write(`event: score\ndata: ${JSON.stringify(this.scoreState || {})}\n\n`);
     this.scoreClients.add(res);
     req.on('close', () => this.scoreClients.delete(res));
+  }
+
+  _serveRankingEvents(req, res) {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(`event: ranking\ndata: ${JSON.stringify(this.rankingState || {})}\n\n`);
+    this.rankingClients.add(res);
+    req.on('close', () => this.rankingClients.delete(res));
   }
 
   _serveFile(filePath, res) {
