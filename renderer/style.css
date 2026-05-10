@@ -1401,10 +1401,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .ranking-display-grid input:not([type="checkbox"]),.ranking-display-grid select { width: 100%; height: 42px; box-sizing: border-box; }
 .ranking-suggest-number { color: #ff5f7e; font-size: 14px; font-weight: 950; }
 .ranking-grid-suggestion { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 12px 10px; color: #d5dae7; font-size: 12px; font-weight: 800; }
-.ranking-list-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid #262a35; border-radius: 14px; background: #10131b; }
+.ranking-list-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #262a35; border-radius: 14px; background: #10131b; }
 .ranking-list-head b { display: block; color: #ffd166; font-size: 15px; font-weight: 950; }
 .ranking-list-head small { display: block; color: #8f98aa; font-size: 12px; margin-top: 2px; }
-.ranking-list-head button { min-width: 120px; height: 42px; font-weight: 950; }
+.ranking-list-head button { min-width: 88px; height: 34px; padding: 0 14px; font-size: 12px; font-weight: 950; border-radius: 10px; }
 .ranking-editor-list { display: grid; gap: 8px; max-height: 760px; overflow-y: auto; padding-right: 6px; }
 .ranking-editor-row { display: grid; gap: 10px; padding: 12px; border: 1px solid #262a35; border-radius: 14px; background: linear-gradient(90deg,rgba(72,142,150,.16),rgba(72,142,150,.06)); }
 .ranking-editor-row:nth-child(even) { background: linear-gradient(90deg,rgba(213,91,139,.14),rgba(213,91,139,.05)); }
@@ -1444,9 +1444,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .ranking-toggle.vote { border-color: rgba(255,209,102,.35); }
 .ranking-toggle.lost { border-color: rgba(255,107,125,.35); }
 .ranking-preview-wrap { position: sticky; top: 10px; }
-.ranking-board-preview .ranking-board { display: inline-grid; grid-template-columns: max-content; width: auto; min-width: 0; padding: 12px 0 0; border-radius: 16px; overflow: visible; color: #fff; background: linear-gradient(180deg,rgba(31,36,48,.9),rgba(25,29,40,.86)); box-shadow: 0 12px 32px rgba(0,0,0,.35); text-shadow: 0 2px 4px rgba(0,0,0,.55); }
-.ranking-board-preview .ranking-title { max-width: 210px; padding: 12px 14px 11px; margin-top: -12px; border-radius: 16px 16px 0 0; font-size: 24px; font-weight: 900; text-align: center; white-space: normal; line-height: 1.08; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; background: linear-gradient(180deg,rgba(31,29,39,.96),rgba(18,17,24,.92)); }
-.ranking-board-preview .ranking-list { overflow: visible; }
+.ranking-board-preview .ranking-board { display: inline-grid; grid-template-columns: minmax(0,max-content); width: max-content; min-width: 0; padding: 12px 0 0; border-radius: 16px; overflow: hidden; color: #fff; background: linear-gradient(180deg,rgba(31,36,48,.9),rgba(25,29,40,.86)); box-shadow: 0 12px 32px rgba(0,0,0,.35); text-shadow: 0 2px 4px rgba(0,0,0,.55); }
+.ranking-board-preview .ranking-title { width: 100%; max-width: none; box-sizing: border-box; padding: 12px 14px 11px; margin-top: -12px; border-radius: 16px 16px 0 0; font-size: 24px; font-weight: 900; text-align: center; white-space: normal; line-height: 1.08; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; background: linear-gradient(180deg,rgba(31,29,39,.96),rgba(18,17,24,.92)); }
+.ranking-board-preview .ranking-list { overflow: hidden; }
 .ranking-board-preview .ranking-row { position: relative; display: flex; gap: 3px; align-items: center; min-height: 62px; padding: 4px 4px 4px 6px; transition: transform .18s, filter .18s, opacity .18s, background .18s; }
 .ranking-board-preview .ranking-row { background: rgba(var(--ranking-card-bg-rgb,42,45,55),var(--ranking-card-bg-opacity,.74)); }
 .ranking-board-preview .ranking-row.top-1 { background: linear-gradient(90deg,rgba(117,86,22,.86),rgba(37,31,22,.76)); box-shadow: inset 0 0 0 1px rgba(255,218,95,.38); }

@@ -2624,9 +2624,8 @@ function renderGroupCard(grp, overlayMap) {
 
   // NHÓM CHUNG: không có toggle bật/tắt + không xoá được + tên cố định
   const toggleHtml = isCommon
-    ? '<span class="group-status common">⭐ Luôn bật</span>'
-    : `<span class="group-status">${enabled ? 'Đang bật' : 'Đang tắt'}</span>
-       <label class="switch" title="Bật/tắt nhóm">
+    ? ''
+    : `<label class="switch" title="Bật/tắt nhóm">
          <input type="checkbox" data-act="toggle-group" data-gid="${grp.id}" ${enabled ? 'checked' : ''} />
          <span class="slider"></span>
        </label>`;
@@ -4707,10 +4706,10 @@ function rankingConfig() {
 function rankingNextCreatorName() {
   const rows = (appSettings.ranking?.rows || []).map(normalizeRankingRow);
   const maxNamed = rows.reduce((max, row) => {
-    const m = String(row.name || '').trim().match(/^New Creator\s+(\d+)$/i);
+    const m = String(row.name || '').trim().match(/^(?:HP Media|New Creator)\s+(\d+)$/i);
     return m ? Math.max(max, parseInt(m[1], 10) || 0) : max;
   }, 0);
-  return `New Creator ${Math.max(maxNamed + 1, rows.length + 1)}`;
+  return `HP Media ${Math.max(maxNamed + 1, rows.length + 1)}`;
 }
 
 function rankingHexToRgb(hex, fallback = '42,45,55') {
