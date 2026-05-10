@@ -319,16 +319,17 @@
                 <label>Độ trễ quà (giây)<input id="scoreDelay" type="number" min="0" max="120" value="5" /></label>
                 <label>Điểm yêu cầu<input id="scoreTarget" type="number" min="1" value="30000" /></label>
                 <label>Quà lớn từ điểm<input id="scoreBigGiftThreshold" type="number" min="1" value="500" /></label>
-                <label>Tự reset sau (giây)<input id="scoreAutoResetSeconds" type="number" min="0" max="300" value="0" /></label>
-                <label>Tự ẩn kết quả sau (giây)<input id="scoreAutoHideSeconds" type="number" min="0" max="300" value="0" /></label>
+                <label>Chuẩn bị trước khi tính (giây)<input id="scorePrepSeconds" type="number" min="0" max="30" value="3" /></label>
               </div>
             </details>
             <details class="score-config-group" open>
               <summary>Nội dung overlay</summary>
               <div class="score-control-grid">
+                <label>Nhóm thành viên<select id="scoreMemberGroup"><option value="">Không chọn nhóm</option></select></label>
+                <label>Thành viên<select id="scoreMember"><option value="">Không chọn thành viên</option></select></label>
                 <label>Nội dung tự nhập<input id="scoreContent" placeholder="VD: Kêu gọi điểm ĐẬU" /></label>
                 <label>Tên Creator<input id="scoreCreatorName" placeholder="Tên Creator" /></label>
-                <label class="wide">Avatar Creator URL<input id="scoreCreatorAvatar" placeholder="Dán link avatar (tuỳ chọn)" /></label>
+                <input id="scoreCreatorAvatar" type="hidden" />
               </div>
             </details>
             <details class="score-config-group">
@@ -356,7 +357,6 @@
                 <label class="score-check-row"><span>Overlay gọn</span><input id="scoreCompactMode" type="checkbox" /></label>
                 <label class="score-check-row"><span>Ẩn avatar</span><input id="scoreHideAvatar" type="checkbox" /></label>
                 <label class="score-check-row"><span>Ẩn tên Creator</span><input id="scoreHideCreator" type="checkbox" /></label>
-                <label class="score-check-row"><span>Chỉ hiện khi chạy</span><input id="scoreShowOnlyActive" type="checkbox" /></label>
               </div>
             </details>
             <details class="score-config-group">
@@ -649,6 +649,30 @@
       </div>
 
       <div class="panel">
+        <h2>👤 THÀNH VIÊN</h2>
+        <div class="hint small" style="margin-bottom:10px">
+          Không bắt buộc. Lưu trước <b>Avatar</b> và <b>Tên Creator</b> để sau này các gameplay như Tính điểm, Vote, Group Dance có thể chọn nhanh theo tên.
+        </div>
+        <div class="member-editor">
+          <input type="hidden" id="memberEditId" />
+          <label>Tên Creator
+            <input id="memberName" placeholder="VD: HP Media" />
+          </label>
+          <label>Avatar URL hoặc file ảnh
+            <div class="member-avatar-row">
+              <input id="memberAvatar" placeholder="Dán link ảnh hoặc chọn file" />
+              <button type="button" id="btnMemberPickAvatar" class="tiny">📁 Chọn ảnh</button>
+              <button type="button" id="btnMemberClearForm" class="tiny">Xoá form</button>
+            </div>
+          </label>
+          <div class="member-editor-actions">
+            <button type="button" id="btnMemberSave" class="primary">+ Lưu thành viên</button>
+          </div>
+        </div>
+        <div id="membersList" class="members-list"></div>
+      </div>
+
+      <div class="panel">
         <h2>📂 Quản lý nhóm quà</h2>
         <div class="row" style="margin-bottom:8px">
           <label style="flex:1">Tên nhóm mới
@@ -850,6 +874,11 @@
       <div class="form-row">
         <label style="flex:1">BIGO ID gắn nhóm (auto-fill khi bật nhóm — tuỳ chọn)
           <input id="grpDlgBigoId" placeholder="vd: 1066691535" />
+        </label>
+      </div>
+      <div class="form-row">
+        <label style="flex:1">Thành viên gắn nhóm (tuỳ chọn)
+          <div id="grpDlgMembers" class="group-member-picker"></div>
         </label>
       </div>
       <div class="form-row">

@@ -797,6 +797,7 @@ const els = {
   bgmVol: $('bgmVol'), bgmVolVal: $('bgmVolVal'),
   fxVol: $('fxVol'), fxVolVal: $('fxVolVal'),
   maxListItems: $('maxListItems'),
+  memberEditId: $('memberEditId'), memberName: $('memberName'), memberAvatar: $('memberAvatar'), btnMemberPickAvatar: $('btnMemberPickAvatar'), btnMemberClearForm: $('btnMemberClearForm'), btnMemberSave: $('btnMemberSave'), membersList: $('membersList'),
   miniQueueCards: $('miniQueueCards'),
   qCardIcon: $('qCardIcon'), qCardIconVal: $('qCardIconVal'),
   qCardCount: $('qCardCount'), qCardCountVal: $('qCardCountVal'),
@@ -806,7 +807,7 @@ const els = {
   gameplayTextFont: $('gameplayTextFont'), gameplayTextColor: $('gameplayTextColor'), gameplaySlotNumberColor: $('gameplaySlotNumberColor'), gameplayCountColor: $('gameplayCountColor'), gameplayUppercase: $('gameplayUppercase'), gameplayShowName: $('gameplayShowName'), gameplayShowCount: $('gameplayShowCount'),
   gameplayCenterLargest: $('gameplayCenterLargest'), gameplayGrayInactive: $('gameplayGrayInactive'), gameplayKeepScore: $('gameplayKeepScore'),
   gameplayReview: $('gameplayReview'), gameplayGridEditor: $('gameplayGridEditor'), gameplayItems: $('gameplayItems'), btnGameplayAddCol: $('btnGameplayAddCol'), btnGameplayAddRow: $('btnGameplayAddRow'), btnGameplayDelCol: $('btnGameplayDelCol'), btnGameplayDelRow: $('btnGameplayDelRow'), btnGameplaySave: $('btnGameplaySave'), btnGameplayCopyUrl: $('btnGameplayCopyUrl'),
-  scoreHours: $('scoreHours'), scoreMinutes: $('scoreMinutes'), scoreSeconds: $('scoreSeconds'), scoreDelay: $('scoreDelay'), scoreTarget: $('scoreTarget'), scoreContent: $('scoreContent'), scoreCreatorName: $('scoreCreatorName'), scoreCreatorAvatar: $('scoreCreatorAvatar'), scoreTimeColor: $('scoreTimeColor'), scoreContentColor: $('scoreContentColor'), scoreOverColor: $('scoreOverColor'), scoreBarColor1: $('scoreBarColor1'), scoreBarColor2: $('scoreBarColor2'), scoreWaveColor: $('scoreWaveColor'), scoreBigGiftThreshold: $('scoreBigGiftThreshold'), scoreAutoResetSeconds: $('scoreAutoResetSeconds'), scoreThemePreset: $('scoreThemePreset'), scoreBarStyle: $('scoreBarStyle'), scoreOverlaySize: $('scoreOverlaySize'), scoreCustomMilestones: $('scoreCustomMilestones'), scoreAutoHideSeconds: $('scoreAutoHideSeconds'), scoreShowGiftUser: $('scoreShowGiftUser'), scoreShowMissing: $('scoreShowMissing'), scoreShowTopUsers: $('scoreShowTopUsers'), scoreShowSpeed: $('scoreShowSpeed'), scoreCompactMode: $('scoreCompactMode'), scoreHideAvatar: $('scoreHideAvatar'), scoreHideCreator: $('scoreHideCreator'), scoreShowOnlyActive: $('scoreShowOnlyActive'), scoreStartSoundLabel: $('scoreStartSoundLabel'), scoreWarningSoundLabel: $('scoreWarningSoundLabel'), scoreGoalSoundLabel: $('scoreGoalSoundLabel'), scoreSuccessSoundLabel: $('scoreSuccessSoundLabel'), scoreFailSoundLabel: $('scoreFailSoundLabel'), btnScorePickStartSound: $('btnScorePickStartSound'), btnScoreClearStartSound: $('btnScoreClearStartSound'), btnScorePickWarningSound: $('btnScorePickWarningSound'), btnScoreClearWarningSound: $('btnScoreClearWarningSound'), btnScorePickGoalSound: $('btnScorePickGoalSound'), btnScoreClearGoalSound: $('btnScoreClearGoalSound'), btnScorePickSuccessSound: $('btnScorePickSuccessSound'), btnScoreClearSuccessSound: $('btnScoreClearSuccessSound'), btnScorePickFailSound: $('btnScorePickFailSound'), btnScoreClearFailSound: $('btnScoreClearFailSound'), btnScoreStart: $('btnScoreStart'), btnScoreStop: $('btnScoreStop'), btnScoreReset: $('btnScoreReset'), scoreTestPoints: $('scoreTestPoints'), btnScoreTest: $('btnScoreTest'), btnScoreTestBig: $('btnScoreTestBig'), btnScoreTestWarning: $('btnScoreTestWarning'), btnScoreTestSuccess: $('btnScoreTestSuccess'), btnScoreTestFail: $('btnScoreTestFail'), btnScoreCopyUrl: $('btnScoreCopyUrl'), scorePreview: $('scorePreview'), scoreReviewStatus: $('scoreReviewStatus'), scoreReviewStats: $('scoreReviewStats'), scoreGiftLog: $('scoreGiftLog'), scoreUserTotals: $('scoreUserTotals'),
+  scoreHours: $('scoreHours'), scoreMinutes: $('scoreMinutes'), scoreSeconds: $('scoreSeconds'), scoreDelay: $('scoreDelay'), scoreTarget: $('scoreTarget'), scoreMemberGroup: $('scoreMemberGroup'), scoreMember: $('scoreMember'), scoreContent: $('scoreContent'), scoreCreatorName: $('scoreCreatorName'), scoreCreatorAvatar: $('scoreCreatorAvatar'), scoreTimeColor: $('scoreTimeColor'), scoreContentColor: $('scoreContentColor'), scoreOverColor: $('scoreOverColor'), scoreBarColor1: $('scoreBarColor1'), scoreBarColor2: $('scoreBarColor2'), scoreWaveColor: $('scoreWaveColor'), scoreBigGiftThreshold: $('scoreBigGiftThreshold'), scorePrepSeconds: $('scorePrepSeconds'), scoreThemePreset: $('scoreThemePreset'), scoreBarStyle: $('scoreBarStyle'), scoreOverlaySize: $('scoreOverlaySize'), scoreCustomMilestones: $('scoreCustomMilestones'), scoreShowGiftUser: $('scoreShowGiftUser'), scoreShowMissing: $('scoreShowMissing'), scoreShowTopUsers: $('scoreShowTopUsers'), scoreShowSpeed: $('scoreShowSpeed'), scoreCompactMode: $('scoreCompactMode'), scoreHideAvatar: $('scoreHideAvatar'), scoreHideCreator: $('scoreHideCreator'), scoreStartSoundLabel: $('scoreStartSoundLabel'), scoreWarningSoundLabel: $('scoreWarningSoundLabel'), scoreGoalSoundLabel: $('scoreGoalSoundLabel'), scoreSuccessSoundLabel: $('scoreSuccessSoundLabel'), scoreFailSoundLabel: $('scoreFailSoundLabel'), btnScorePickStartSound: $('btnScorePickStartSound'), btnScoreClearStartSound: $('btnScoreClearStartSound'), btnScorePickWarningSound: $('btnScorePickWarningSound'), btnScoreClearWarningSound: $('btnScoreClearWarningSound'), btnScorePickGoalSound: $('btnScorePickGoalSound'), btnScoreClearGoalSound: $('btnScoreClearGoalSound'), btnScorePickSuccessSound: $('btnScorePickSuccessSound'), btnScoreClearSuccessSound: $('btnScoreClearSuccessSound'), btnScorePickFailSound: $('btnScorePickFailSound'), btnScoreClearFailSound: $('btnScoreClearFailSound'), btnScoreStart: $('btnScoreStart'), btnScoreStop: $('btnScoreStop'), btnScoreReset: $('btnScoreReset'), scoreTestPoints: $('scoreTestPoints'), btnScoreTest: $('btnScoreTest'), btnScoreTestBig: $('btnScoreTestBig'), btnScoreTestWarning: $('btnScoreTestWarning'), btnScoreTestSuccess: $('btnScoreTestSuccess'), btnScoreTestFail: $('btnScoreTestFail'), btnScoreCopyUrl: $('btnScoreCopyUrl'), scorePreview: $('scorePreview'), scoreReviewStatus: $('scoreReviewStatus'), scoreReviewStats: $('scoreReviewStats'), scoreGiftLog: $('scoreGiftLog'), scoreUserTotals: $('scoreUserTotals'),
   // Gift dialog extras
   dlgPauseBgm: $('dlgPauseBgm'), dlgPreFx: $('dlgPreFx'),
   effectQueue: $('effectQueue'), btnClearQueue: $('btnClearQueue'),
@@ -2628,11 +2629,14 @@ function renderGroupCard(grp, overlayMap) {
        </label>`;
   const editBtn = isCommon ? '' :
     `<button class="tiny" data-act="edit-group" data-gid="${grp.id}" title="Sửa nhóm">✏️</button>`;
+  const groupMembers = getGroupMembers(grp);
+  const memberBadge = groupMembers.length ? `<span class="group-badge member-count" title="Thành viên: ${escapeHtml(groupMembers.map(m => m.name).join(', '))}">👤 ${groupMembers.length}</span>` : '';
 
   return `<div class="group-card ${enabled ? 'on' : 'off'} ${collapsed ? 'collapsed' : ''} ${isCommon ? 'common' : ''}" data-gid="${grp.id}">
     <div class="group-head">
       <span class="group-name">${escapeHtml(grp.name)}</span>
       <span class="group-head-spacer"></span>
+      ${memberBadge}
       <span class="group-badge">${(grp.items || []).length} mục</span>
       <button class="tiny" data-act="add-item" data-gid="${grp.id}" title="Thêm quà vào nhóm">+ Thêm quà</button>
       ${editBtn}
@@ -3704,7 +3708,7 @@ let appSettings = {
   bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
   gameplay: { groupId: '', useCommonGroup: true, orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', slotNumberColor: '#ffffff', countColor: '#ffffff', countSize: 12, uppercase: false, showName: true, showCount: true, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] },
-  scoreVote: { hours: 0, minutes: 3, seconds: 0, delaySeconds: 5, target: 30000, content: 'Kêu gọi điểm ĐẬU', creatorName: 'Creator', creatorAvatar: '', timeColor: '#ffffff', contentColor: '#f0eef6', overColor: '#ff0000', barColor1: '#b93678', barColor2: '#ff8ed1', waveColor: '#ffffff', bigGiftThreshold: 500, autoResetSeconds: 0, themePreset: 'custom', barStyle: 'pill', overlaySize: 'medium', customMilestones: '', autoHideSeconds: 0, showGiftUser: true, showMissing: true, showTopUsers: true, showSpeed: true, compactMode: false, hideAvatar: false, hideCreator: false, showOnlyActive: false, startSound: '', startSoundName: '', warningSound: '', warningSoundName: '', goalSound: '', goalSoundName: '', successSound: '', successSoundName: '', failSound: '', failSoundName: '' },
+  scoreVote: { hours: 0, minutes: 3, seconds: 0, delaySeconds: 5, target: 30000, memberGroupId: '', memberId: '', content: 'Kêu gọi điểm ĐẬU', creatorName: 'Creator', creatorAvatar: '', timeColor: '#ffffff', contentColor: '#f0eef6', overColor: '#ff0000', barColor1: '#b93678', barColor2: '#ff8ed1', waveColor: '#ffffff', bigGiftThreshold: 500, prepSeconds: 3, themePreset: 'custom', barStyle: 'pill', overlaySize: 'medium', customMilestones: '', showGiftUser: true, showMissing: true, showTopUsers: true, showSpeed: true, compactMode: false, hideAvatar: false, hideCreator: false, startSound: '', startSoundName: '', warningSound: '', warningSoundName: '', goalSound: '', goalSoundName: '', successSound: '', successSoundName: '', failSound: '', failSoundName: '' },
   // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
   specialEffects: {
     clearQueue:      { enabled: false, typeid: null, giftName: '', iconUrl: '' },
@@ -3717,6 +3721,7 @@ let appSettings = {
     // TÁP TIM: KPI hearts. Khi đạt target → phát media (mp3/mp4).
     heartGoal:       { enabled: false, target: 100, mediaFile: '', overlayId: '', currentCount: 0 },
   },
+  members: [],
   fxVolume: 100,
   maxListItems: 200,
 };
@@ -3728,6 +3733,7 @@ async function saveAppSettings(patch) {
     if (patch.preFx) s.preFx = { ...(s.preFx || {}), ...patch.preFx };
     if (patch.gameplay) s.gameplay = { ...(s.gameplay || {}), ...patch.gameplay };
     if (patch.scoreVote) s.scoreVote = { ...(s.scoreVote || {}), ...patch.scoreVote };
+    if (patch.members) s.members = Array.isArray(patch.members) ? patch.members : [];
     if (patch.specialEffects) {
       s.specialEffects = s.specialEffects || {};
       for (const [k, v] of Object.entries(patch.specialEffects)) {
@@ -3809,6 +3815,7 @@ async function initAppSettings(s) {
   appSettings.preFx = { ...appSettings.preFx, ...(s.preFx || {}) };
   appSettings.gameplay = { ...appSettings.gameplay, ...(s.gameplay || {}) };
   appSettings.scoreVote = { ...appSettings.scoreVote, ...(s.scoreVote || {}) };
+  appSettings.members = Array.isArray(s.members) ? s.members : [];
   // Migrate old clearGift → specialEffects.clearQueue (backward compat)
   if (s.clearGift && !s.specialEffects?.clearQueue) {
     appSettings.specialEffects.clearQueue = {
@@ -3852,6 +3859,7 @@ async function initAppSettings(s) {
   if (els.bgmVol) { els.bgmVol.value = appSettings.bgm.volume || 80; els.bgmVolVal.textContent = els.bgmVol.value; }
   if (els.fxVol) { els.fxVol.value = appSettings.fxVolume; els.fxVolVal.textContent = appSettings.fxVolume; }
   if (els.maxListItems) els.maxListItems.value = appSettings.maxListItems;
+  renderMembersList();
   applyScoreSettingsUi();
   // Devices
   await refreshAudioDevices();
@@ -4467,6 +4475,152 @@ if (els.maxListItems) {
     saveAppSettings({ maxListItems: appSettings.maxListItems });
   });
 }
+
+function normalizeMember(member = {}) {
+  return {
+    id: member.id || `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    name: String(member.name || '').trim(),
+    avatar: String(member.avatar || '').trim(),
+  };
+}
+
+function clearMemberForm() {
+  if (els.memberEditId) els.memberEditId.value = '';
+  if (els.memberName) els.memberName.value = '';
+  if (els.memberAvatar) els.memberAvatar.value = '';
+  if (els.btnMemberSave) els.btnMemberSave.textContent = '+ Lưu thành viên';
+}
+
+async function persistMembers() {
+  appSettings.members = (appSettings.members || []).map(normalizeMember).filter(m => m.name);
+  await saveAppSettings({ members: appSettings.members });
+  renderMembersList();
+}
+
+function renderMembersList() {
+  if (!els.membersList) return;
+  const members = Array.isArray(appSettings.members) ? appSettings.members : [];
+  if (!members.length) {
+    els.membersList.innerHTML = '<div class="score-log-empty">Chưa có thành viên nào. Có thể bỏ trống, không ảnh hưởng các tính năng hiện tại.</div>';
+    return;
+  }
+  els.membersList.innerHTML = members.map(member => {
+    const item = normalizeMember(member);
+    const avatar = item.avatar ? `<img src="${escapeHtml(item.avatar)}" loading="lazy" />` : '👤';
+    return `<div class="member-row" data-id="${escapeHtml(item.id)}">
+      <div class="member-avatar">${avatar}</div>
+      <div class="member-main"><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.avatar || 'Chưa có avatar')}</small></div>
+      <button type="button" class="tiny" data-member-edit="${escapeHtml(item.id)}">Sửa</button>
+      <button type="button" class="tiny danger" data-member-delete="${escapeHtml(item.id)}">Xoá</button>
+    </div>`;
+  }).join('');
+}
+
+function getMemberById(id) {
+  return (appSettings.members || []).find(m => m.id === id) || null;
+}
+
+function getGroupMembers(group) {
+  const ids = Array.isArray(group?.memberIds) ? group.memberIds : [];
+  return ids.map(getMemberById).filter(Boolean);
+}
+
+function renderGroupMemberPicker(group) {
+  const box = document.getElementById('grpDlgMembers');
+  if (!box) return;
+  const members = Array.isArray(appSettings.members) ? appSettings.members : [];
+  if (!members.length) {
+    box.innerHTML = '<div class="group-member-empty">Chưa có thành viên. Tạo ở Cài đặt chung → THÀNH VIÊN.</div>';
+    return;
+  }
+  const selected = new Set(Array.isArray(group?.memberIds) ? group.memberIds : []);
+  box.innerHTML = members.map(member => {
+    const item = normalizeMember(member);
+    const avatar = item.avatar ? `<img src="${escapeHtml(item.avatar)}" loading="lazy" />` : '👤';
+    return `<label class="group-member-option">
+      <input type="checkbox" value="${escapeHtml(item.id)}" ${selected.has(item.id) ? 'checked' : ''} />
+      <span class="group-member-avatar">${avatar}</span>
+      <span class="group-member-name">${escapeHtml(item.name)}</span>
+    </label>`;
+  }).join('');
+}
+
+function renderScoreMemberSelectors() {
+  if (!els.scoreMemberGroup || !els.scoreMember) return;
+  const groups = (mapping.groups || []).filter(g => !g.isCommon && getGroupMembers(g).length);
+  const currentGroupId = els.scoreMemberGroup.value || appSettings.scoreVote?.memberGroupId || '';
+  els.scoreMemberGroup.innerHTML = '<option value="">Không chọn nhóm</option>' + groups.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)} (${getGroupMembers(g).length})</option>`).join('');
+  if (groups.some(g => g.id === currentGroupId)) els.scoreMemberGroup.value = currentGroupId;
+  const group = (mapping.groups || []).find(g => g.id === els.scoreMemberGroup.value);
+  const members = group ? getGroupMembers(group) : [];
+  const currentMemberId = els.scoreMember.value || appSettings.scoreVote?.memberId || '';
+  els.scoreMember.innerHTML = '<option value="">Không chọn thành viên</option>' + members.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)}</option>`).join('');
+  if (members.some(m => m.id === currentMemberId)) els.scoreMember.value = currentMemberId;
+}
+
+function applyScoreSelectedMember() {
+  if (!els.scoreMember) return;
+  const member = getMemberById(els.scoreMember.value);
+  if (!member) return;
+  if (els.scoreCreatorName) els.scoreCreatorName.value = member.name || '';
+  if (els.scoreCreatorAvatar) els.scoreCreatorAvatar.value = member.avatar || '';
+  persistScoreConfig();
+}
+
+async function saveMemberFromForm() {
+  const name = String(els.memberName?.value || '').trim();
+  if (!name) { alert('Tên Creator không được trống'); return; }
+  const id = String(els.memberEditId?.value || '').trim() || `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const avatar = String(els.memberAvatar?.value || '').trim();
+  const members = Array.isArray(appSettings.members) ? [...appSettings.members] : [];
+  const idx = members.findIndex(m => m.id === id);
+  const next = normalizeMember({ id, name, avatar });
+  if (idx >= 0) members[idx] = next;
+  else members.push(next);
+  appSettings.members = members;
+  await persistMembers();
+  renderScoreMemberSelectors();
+  clearMemberForm();
+}
+
+if (els.btnMemberPickAvatar) {
+  els.btnMemberPickAvatar.onclick = async () => {
+    const r = await window.bigo.effectsPickFiles();
+    if (!r.ok || !r.files?.length) return;
+    const picked = r.files[0];
+    if (els.memberAvatar) els.memberAvatar.value = picked.fileUrl || picked.file || '';
+  };
+}
+if (els.btnMemberClearForm) els.btnMemberClearForm.onclick = clearMemberForm;
+if (els.btnMemberSave) els.btnMemberSave.onclick = () => saveMemberFromForm().catch(e => alert('Lỗi lưu thành viên: ' + e.message));
+if (els.membersList) {
+  els.membersList.onclick = async (e) => {
+    const editBtn = e.target.closest('[data-member-edit]');
+    const delBtn = e.target.closest('[data-member-delete]');
+    if (editBtn) {
+      const member = (appSettings.members || []).find(m => m.id === editBtn.dataset.memberEdit);
+      if (!member) return;
+      if (els.memberEditId) els.memberEditId.value = member.id;
+      if (els.memberName) els.memberName.value = member.name || '';
+      if (els.memberAvatar) els.memberAvatar.value = member.avatar || '';
+      if (els.btnMemberSave) els.btnMemberSave.textContent = 'Lưu thay đổi';
+      return;
+    }
+    if (delBtn) {
+      const ok = await appConfirm({ title: 'Xoá thành viên?', message: 'Xoá thành viên này khỏi danh sách?', okText: 'Xoá', cancelText: 'Không', danger: true });
+      if (!ok) return;
+      appSettings.members = (appSettings.members || []).filter(m => m.id !== delBtn.dataset.memberDelete);
+      (mapping.groups || []).forEach(g => {
+        if (Array.isArray(g.memberIds)) g.memberIds = g.memberIds.filter(id => id !== delBtn.dataset.memberDelete);
+      });
+      await persistMapping();
+      await persistMembers();
+      renderScoreMemberSelectors();
+      clearMemberForm();
+    }
+  };
+}
+
 if (els.gameplayGroup) {
   els.gameplayGroup.addEventListener('change', () => {
     gameplayReviewState.clear();
@@ -4746,6 +4900,8 @@ let scoreState = {
   durationMs: 180000,
   delayMs: 5000,
   startedAt: 0,
+  runStartedAt: 0,
+  prepEndAt: 0,
   endAt: 0,
   delayEndAt: 0,
   resultAt: 0,
@@ -4783,6 +4939,8 @@ function scoreReadConfig() {
   const target = Math.max(1, parseInt(els.scoreTarget?.value, 10) || 30000);
   return {
     hours, minutes, seconds, delaySeconds, target,
+    memberGroupId: String(els.scoreMemberGroup?.value || '').trim(),
+    memberId: String(els.scoreMember?.value || '').trim(),
     content: String(els.scoreContent?.value || '').trim() || 'Kêu gọi điểm ĐẬU',
     creatorName: String(els.scoreCreatorName?.value || '').trim() || 'Creator',
     creatorAvatar: String(els.scoreCreatorAvatar?.value || '').trim(),
@@ -4793,12 +4951,11 @@ function scoreReadConfig() {
     barColor2: String(els.scoreBarColor2?.value || '#ff8ed1').trim(),
     waveColor: String(els.scoreWaveColor?.value || '#ffffff').trim(),
     bigGiftThreshold: Math.max(1, parseInt(els.scoreBigGiftThreshold?.value, 10) || 500),
-    autoResetSeconds: clampInt(els.scoreAutoResetSeconds?.value, 0, 300, 0),
+    prepSeconds: clampInt(els.scorePrepSeconds?.value, 0, 30, 3),
     themePreset: String(els.scoreThemePreset?.value || 'custom'),
     barStyle: String(els.scoreBarStyle?.value || 'pill'),
     overlaySize: String(els.scoreOverlaySize?.value || 'medium'),
     customMilestones: String(els.scoreCustomMilestones?.value || '').trim(),
-    autoHideSeconds: clampInt(els.scoreAutoHideSeconds?.value, 0, 300, 0),
     showGiftUser: els.scoreShowGiftUser ? els.scoreShowGiftUser.checked : true,
     showMissing: els.scoreShowMissing ? els.scoreShowMissing.checked : true,
     showTopUsers: els.scoreShowTopUsers ? els.scoreShowTopUsers.checked : true,
@@ -4806,7 +4963,6 @@ function scoreReadConfig() {
     compactMode: els.scoreCompactMode ? els.scoreCompactMode.checked : false,
     hideAvatar: els.scoreHideAvatar ? els.scoreHideAvatar.checked : false,
     hideCreator: els.scoreHideCreator ? els.scoreHideCreator.checked : false,
-    showOnlyActive: els.scoreShowOnlyActive ? els.scoreShowOnlyActive.checked : false,
   };
 }
 function scoreDurationMs(cfg) {
@@ -4824,9 +4980,7 @@ function formatScoreTime(ms) {
 function scorePublicState() {
   const cfg = scoreReadConfig();
   const status = scoreState.status || 'idle';
-  const autoHidden = ['success', 'failed'].includes(status) && cfg.autoHideSeconds > 0 && scoreState.resultAt && Date.now() - scoreState.resultAt >= cfg.autoHideSeconds * 1000;
-  const hidden = (cfg.showOnlyActive && status === 'idle') || autoHidden;
-  return { ...scoreState, ...cfg, hidden, topUsers: scoreTopUsers(), customMilestoneValues: scoreMilestoneValues(cfg.customMilestones, cfg.target) };
+  return { ...scoreState, ...cfg, hidden: false, topUsers: scoreTopUsers(), customMilestoneValues: scoreMilestoneValues(cfg.customMilestones, cfg.target) };
 }
 
 function scoreMilestoneValues(text, target) {
@@ -4840,7 +4994,7 @@ function scoreTopUsers(limit = 3) {
 function scoreMetrics(state = scorePublicState()) {
   const target = Math.max(1, Number(state.target) || 1);
   const score = Math.max(0, Number(state.score) || 0);
-  const elapsedMs = state.startedAt ? Math.max(0, Date.now() - state.startedAt) : 0;
+  const elapsedMs = state.runStartedAt ? Math.max(0, Date.now() - state.runStartedAt) : 0;
   const avgPerMin = elapsedMs > 5000 ? Math.round(score / (elapsedMs / 60000)) : 0;
   const remainingMs = state.status === 'running' ? Math.max(0, state.endAt - Date.now()) : 0;
   const projected = avgPerMin && remainingMs ? Math.round(score + avgPerMin * (remainingMs / 60000)) : 0;
@@ -4870,17 +5024,7 @@ function setScoreStatus(status) {
   if (status === 'success' || status === 'failed') {
     scoreState.resultAt = Date.now();
     playScoreResultSound(status);
-    scheduleScoreAutoReset();
-    const cfg = scoreReadConfig();
-    if (cfg.autoHideSeconds > 0) setTimeout(pushScoreState, cfg.autoHideSeconds * 1000 + 80);
   }
-}
-
-function scheduleScoreAutoReset() {
-  if (scoreAutoResetTimer) clearTimeout(scoreAutoResetTimer);
-  const seconds = Math.max(0, Number(scoreReadConfig().autoResetSeconds) || 0);
-  if (!seconds) return;
-  scoreAutoResetTimer = setTimeout(() => scoreReset(), seconds * 1000);
 }
 
 async function pickScoreSound(kind) {
@@ -4956,6 +5100,7 @@ function renderScorePreview(state = scorePublicState()) {
     ${state.showSpeed !== false ? `<div class="score-preview-extra">${escapeHtml(predictionText)}</div>` : ''}`;
 }
 function scoreStatusLabel(status) {
+  if (status === 'prestart') return 'CHUẨN BỊ';
   if (status === 'running') return 'ĐANG CHẠY';
   if (status === 'grace') return 'ĐANG CHỜ QUÀ TRỄ';
   if (status === 'success') return 'THÀNH CÔNG';
@@ -5035,6 +5180,10 @@ function applyScoreSettingsUi() {
   if (els.scoreSeconds) els.scoreSeconds.value = cfg.seconds ?? 0;
   if (els.scoreDelay) els.scoreDelay.value = cfg.delaySeconds ?? 5;
   if (els.scoreTarget) els.scoreTarget.value = cfg.target ?? 30000;
+  renderScoreMemberSelectors();
+  if (els.scoreMemberGroup) els.scoreMemberGroup.value = cfg.memberGroupId || '';
+  renderScoreMemberSelectors();
+  if (els.scoreMember) els.scoreMember.value = cfg.memberId || '';
   if (els.scoreContent) els.scoreContent.value = cfg.content || 'Kêu gọi điểm ĐẬU';
   if (els.scoreCreatorName) els.scoreCreatorName.value = cfg.creatorName || 'Creator';
   if (els.scoreCreatorAvatar) els.scoreCreatorAvatar.value = cfg.creatorAvatar || '';
@@ -5045,12 +5194,11 @@ function applyScoreSettingsUi() {
   if (els.scoreBarColor2) els.scoreBarColor2.value = cfg.barColor2 || '#ff8ed1';
   if (els.scoreWaveColor) els.scoreWaveColor.value = cfg.waveColor || '#ffffff';
   if (els.scoreBigGiftThreshold) els.scoreBigGiftThreshold.value = cfg.bigGiftThreshold ?? 500;
-  if (els.scoreAutoResetSeconds) els.scoreAutoResetSeconds.value = cfg.autoResetSeconds ?? 0;
+  if (els.scorePrepSeconds) els.scorePrepSeconds.value = cfg.prepSeconds ?? 3;
   if (els.scoreThemePreset) els.scoreThemePreset.value = cfg.themePreset || 'custom';
   if (els.scoreBarStyle) els.scoreBarStyle.value = cfg.barStyle || 'pill';
   if (els.scoreOverlaySize) els.scoreOverlaySize.value = cfg.overlaySize || 'medium';
   if (els.scoreCustomMilestones) els.scoreCustomMilestones.value = cfg.customMilestones || '';
-  if (els.scoreAutoHideSeconds) els.scoreAutoHideSeconds.value = cfg.autoHideSeconds ?? 0;
   if (els.scoreShowGiftUser) els.scoreShowGiftUser.checked = cfg.showGiftUser !== false;
   if (els.scoreShowMissing) els.scoreShowMissing.checked = cfg.showMissing !== false;
   if (els.scoreShowTopUsers) els.scoreShowTopUsers.checked = cfg.showTopUsers !== false;
@@ -5058,7 +5206,6 @@ function applyScoreSettingsUi() {
   if (els.scoreCompactMode) els.scoreCompactMode.checked = !!cfg.compactMode;
   if (els.scoreHideAvatar) els.scoreHideAvatar.checked = !!cfg.hideAvatar;
   if (els.scoreHideCreator) els.scoreHideCreator.checked = !!cfg.hideCreator;
-  if (els.scoreShowOnlyActive) els.scoreShowOnlyActive.checked = !!cfg.showOnlyActive;
   if (els.scoreStartSoundLabel) els.scoreStartSoundLabel.value = cfg.startSoundName || '';
   if (els.scoreWarningSoundLabel) els.scoreWarningSoundLabel.value = cfg.warningSoundName || '';
   if (els.scoreGoalSoundLabel) els.scoreGoalSoundLabel.value = cfg.goalSoundName || '';
@@ -5098,6 +5245,12 @@ function applyScoreThemePreset() {
 }
 function scoreTick() {
   const now = Date.now();
+  if (scoreState.status === 'prestart') {
+    const remainingPrep = scoreState.prepEndAt - now;
+    const secondsLeft = Math.ceil(remainingPrep / 1000);
+    scoreState.timeText = secondsLeft > 0 ? String(secondsLeft) : 'BẮT ĐẦU';
+    if (remainingPrep <= -450) scoreBeginRunning(now);
+  }
   if (scoreState.status === 'running') {
     const remaining = scoreState.endAt - now;
     scoreState.timeText = formatScoreTime(remaining);
@@ -5113,10 +5266,20 @@ function scoreTick() {
     if (remainingDelay <= 0) setScoreStatus(scoreState.score >= scoreState.target ? 'success' : 'failed');
   }
   pushScoreState();
-  if (!['running', 'grace'].includes(scoreState.status) && scoreTimer) {
+  if (!['prestart', 'running', 'grace'].includes(scoreState.status) && scoreTimer) {
     clearInterval(scoreTimer);
     scoreTimer = null;
   }
+}
+
+function scoreBeginRunning(now = Date.now()) {
+  const durationMs = scoreState.durationMs || scoreDurationMs(scoreReadConfig());
+  scoreState.status = 'running';
+  scoreState.runStartedAt = now;
+  scoreState.endAt = now + durationMs;
+  scoreState.delayEndAt = now + durationMs + (scoreState.delayMs || 0);
+  scoreState.timeText = formatScoreTime(durationMs);
+  playScoreCue('start');
 }
 function scoreStart() {
   if (!isConnected) {
@@ -5129,26 +5292,29 @@ function scoreStart() {
   const now = Date.now();
   const durationMs = scoreDurationMs(cfg);
   const delayMs = cfg.delaySeconds * 1000;
+  const prepMs = Math.max(0, Number(cfg.prepSeconds) || 0) * 1000;
   scoreCountedEventKeys.clear();
   if (scoreAutoResetTimer) clearTimeout(scoreAutoResetTimer);
   scoreResultSoundPlayed = false;
   scoreWarningSoundPlayed = false;
   scoreGoalSoundPlayed = false;
-  playScoreCue('start');
   scoreState = {
     ...scoreState,
-    status: 'running',
+    status: prepMs > 0 ? 'prestart' : 'running',
     target: cfg.target,
     durationMs,
     delayMs,
     startedAt: now,
-    endAt: now + durationMs,
-    delayEndAt: now + durationMs + delayMs,
+    runStartedAt: prepMs > 0 ? 0 : now,
+    prepEndAt: now + prepMs,
+    endAt: prepMs > 0 ? 0 : now + durationMs,
+    delayEndAt: prepMs > 0 ? 0 : now + durationMs + delayMs,
     resultAt: 0,
     lastAdd: 0,
     lastAddUser: '',
-    timeText: formatScoreTime(durationMs),
+    timeText: prepMs > 0 ? String(Math.ceil(prepMs / 1000)) : formatScoreTime(durationMs),
   };
+  if (!prepMs) playScoreCue('start');
   if (scoreTimer) clearInterval(scoreTimer);
   scoreTimer = setInterval(scoreTick, 250);
   scoreTick();
@@ -5166,6 +5332,10 @@ function scoreReset() {
   scoreState.score = 0;
   scoreState.lastAdd = 0;
   scoreState.lastAddUser = '';
+  scoreState.runStartedAt = 0;
+  scoreState.prepEndAt = 0;
+  scoreState.endAt = 0;
+  scoreState.delayEndAt = 0;
   setScoreStatus('idle');
   scoreResultSoundPlayed = false;
   scoreWarningSoundPlayed = false;
@@ -5220,11 +5390,18 @@ function scoreHandleGift(ev) {
   if (scoreCountedEventKeys.size > 1200) scoreCountedEventKeys.clear();
   scoreAdd(giftDiamondPointsFromEvent(ev), ev);
 }
-['scoreHours','scoreMinutes','scoreSeconds','scoreDelay','scoreTarget','scoreContent','scoreCreatorName','scoreCreatorAvatar','scoreTimeColor','scoreContentColor','scoreOverColor','scoreBarColor1','scoreBarColor2','scoreWaveColor','scoreBigGiftThreshold','scoreAutoResetSeconds','scoreThemePreset','scoreBarStyle','scoreOverlaySize','scoreCustomMilestones','scoreAutoHideSeconds','scoreShowGiftUser','scoreShowMissing','scoreShowTopUsers','scoreShowSpeed','scoreCompactMode','scoreHideAvatar','scoreHideCreator','scoreShowOnlyActive'].forEach(id => {
+['scoreHours','scoreMinutes','scoreSeconds','scoreDelay','scoreTarget','scoreMemberGroup','scoreMember','scoreContent','scoreCreatorName','scoreCreatorAvatar','scoreTimeColor','scoreContentColor','scoreOverColor','scoreBarColor1','scoreBarColor2','scoreWaveColor','scoreBigGiftThreshold','scorePrepSeconds','scoreThemePreset','scoreBarStyle','scoreOverlaySize','scoreCustomMilestones','scoreShowGiftUser','scoreShowMissing','scoreShowTopUsers','scoreShowSpeed','scoreCompactMode','scoreHideAvatar','scoreHideCreator'].forEach(id => {
   const el = els[id];
   if (el) el.addEventListener('change', id === 'scoreThemePreset' ? applyScoreThemePreset : persistScoreConfig);
   if (el && ['scoreContent','scoreCreatorName','scoreCreatorAvatar','scoreTimeColor','scoreContentColor','scoreOverColor','scoreBarColor1','scoreBarColor2','scoreWaveColor','scoreCustomMilestones'].includes(id)) el.addEventListener('input', () => { persistScoreConfig(); });
 });
+if (els.scoreMemberGroup) {
+  els.scoreMemberGroup.addEventListener('change', () => {
+    renderScoreMemberSelectors();
+    persistScoreConfig();
+  });
+}
+if (els.scoreMember) els.scoreMember.addEventListener('change', applyScoreSelectedMember);
 function scoreEnsureTestRunning() {
   if (['running', 'grace'].includes(scoreState.status)) return;
   const cfg = scoreReadConfig();
@@ -5232,7 +5409,7 @@ function scoreEnsureTestRunning() {
   scoreResultSoundPlayed = false;
   scoreWarningSoundPlayed = false;
   scoreGoalSoundPlayed = false;
-  scoreState = { ...scoreState, status: 'running', target: cfg.target, durationMs: scoreDurationMs(cfg), delayMs: cfg.delaySeconds * 1000, startedAt: now, endAt: now + scoreDurationMs(cfg), delayEndAt: now + scoreDurationMs(cfg) + cfg.delaySeconds * 1000, resultAt: 0, timeText: formatScoreTime(scoreDurationMs(cfg)) };
+  scoreState = { ...scoreState, status: 'running', target: cfg.target, durationMs: scoreDurationMs(cfg), delayMs: cfg.delaySeconds * 1000, startedAt: now, runStartedAt: now, prepEndAt: 0, endAt: now + scoreDurationMs(cfg), delayEndAt: now + scoreDurationMs(cfg) + cfg.delaySeconds * 1000, resultAt: 0, timeText: formatScoreTime(scoreDurationMs(cfg)) };
   if (scoreTimer) clearInterval(scoreTimer);
   scoreTimer = setInterval(scoreTick, 250);
 }
@@ -5301,6 +5478,7 @@ function openGroupEditDialog(grp) {
   document.getElementById('grpDlgName').value = grp.name || '';
   document.getElementById('grpDlgBigoId').value = grp.bigoId || '';
   document.getElementById('grpDlgBgmLabel').value = editingGrpBgmName;
+  renderGroupMemberPicker(grp);
   groupEditDialog.showModal();
 }
 
@@ -5335,12 +5513,15 @@ if (grpDlgSave) {
     if (dup) { e.preventDefault(); alert(`Đã có nhóm "${dup.name}" - tên trùng (không phân biệt hoa/thường)`); return; }
     grp.name = newName;
     grp.bigoId = document.getElementById('grpDlgBigoId').value.trim();
+    grp.memberIds = Array.from(document.querySelectorAll('#grpDlgMembers input[type="checkbox"]:checked')).map(input => input.value);
     grp.bgmFile = editingGrpBgmFile;
     grp.bgmFileName = editingGrpBgmName;
     await persistMapping();
     renderGiftTable();
     renderSettingsGroupsList();
     applyActiveBgm();
+    renderScoreMemberSelectors();
+    renderGiftTable();
   };
 }
 
@@ -5395,6 +5576,7 @@ function renderSettingsGroupsList() {
     <div class="gls-row" data-gid="${g.id}">
       <span class="name">${escapeHtml(g.name)}${g.isCommon ? ' <span style="color:#ffd166">⭐</span>' : ''}</span>
       <span class="count">${(g.items || []).length} mục</span>
+      <span class="count member-count">${getGroupMembers(g).length} thành viên</span>
       ${g.isCommon ? '' : `<button class="tiny" data-glsact="rename" data-gid="${g.id}" title="Đổi tên">✏️</button>`}
       ${g.isCommon ? '' : `<button class="tiny danger" data-glsact="del" data-gid="${g.id}" title="Xoá (items về NHÓM CHUNG)">🗑</button>`}
     </div>

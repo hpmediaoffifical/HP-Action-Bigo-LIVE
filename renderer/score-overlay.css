@@ -4,6 +4,7 @@ html, body { margin:0; width:100%; height:100%; background:transparent; overflow
 .score-obs.size-small { width:min(560px,96vw); }
 .score-obs.size-large { width:min(920px,98vw); }
 .score-time { margin:0 0 7px; color:var(--score-time-color,#fff); font-size:29px; font-weight:900; letter-spacing:.02em; text-align:center; }
+.status-prestart .score-time { font-size:46px; color:#ffd166; animation:scorePrepPulse .72s ease-in-out infinite; }
 .size-small .score-time { font-size:23px; }
 .size-large .score-time { font-size:36px; }
 .score-bar { --score-pct:0%; position:relative; height:30px; border-radius:999px; overflow:hidden; background:linear-gradient(180deg,rgba(130,130,130,.72),rgba(62,62,62,.78)); border:1px solid rgba(255,255,255,.24); box-shadow:0 8px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.15); }
@@ -67,6 +68,7 @@ html, body { margin:0; width:100%; height:100%; background:transparent; overflow
 @keyframes scoreAddFlash { 0%, 70% { opacity:0; transform:scale(.8); } 78% { opacity:.95; transform:scale(1.2); } 100% { opacity:0; transform:scale(1.8); } }
 @keyframes scoreUrgentBlink { 0%,100% { opacity:1; } 50% { opacity:.45; } }
 @keyframes scoreUrgentShake { 0%,100% { transform:translateX(0); } 25% { transform:translateX(-1px); } 75% { transform:translateX(1px); } }
+@keyframes scorePrepPulse { 0%,100% { transform:scale(.9); opacity:.72; text-shadow:0 2px 4px rgba(0,0,0,.75); } 50% { transform:scale(1.18); opacity:1; text-shadow:0 0 18px rgba(255,209,102,.75), 0 2px 4px rgba(0,0,0,.75); } }
 @keyframes scoreSuccessGlow { 0%,100% { box-shadow:0 0 0 1px rgba(255,255,255,.45), 0 0 16px rgba(255,82,174,.45), 0 0 30px rgba(104,210,255,.36), 0 0 44px rgba(255,218,95,.3), inset 0 1px 0 rgba(255,255,255,.3); } 50% { box-shadow:0 0 0 2px rgba(255,255,255,.82), 0 0 22px rgba(255,82,174,.72), 0 0 42px rgba(104,210,255,.58), 0 0 60px rgba(255,218,95,.48), inset 0 1px 0 rgba(255,255,255,.38); } }
 @keyframes scoreSuccessHue { from { filter:hue-rotate(0deg) saturate(1.08); } to { filter:hue-rotate(360deg) saturate(1.08); } }
 @keyframes scoreRunner { from { transform:translateX(-1px) scaleX(-1) rotate(-4deg); } to { transform:translateX(3px) scaleX(-1) rotate(4deg); } }

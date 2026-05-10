@@ -7,6 +7,12 @@ function escapeHtml(s) {
 function fmt(n) {
   return Math.max(0, Math.floor(Number(n) || 0)).toLocaleString('en-US');
 }
+function scoreStatusText(status, timeText) {
+  if (status === 'prestart') return timeText || 'CHUẨN BỊ';
+  if (status === 'success') return 'THÀNH CÔNG';
+  if (status === 'failed') return 'KHÔNG HOÀN THÀNH';
+  return timeText || '03:00';
+}
 function render(state = {}) {
   const target = Math.max(1, Number(state.target) || 1);
   const score = Math.max(0, Number(state.score) || 0);
@@ -18,7 +24,7 @@ function render(state = {}) {
   const avatar = state.creatorAvatar || '';
   const creator = state.creatorName || 'Creator';
   const content = state.content || 'Kêu gọi điểm ĐẬU';
-  const statusText = status === 'success' ? 'THÀNH CÔNG' : (status === 'failed' ? 'KHÔNG HOÀN THÀNH' : (state.timeText || '03:00'));
+  const statusText = scoreStatusText(status, state.timeText);
   const activeRunner = ['running', 'grace'].includes(status) && !!state.lastAdd;
   const runnerUser = state.showGiftUser !== false && state.lastAddUser ? `${state.lastAddUser} ` : '';
   const runnerPoints = state.lastAdd ? `+${fmt(state.lastAdd)}` : '';
@@ -30,7 +36,7 @@ function render(state = {}) {
   const milestones = milestoneValues.map(v => `<span class="score-marker ${score >= v ? 'reached' : ''}" style="left:${Math.max(0, Math.min(100, (v / target) * 100))}%"></span>`).join('');
   const topUsers = Array.isArray(state.topUsers) ? state.topUsers : [];
   const topText = topUsers.length ? topUsers.map(u => `${escapeHtml(u.user || '?')} ${fmt(u.points)}`).join(' | ') : '';
-  const elapsedMs = state.startedAt ? Math.max(0, Date.now() - Number(state.startedAt)) : 0;
+  const elapsedMs = state.runStartedAt ? Math.max(0, Date.now() - Number(state.runStartedAt)) : 0;
   const avgPerMin = elapsedMs > 5000 ? Math.round(score / (elapsedMs / 60000)) : 0;
   const projected = avgPerMin && remainingMs ? Math.round(score + avgPerMin * (remainingMs / 60000)) : 0;
   const predictionText = avgPerMin ? (projected >= target ? 'Dự kiến đạt' : 'Cần tăng tốc') : 'Đang tính tốc độ';
