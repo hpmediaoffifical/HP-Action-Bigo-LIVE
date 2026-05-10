@@ -3,6 +3,7 @@ const wrap = document.getElementById('wrap');
 let cfg = { items: [], orientation: 'horizontal', labelPosition: 'bottom' };
 const state = new Map();
 let activeIds = new Set();
+const nodes = new Map();
 
 function keyForGift(ev) {
   if (ev.gift_id != null) return 'id:' + String(ev.gift_id);
@@ -69,7 +70,7 @@ function nameClass(name) {
   if (mode === 'marquee' && String(name || '').length > 9) return ' marquee';
   return '';
 }
-function render() {
+function applyLayoutStyles() {
   wrap.className = cfg.orientation === 'vertical' ? 'vertical' : '';
   wrap.classList.toggle('gray-inactive', !!cfg.grayInactive);
   wrap.classList.toggle('grid-mode', Array.isArray(cfg.slots) && cfg.slots.length > 0);
@@ -93,32 +94,120 @@ function render() {
   wrap.style.setProperty('--top-safe', `${12 + (cfg.enlargeActive ? Math.ceil(iconSize * Math.max(0, activeScale - 1)) : 0)}px`);
   wrap.classList.toggle('uppercase', !!cfg.uppercase);
   wrap.classList.toggle('hide-name', cfg.showName === false);
-  wrap.innerHTML = orderedSlotsForDisplay().map((item, idx) => {
-    if (item.visible === false || (!item.itemId && !item.id)) {
-      return `<div class="gift empty" data-slot="${idx}"></div>`;
+}
+function nodeKey(item, idx) {
+  if (Array.isArray(cfg.slots) && cfg.slots.length) return `slot:${item.index ?? idx}`;
+  return `item:${item.itemId || item.id || idx}`;
+}
+function ensureChild(parent, selector, className, tagName = 'div') {
+  let el = parent.querySelector(selector);
+  if (!el) {
+    el = document.createElement(tagName);
+    if (className) el.className = className;
+  }
+  return el;
+}
+function updateGiftNode(el, item, idx) {
+  const itemId = item.itemId || item.id || '';
+  const empty = item.visible === false || !itemId;
+  el.dataset.slot = String(item.index ?? idx);
+  if (empty) {
+    el.className = 'gift empty';
+    el.removeAttribute('data-id');
+    el.replaceChildren();
+    return;
+  }
+  const st = state.get(itemId) || { count: 0 };
+  const icon = iconSrc(item);
+  const labelPosition = ['top', 'bottom', 'left', 'right'].includes(cfg.labelPosition) ? cfg.labelPosition : 'bottom';
+  const name = item.name || '';
+  const slotNumber = String(item.number || '').trim();
+  const isActive = activeIds.has(itemId);
+  el.className = [
+    'gift',
+    `label-${labelPosition}`,
+    isActive ? 'active' : '',
+    cfg.enlargeActive && isActive ? 'enlarged' : '',
+  ].filter(Boolean).join(' ');
+  el.dataset.id = itemId;
+
+  const iconWrap = ensureChild(el, ':scope > .icon-wrap', 'icon-wrap');
+  let img = iconWrap.querySelector(':scope > img');
+  let placeholder = iconWrap.querySelector(':scope > .icon-placeholder');
+  if (icon) {
+    if (!img) {
+      img = document.createElement('img');
+      iconWrap.prepend(img);
     }
-    const itemId = item.itemId || item.id;
-    const st = state.get(itemId) || { count: 0 };
-    const icon = iconSrc(item);
-    const labelPosition = ['top', 'bottom', 'left', 'right'].includes(cfg.labelPosition) ? cfg.labelPosition : 'bottom';
-    const name = item.name || '';
-    const slotNumber = String(item.number || '').trim();
-    const isActive = activeIds.has(itemId);
-    const classes = [
-      'gift',
-      `label-${labelPosition}`,
-      isActive ? 'active' : '',
-      cfg.enlargeActive && isActive ? 'enlarged' : '',
-    ].filter(Boolean).join(' ');
-    return `<div class="${classes}" data-id="${escapeHtml(itemId)}">
-      <div class="icon-wrap">
-        ${icon ? `<img src="${escapeHtml(icon)}" />` : '<div style="width:50px;height:50px"></div>'}
-        ${st.count ? `<div class="count">${Number(st.count).toLocaleString('en-US')}</div>` : ''}
-      </div>
-      ${slotNumber ? `<div class="slot-number">${escapeHtml(slotNumber)}</div>` : ''}
-      ${cfg.showName === false ? '' : `<div class="name${nameClass(name)}"><span>${escapeHtml(name)}</span></div>`}
-    </div>`;
-  }).join('');
+    if (img.getAttribute('src') !== icon) img.setAttribute('src', icon);
+    if (placeholder) placeholder.remove();
+  } else {
+    if (img) img.remove();
+    if (!placeholder) {
+      placeholder = document.createElement('div');
+      placeholder.className = 'icon-placeholder';
+      placeholder.style.cssText = 'width:50px;height:50px';
+      iconWrap.prepend(placeholder);
+    }
+  }
+
+  let count = iconWrap.querySelector(':scope > .count');
+  if (st.count && cfg.showCount !== false) {
+    if (!count) {
+      count = document.createElement('div');
+      count.className = 'count';
+      iconWrap.append(count);
+    }
+    count.textContent = Number(st.count).toLocaleString('en-US');
+  } else if (count) {
+    count.remove();
+  }
+
+  let slot = el.querySelector(':scope > .slot-number');
+  if (slotNumber) {
+    if (!slot) slot = document.createElement('div');
+    slot.className = 'slot-number';
+    slot.textContent = slotNumber;
+    el.append(slot);
+  } else if (slot) {
+    slot.remove();
+  }
+
+  let nameEl = el.querySelector(':scope > .name');
+  if (cfg.showName !== false) {
+    if (!nameEl) {
+      nameEl = document.createElement('div');
+      nameEl.append(document.createElement('span'));
+    }
+    nameEl.className = `name${nameClass(name)}`;
+    nameEl.querySelector('span').textContent = name;
+    el.append(nameEl);
+  } else if (nameEl) {
+    nameEl.remove();
+  }
+
+  el.prepend(iconWrap);
+}
+function render() {
+  applyLayoutStyles();
+  const used = new Set();
+  orderedSlotsForDisplay().forEach((item, idx) => {
+    const key = nodeKey(item, idx);
+    used.add(key);
+    let el = nodes.get(key);
+    if (!el) {
+      el = document.createElement('div');
+      nodes.set(key, el);
+    }
+    updateGiftNode(el, item, idx);
+    wrap.append(el);
+  });
+  for (const [key, el] of nodes) {
+    if (!used.has(key)) {
+      el.remove();
+      nodes.delete(key);
+    }
+  }
 }
 const es = new EventSource(`/gameplay-events?token=${encodeURIComponent(token)}`);
 es.addEventListener('config', e => {

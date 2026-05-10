@@ -1,8 +1,8 @@
 html, body { margin:0; width:100%; height:100%; background:transparent; overflow:hidden; font-family:'Segoe UI', Arial, sans-serif; }
-.score-obs { width:min(760px,96vw); padding:8px 12px 10px; color:#fff; text-shadow:0 2px 4px rgba(0,0,0,.75); box-sizing:border-box; }
+.score-obs { width:min(620px,96vw); margin:0 auto; padding:8px 12px 10px; color:#fff; text-shadow:0 2px 4px rgba(0,0,0,.75); box-sizing:border-box; }
 .score-obs.hidden { display:none; }
-.score-obs.size-small { width:min(560px,96vw); }
-.score-obs.size-large { width:min(920px,98vw); }
+.score-obs.size-small { width:min(480px,96vw); }
+.score-obs.size-large { width:min(760px,98vw); }
 .score-time { margin:0 0 7px; color:var(--score-time-color,#fff); font-size:29px; font-weight:900; letter-spacing:.02em; text-align:center; }
 .status-prestart .score-time { font-size:46px; color:#ffd166; animation:scorePrepPulse .72s ease-in-out infinite; }
 .size-small .score-time { font-size:23px; }
@@ -48,10 +48,10 @@ html, body { margin:0; width:100%; height:100%; background:transparent; overflow
 .score-marker.reached { background:#fff; box-shadow:0 0 10px #fff; }
 .score-sub { margin-top:5px; text-align:center; color:#fff; font-size:16px; font-weight:900; }
 .score-flag { position:absolute; right:5px; top:50%; transform:translateY(-50%); z-index:3; width:26px; height:26px; display:grid; place-items:center; border-radius:50%; background:#c03e85; border:2px solid rgba(255,255,255,.7); font-size:16px; }
-.score-meta { display:grid; grid-template-columns:30px auto minmax(180px,1fr) auto; gap:10px; align-items:center; margin-top:8px; font-size:18px; font-weight:800; }
-.score-avatar { width:30px; height:30px; display:grid; place-items:center; border-radius:50%; overflow:hidden; background:rgba(0,0,0,.38); border:1px solid rgba(255,255,255,.55); font-size:15px; }
+.score-meta { display:grid; grid-template-columns:36px auto minmax(150px,1fr) auto; gap:10px; align-items:center; margin-top:8px; font-size:20px; font-weight:800; }
+.score-avatar { width:36px; height:36px; display:grid; place-items:center; border-radius:50%; overflow:hidden; background:rgba(0,0,0,.38); border:1px solid rgba(255,255,255,.55); font-size:18px; }
 .score-avatar img { width:100%; height:100%; object-fit:cover; }
-.score-creator { max-width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.score-creator { max-width:170px; font-size:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .score-content { justify-self:center; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--score-content-color,#f0eef6); font-size:21px; font-weight:950; text-align:center; }
 .score-points { white-space:nowrap; font-size:18px; }
 .score-extra { margin-top:4px; color:#d5dae7; font-size:13px; font-weight:800; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

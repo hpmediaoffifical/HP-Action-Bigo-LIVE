@@ -219,7 +219,10 @@ class ObsOverlayServer {
   _serveGiftIcon(reqUrl, res) {
     const typeid = decodeURIComponent(reqUrl.pathname.split('/')[2] || '');
     if (!/^\d+$/.test(typeid)) return this._reject(res, 404, 'icon not found');
-    this._serveFile(path.join(this.root, 'assets', 'gift-icons', `${typeid}.png`), res);
+    const filePath = path.join(this.root, 'assets', 'gift-icons', `${typeid}.png`);
+    if (!fs.existsSync(filePath)) return this._reject(res, 404, 'icon not found');
+    res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400, immutable', 'X-Content-Type-Options': 'nosniff' });
+    fs.createReadStream(filePath).pipe(res);
   }
 
   _handleEvent(reqUrl, req, res) {
