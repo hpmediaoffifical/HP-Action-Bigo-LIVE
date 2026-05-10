@@ -33,6 +33,7 @@
       <button class="tab sidebar-tab" data-tab="gifts" title="BẢNG QUÀ" aria-label="BẢNG QUÀ">🎁</button>
       <button class="tab sidebar-tab" data-tab="gameplay" title="GROUP DANCE" aria-label="GROUP DANCE">👯</button>
       <button class="tab sidebar-tab" data-tab="ranking" title="BẢNG XẾP HẠNG" aria-label="BẢNG XẾP HẠNG">👑</button>
+      <button class="tab sidebar-tab" data-tab="pkduo" title="PK ĐÔI" aria-label="PK ĐÔI">⚔️</button>
       <button class="tab sidebar-tab" data-tab="score" title="TÍNH ĐIỂM" aria-label="TÍNH ĐIỂM">🎯</button>
       <button class="tab sidebar-tab" data-tab="overlays" title="OVERLAY" aria-label="OVERLAY">🪟</button>
       <button class="tab sidebar-tab" data-tab="special" title="ĐẶC BIỆT" aria-label="ĐẶC BIỆT">✨</button>
@@ -374,6 +375,74 @@
             <div id="rankingGridPreviewSection">
               <h3 class="gameplay-section-title ranking-grid-preview-title">Review BXH ngang / lưới</h3>
               <div id="rankingGridPreview" class="ranking-grid-board-preview"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================== TAB: PK DUO =================== -->
+    <section class="tab-panel" data-tab="pkduo">
+      <div class="panel pkduo-panel">
+        <div class="panel-head">
+          <h2>⚔️ PK ĐÔI</h2>
+          <div style="display:flex;gap:8px">
+            <button id="btnPkDuoSave" class="primary">💾 LƯU</button>
+            <button id="btnPkDuoCopyUrl" class="primary">🔗 Copy link OBS</button>
+          </div>
+        </div>
+        <div class="pkduo-monitor">
+          <h3 class="gameplay-section-title">Review PK ĐÔI</h3>
+          <div id="pkDuoPreview" class="pkduo-preview"></div>
+        </div>
+        <div class="pkduo-layout">
+          <div class="pkduo-controls">
+            <div class="pkduo-actions">
+              <button id="btnPkDuoStart" class="primary" type="button">BẮT ĐẦU</button>
+              <button id="btnPkDuoStop" class="danger" type="button">DỪNG</button>
+              <button id="btnPkDuoReset" class="danger" type="button">RESET</button>
+              <span id="pkDuoStatus" class="pkduo-status">CHỜ</span>
+            </div>
+            <details class="score-config-group" open>
+              <summary>Trận đấu</summary>
+              <div class="pkduo-config-grid">
+                <label>Tiếng<input id="pkDuoHours" type="number" min="0" max="24" value="0" /></label>
+                <label>Phút<input id="pkDuoMinutes" type="number" min="0" max="59" value="1" /></label>
+                <label>Giây<input id="pkDuoSeconds" type="number" min="0" max="59" value="0" /></label>
+                <label>Chuẩn bị<input id="pkDuoPrepSeconds" type="number" min="0" max="120" value="10" /></label>
+                <label>Độ trễ (s)<input id="pkDuoDelaySeconds" type="number" min="0" max="120" value="5" /></label>
+                <label>Nội dung hiển thị<input id="pkDuoContent" value="Vui lòng chờ" /></label>
+                <label>Kích thước chữ <span id="pkDuoTextSizeVal">21px</span><input id="pkDuoTextSize" type="range" min="14" max="42" value="21" /></label>
+                <label class="pkduo-color-compact">Màu đội A<input id="pkDuoTeamAColor" type="color" value="#d8587c" /></label>
+                <label class="pkduo-color-compact">Màu đội B<input id="pkDuoTeamBColor" type="color" value="#6380ff" /></label>
+                <label class="pkduo-bg-control">Nền overlay
+                  <span class="pkduo-bg-editor"><input id="pkDuoBgColor" type="color" value="#000000" /><span>Độ đặc <b id="pkDuoBgOpacityVal">88%</b></span><input id="pkDuoBgOpacity" type="range" min="0" max="100" value="88" /></span>
+                </label>
+                <label>Kích thước quà <span id="pkDuoGiftSizeVal">46px</span><input id="pkDuoGiftSize" type="range" min="28" max="90" value="46" /></label>
+                <label class="ranking-toggle"><span>Chọn Phe</span><input id="pkDuoJoinMode" type="checkbox" /></label>
+              </div>
+            </details>
+            <details class="score-config-group">
+              <summary>Âm thanh</summary>
+              <div class="score-sound-grid pkduo-sound-grid">
+                <label>Âm thanh BẮT ĐẦU<div class="score-sound-row"><input id="pkDuoStartSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickStartSound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearStartSound" class="tiny danger">🗑</button></div></label>
+                <label>Âm thanh 10 GIÂY CUỐI<div class="score-sound-row"><input id="pkDuoWarningSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickWarningSound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearWarningSound" class="tiny danger">🗑</button></div></label>
+                <label>Âm thanh ĐỘI A THẮNG<div class="score-sound-row"><input id="pkDuoTeamASoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickTeamASound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearTeamASound" class="tiny danger">🗑</button></div></label>
+                <label>Âm thanh ĐỘI B THẮNG<div class="score-sound-row"><input id="pkDuoTeamBSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickTeamBSound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearTeamBSound" class="tiny danger">🗑</button></div></label>
+                <label>Âm thanh HÒA / KẾT THÚC<div class="score-sound-row"><input id="pkDuoDrawSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickDrawSound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearDrawSound" class="tiny danger">🗑</button></div></label>
+              </div>
+            </details>
+            <div class="pkduo-teams">
+              <div class="pkduo-team-card team-a">
+                <label>Tên đội A<input id="pkDuoTeamAName" value="ĐỘI A" /></label>
+                <div class="pkduo-team-title">Quà đội A</div>
+                <div id="pkDuoTeamAGifts" class="pkduo-gift-list"></div>
+              </div>
+              <div class="pkduo-team-card team-b">
+                <label>Tên đội B<input id="pkDuoTeamBName" value="ĐỘI B" /></label>
+                <div class="pkduo-team-title">Quà đội B</div>
+                <div id="pkDuoTeamBGifts" class="pkduo-gift-list"></div>
+              </div>
             </div>
           </div>
         </div>

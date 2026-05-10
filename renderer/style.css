@@ -1510,6 +1510,85 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 @keyframes rankingNameMarquee { 0%,12% { transform: translateX(0); } 88%,100% { transform: translateX(calc(-100% + 100px)); } }
 
+.pkduo-monitor { margin-bottom: 14px; padding: 12px; border: 1px solid #262a35; border-radius: 16px; background: #10131b; }
+.pkduo-layout { display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start; }
+.pkduo-controls { display: grid; gap: 12px; }
+.pkduo-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; padding: 12px; border: 1px solid #262a35; border-radius: 16px; background: #10131b; }
+.pkduo-actions button { min-width: 104px; height: 42px; font-weight: 950; }
+.pkduo-status { color: #ffd166; font-size: 13px; font-weight: 950; }
+.pkduo-config-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; padding: 12px; }
+.pkduo-config-grid label { display: grid; gap: 6px; color: #aeb6c7; font-size: 12px; font-weight: 800; }
+.pkduo-config-grid input:not([type="checkbox"]) { width: 100%; height: 42px; box-sizing: border-box; }
+.pkduo-teams { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.pkduo-team-card { display: grid; gap: 10px; padding: 12px; border: 1px solid #262a35; border-radius: 16px; background: #10131b; }
+.pkduo-team-card label { display: grid; gap: 6px; color: #d5dae7; font-size: 12px; font-weight: 850; }
+.pkduo-team-card input { width: 100%; height: 42px; box-sizing: border-box; }
+.pkduo-team-title { color: #ffd166; font-size: 14px; font-weight: 950; }
+.pkduo-gift-list { display: grid; gap: 8px; }
+.pkduo-gift-row { display: grid; grid-template-columns: minmax(0,1fr) 72px 48px; gap: 8px; }
+.pkduo-gift-picker { min-width: 0; height: 42px; display: grid; grid-template-columns: 30px minmax(0,1fr); gap: 8px; align-items: center; padding: 0 12px; border: 1px solid #303746; border-radius: 10px; background: #0f1118; color: #fff; text-align: left; }
+.pkduo-gift-picker img { width: 28px; height: 28px; object-fit: contain; }
+.pkduo-gift-picker b { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 700; }
+.pkduo-add-gift { height: 42px; border: 1px solid #303746; border-radius: 10px; background: #161a24; color: #fff; font-size: 28px; line-height: 1; }
+.pkduo-preview { overflow-x: auto; padding-bottom: 8px; }
+.pkduo-board { width: 594px; overflow: hidden; border-radius: 8px; background: rgba(var(--pk-bg),var(--pk-bg-opacity)); color: #fff; box-shadow: 0 12px 30px rgba(0,0,0,.35); text-shadow: 0 2px 4px rgba(0,0,0,.55); }
+.pkduo-head { display: grid; grid-template-columns: 1fr 1.2fr 1fr; align-items: center; gap: 8px; padding: 18px 16px 10px; font-size: var(--pk-text); font-weight: 950; }
+.pkduo-head span { text-align: center; font-size: calc(var(--pk-text) * .82); font-weight: 850; }
+.pkduo-head b:last-child { text-align: right; }
+.pkduo-gifts { display: grid; grid-template-columns: 1fr 3px 1fr; align-items: center; gap: 14px; padding: 18px 24px 26px; }
+.pkduo-gifts > div { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.pkduo-gifts > div:last-child { justify-content: flex-end; }
+.pkduo-gifts i { display: block; width: 3px; height: 34px; background: rgba(255,255,255,.46); }
+.pkduo-gift-icon { width: var(--pk-gift); height: var(--pk-gift); display: grid; place-items: center; font-size: calc(var(--pk-gift) * .7); }
+.pkduo-gift-icon img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0,0,0,.5)); }
+.pkduo-bar { position: relative; display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; height: 30px; overflow: hidden; background: linear-gradient(90deg,var(--pk-a) 0,var(--pk-a) var(--pk-a-width),var(--pk-b) var(--pk-a-width),var(--pk-b) 100%); }
+.pkduo-bar strong { z-index: 2; display: grid; place-items: center; height: 100%; padding: 0; font-size: 18px; font-weight: 950; text-align: center; }
+.pkduo-bar strong:last-child { text-align: right; }
+.pkduo-bar-a,.pkduo-bar-b { height: 100%; opacity: .22; }
+.pkduo-bar em { position: absolute; left: var(--pk-a-width); top: 50%; z-index: 4; display: grid; place-items: center; width: 46px; height: 30px; font-style: normal; font-size: 30px; font-weight: 950; line-height: 1; transform: translate(-50%,-50%); transition: left .25s ease; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)); }
+@media (max-width: 900px) { .pkduo-config-grid,.pkduo-teams { grid-template-columns: 1fr; } }
+.pkduo-picker-menu { width: 360px; max-width: calc(100vw - 16px); padding: 10px; }
+.pkduo-picker-search { width: 100%; height: 38px; margin-bottom: 8px; box-sizing: border-box; }
+.pkduo-picker-list { max-height: 420px; overflow: auto; display: grid; gap: 4px; }
+.pkduo-picker-list button { display: grid; grid-template-columns: 32px minmax(0,1fr) 58px; gap: 8px; align-items: center; min-height: 38px; padding: 4px 8px; border: 0; border-radius: 8px; background: transparent; color: #fff; text-align: left; }
+.pkduo-picker-list button:hover { background: rgba(255,255,255,.08); }
+.pkduo-picker-list img { width: 30px; height: 30px; object-fit: contain; }
+.pkduo-picker-list b { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pkduo-picker-list small { color: #8f98aa; text-align: right; }
+
+.pkduo-monitor { display: grid; justify-items: center; }
+.pkduo-monitor .gameplay-section-title { width: 100%; text-align: center; }
+.pkduo-preview { width: 100%; display: flex; justify-content: center; overflow-x: auto; padding: 4px 0 10px; }
+.pkduo-bg-control { grid-column: span 2; }
+.pkduo-bg-editor { display: grid; grid-template-columns: 46px auto minmax(110px,1fr); gap: 8px; align-items: center; min-height: 42px; padding: 6px 8px; border: 1px solid #303746; border-radius: 10px; background: #0f1118; }
+.pkduo-bg-editor input[type="color"] { width: 34px; height: 30px; padding: 0; border: 0; background: transparent; }
+.pkduo-bg-editor input[type="range"] { height: 24px; }
+.pkduo-bg-editor span { color: #aeb6c7; font-size: 11px; white-space: nowrap; }
+.pkduo-color-compact { max-width: 140px; }
+.pkduo-color-compact input[type="color"] { width: 54px; padding: 3px; justify-self: start; }
+.pkduo-board { width: 720px; border-radius: 9px; background: rgba(var(--pk-bg),var(--pk-bg-opacity)); }
+.pkduo-head { grid-template-columns: 1fr 1.3fr 1fr; padding: 20px 20px 8px; }
+.pkduo-head span { font-size: calc(var(--pk-text) * 1.15); font-weight: 950; letter-spacing: -.02em; }
+.pkduo-gifts { gap: 22px; padding: 20px 30px 28px; }
+.pkduo-gifts > div { gap: 14px; }
+.pkduo-gifts i { height: 38px; background: rgba(255,255,255,.45); }
+.pkduo-bar { grid-template-columns: 72px minmax(0,1fr) minmax(0,1fr) 72px; height: 36px; overflow: hidden; }
+.pkduo-bar strong { z-index: 5; font-size: 20px; background: transparent; }
+.pkduo-bar .score-a { grid-column: 1; }
+.pkduo-bar .score-b { grid-column: 4; }
+.pkduo-team-label { z-index: 2; min-width: 0; height: 100%; display: grid; place-items: center; padding: 0 38px; color: rgba(255,255,255,.32); font-size: 17px; font-weight: 950; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; animation: pkDuoWatermarkOnce 2.2s ease-out 1 both; }
+.pkduo-team-label.a { grid-column: 2; }
+.pkduo-team-label.b { grid-column: 3; }
+.pkduo-bar em { width: 62px; height: 38px; font-size: 0; pointer-events: none; animation: pkDuoBoostPush .75s ease-in-out infinite; }
+.pkduo-bar em img { width: 52px; height: auto; display: block; }
+.pkduo-bar em.flip img { transform: scaleX(-1); }
+.pkduo-board.status-prestart .pkduo-head span,.pkduo-board.urgent .pkduo-head span { animation: pkDuoBlink .5s ease-in-out infinite; color: #fff1a6; }
+.pkduo-board.urgent { box-shadow: 0 0 0 2px rgba(255,255,255,.15), 0 0 24px rgba(255,54,84,.45); }
+.pkduo-sound-grid { padding: 12px; }
+@keyframes pkDuoBlink { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(1.12); } }
+@keyframes pkDuoBoostPush { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(calc(-50% + 5px),-50%) scale(1.1); } }
+@keyframes pkDuoWatermarkOnce { 0% { opacity: 0; transform: translateY(2px); } 38% { opacity: .34; transform: translateY(0); } 100% { opacity: .2; transform: translateY(0); } }
+
 @keyframes scoreWaveTravel { 0%, 8% { transform: translate3d(0,0,0) skewX(-16deg); opacity: 0; } 14% { opacity: 1; } 82% { transform: translate3d(280%,0,0) skewX(-16deg); opacity: .95; } 90%, 100% { transform: translate3d(280%,0,0) skewX(-16deg); opacity: 0; } }
 @keyframes scoreAddFlash { 0%, 70% { opacity: 0; transform: scale(.8); } 78% { opacity: .95; transform: scale(1.2); } 100% { opacity: 0; transform: scale(1.8); } }
 @keyframes scoreUrgentBlink { 0%,100% { opacity: 1; } 50% { opacity: .45; } }

@@ -1553,6 +1553,7 @@ async function init() {
   renderRankingMemberSelectors();
   renderRankingEditor();
   pushRankingState();
+  renderPkDuo();
   // Chat font size slider — persist localStorage
   const chatFont = document.getElementById('chatFontSize');
   if (chatFont) {
@@ -3383,9 +3384,16 @@ function showContextMenu(x, y, items) {
   }, 0);
 }
 function removeContextMenu() {
+  document.removeEventListener('pointerdown', closePkDuoPickerOnPointer, true);
+  document.removeEventListener('contextmenu', closePkDuoPickerOnPointer, true);
   document.querySelectorAll('.ctx-menu').forEach(m => m.remove());
 }
 function escContextMenu(e) { if (e.key === 'Escape') removeContextMenu(); }
+function closePkDuoPickerOnPointer(e) {
+  const menu = document.querySelector('.pkduo-picker-menu');
+  if (!menu || menu.contains(e.target)) return;
+  removeContextMenu();
+}
 
 // =================== Received gifts (right panel) ===================
 const receivedGifts = [];
@@ -3423,6 +3431,7 @@ function addReceivedGift(ev) {
   renderReceivedGifts();
   forwardReceivedGiftsSnapshot();
   rankingHandleGift(ev);
+  pkDuoHandleGift(ev);
   scoreHandleGift(ev);
 }
 
@@ -3712,6 +3721,7 @@ let appSettings = {
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
   gameplay: { groupId: '', useCommonGroup: true, orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', slotNumberColor: '#ffffff', countColor: '#ffffff', countSize: 12, uppercase: false, showName: true, showCount: true, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] },
   ranking: { title: 'Ranking list', memberGroupId: '', rows: [], activeId: '', running: false, linkScoreTimer: true, roundSeconds: 60, streakSeconds: 12, streakColor: '#67e8f9', grayLosers: true, showRank: true, showAvatar: true, showGift: true, showRound: true, hideAllScores: false, rankStart: 1, rankEnd: 20, gridRows: 3, gridCols: 3, gridFlow: 'row', nameMode: 'two-line', overlayBgColor: '#2a2d37', overlayBgOpacity: 74, showVerticalPreview: true, showGridPreview: true, compactPreview: true },
+  pkDuo: { running: false, status: 'idle', prepSeconds: 10, delaySeconds: 5, durationSeconds: 60, endsAt: 0, teamA: { name: 'ĐỘI A', content: 'HP Media', color: '#d8587c', giftIds: ['', '', ''] }, teamB: { name: 'ĐỘI B', content: 'HP Media', color: '#6380ff', giftIds: ['', '', ''] }, scoreA: 0, scoreB: 0, joinMode: false, userTeams: {}, bgColor: '#000000', bgOpacity: 88, giftSize: 46, content: 'Vui lòng chờ', textSize: 21, startSound: '', startSoundName: '', warningSound: '', warningSoundName: '', teamASound: '', teamASoundName: '', teamBSound: '', teamBSoundName: '', drawSound: '', drawSoundName: '' },
   scoreVote: { hours: 0, minutes: 3, seconds: 0, delaySeconds: 5, target: 30000, memberGroupId: '', memberId: '', content: 'Kêu gọi điểm ĐẬU', creatorName: 'Creator', creatorAvatar: '', timeColor: '#ffffff', contentColor: '#f0eef6', overColor: '#ff0000', barColor1: '#b93678', barColor2: '#ff8ed1', waveColor: '#ffffff', bigGiftThreshold: 500, prepSeconds: 3, themePreset: 'custom', barStyle: 'pill', overlaySize: 'medium', customMilestones: '', showGiftUser: true, showMissing: true, showTopUsers: true, showSpeed: true, compactMode: false, hideAvatar: false, hideCreator: false, startSound: '', startSoundName: '', warningSound: '', warningSoundName: '', goalSound: '', goalSoundName: '', successSound: '', successSoundName: '', failSound: '', failSoundName: '' },
   // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
   specialEffects: {
@@ -3737,6 +3747,7 @@ async function saveAppSettings(patch) {
     if (patch.preFx) s.preFx = { ...(s.preFx || {}), ...patch.preFx };
     if (patch.gameplay) s.gameplay = { ...(s.gameplay || {}), ...patch.gameplay };
     if (patch.ranking) s.ranking = { ...(s.ranking || {}), ...patch.ranking };
+    if (patch.pkDuo) s.pkDuo = { ...(s.pkDuo || {}), ...patch.pkDuo };
     if (patch.scoreVote) s.scoreVote = { ...(s.scoreVote || {}), ...patch.scoreVote };
     if (patch.members) s.members = Array.isArray(patch.members) ? patch.members : [];
     if (patch.specialEffects) {
@@ -3821,6 +3832,7 @@ async function initAppSettings(s) {
   appSettings.gameplay = { ...appSettings.gameplay, ...(s.gameplay || {}) };
   appSettings.ranking = { ...appSettings.ranking, ...(s.ranking || {}) };
   appSettings.ranking.rows = Array.isArray(appSettings.ranking.rows) ? appSettings.ranking.rows : [];
+  appSettings.pkDuo = { ...appSettings.pkDuo, ...(s.pkDuo || {}) };
   appSettings.scoreVote = { ...appSettings.scoreVote, ...(s.scoreVote || {}) };
   appSettings.members = Array.isArray(s.members) ? s.members : [];
   // Migrate old clearGift → specialEffects.clearQueue (backward compat)
@@ -5242,6 +5254,404 @@ function wireRankingUi() {
   };
 }
 wireRankingUi();
+
+// =================== PK Đôi ===================
+let pkDuoTimer = null;
+let pkDuoWarningSoundPlayed = false;
+let pkDuoResultSoundPlayed = false;
+
+function pkDuoEls() {
+  return {
+    hours: $('pkDuoHours'), minutes: $('pkDuoMinutes'), seconds: $('pkDuoSeconds'), prep: $('pkDuoPrepSeconds'), delay: $('pkDuoDelaySeconds'), content: $('pkDuoContent'), textSize: $('pkDuoTextSize'), textSizeVal: $('pkDuoTextSizeVal'), bgColor: $('pkDuoBgColor'), bgOpacity: $('pkDuoBgOpacity'), bgOpacityVal: $('pkDuoBgOpacityVal'), giftSize: $('pkDuoGiftSize'), giftSizeVal: $('pkDuoGiftSizeVal'),
+    aName: $('pkDuoTeamAName'), bName: $('pkDuoTeamBName'), aColor: $('pkDuoTeamAColor'), bColor: $('pkDuoTeamBColor'), joinMode: $('pkDuoJoinMode'),
+    aGifts: $('pkDuoTeamAGifts'), bGifts: $('pkDuoTeamBGifts'), preview: $('pkDuoPreview'), status: $('pkDuoStatus'),
+    start: $('btnPkDuoStart'), stop: $('btnPkDuoStop'), reset: $('btnPkDuoReset'), save: $('btnPkDuoSave'), copy: $('btnPkDuoCopyUrl'),
+    startSoundLabel: $('pkDuoStartSoundLabel'), warningSoundLabel: $('pkDuoWarningSoundLabel'), teamASoundLabel: $('pkDuoTeamASoundLabel'), teamBSoundLabel: $('pkDuoTeamBSoundLabel'), drawSoundLabel: $('pkDuoDrawSoundLabel'),
+    pickStartSound: $('btnPkDuoPickStartSound'), clearStartSound: $('btnPkDuoClearStartSound'), pickWarningSound: $('btnPkDuoPickWarningSound'), clearWarningSound: $('btnPkDuoClearWarningSound'), pickTeamASound: $('btnPkDuoPickTeamASound'), clearTeamASound: $('btnPkDuoClearTeamASound'), pickTeamBSound: $('btnPkDuoPickTeamBSound'), clearTeamBSound: $('btnPkDuoClearTeamBSound'), pickDrawSound: $('btnPkDuoPickDrawSound'), clearDrawSound: $('btnPkDuoClearDrawSound'),
+  };
+}
+
+function normalizePkDuo() {
+  const p = appSettings.pkDuo || {};
+  const teamA = { ...(p.teamA || {}) };
+  const teamB = { ...(p.teamB || {}) };
+  const defaultGiftSlots = p.joinMode ? [''] : ['', '', ''];
+  const giftIdsA = Array.isArray(teamA.giftIds) && teamA.giftIds.length ? teamA.giftIds.slice(0, 12) : [...defaultGiftSlots];
+  const giftIdsB = Array.isArray(teamB.giftIds) && teamB.giftIds.length ? teamB.giftIds.slice(0, 12) : [...defaultGiftSlots];
+  return {
+    running: !!p.running,
+    status: ['idle','prestart','running','finished'].includes(p.status) ? p.status : 'idle',
+    prepSeconds: Math.max(0, Math.min(120, parseInt(p.prepSeconds, 10) || 0)),
+    delaySeconds: Math.max(0, Math.min(120, parseInt(p.delaySeconds, 10) || 5)),
+    durationSeconds: Math.max(5, Math.min(7200, parseInt(p.durationSeconds, 10) || 60)),
+    endsAt: Math.max(0, Number(p.endsAt) || 0),
+    scoreA: Math.max(0, Math.round(Number(p.scoreA) || 0)),
+    scoreB: Math.max(0, Math.round(Number(p.scoreB) || 0)),
+    joinMode: !!p.joinMode,
+    userTeams: p.userTeams && typeof p.userTeams === 'object' ? p.userTeams : {},
+    bgColor: /^#[0-9a-f]{6}$/i.test(String(p.bgColor || '')) ? p.bgColor : '#000000',
+    bgOpacity: Math.max(0, Math.min(100, parseInt(p.bgOpacity, 10) || 88)),
+    giftSize: Math.max(28, Math.min(90, parseInt(p.giftSize, 10) || 46)),
+    content: String(p.content || 'Vui lòng chờ').trim() || 'Vui lòng chờ',
+    textSize: Math.max(14, Math.min(42, parseInt(p.textSize, 10) || 21)),
+    startSound: String(p.startSound || ''), startSoundName: String(p.startSoundName || ''),
+    warningSound: String(p.warningSound || ''), warningSoundName: String(p.warningSoundName || ''),
+    teamASound: String(p.teamASound || ''), teamASoundName: String(p.teamASoundName || ''),
+    teamBSound: String(p.teamBSound || ''), teamBSoundName: String(p.teamBSoundName || ''),
+    drawSound: String(p.drawSound || ''), drawSoundName: String(p.drawSoundName || ''),
+    teamA: { name: String(teamA.name || 'ĐỘI A').trim() || 'ĐỘI A', color: /^#[0-9a-f]{6}$/i.test(String(teamA.color || '')) ? teamA.color : '#d8587c', giftIds: giftIdsA },
+    teamB: { name: String(teamB.name || 'ĐỘI B').trim() || 'ĐỘI B', color: /^#[0-9a-f]{6}$/i.test(String(teamB.color || '')) ? teamB.color : '#6380ff', giftIds: giftIdsB },
+  };
+}
+
+function pkDuoGiftCanonicalId(itemId) {
+  const id = String(itemId || '');
+  if (!id) return '';
+  if (id.startsWith('master:')) return `id:${id.slice(7)}`;
+  const found = findItemById(id)?.item;
+  const iconId = getGameplayItemIconId(found);
+  return iconId ? `id:${iconId}` : `item:${id}`;
+}
+
+function pkDuoGiftCatalog() {
+  const items = [];
+  const seen = new Set();
+  for (const g of (masterFullList || [])) {
+    const id = `master:${g.typeid}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    items.push({ id, name: g.gift_name || g.name || `Gift ${g.typeid}`, icon: g.localIcon || g.icon || g.img_url || '', iconId: String(g.typeid || ''), source: 'master' });
+  }
+  for (const item of rankingGiftItems()) {
+    const id = item.id;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    items.push({ id, name: getGameplayItemName(item), icon: getGameplayItemIcon(item), iconId: getGameplayItemIconId(item), source: 'mapping' });
+  }
+  return items.sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi', { sensitivity: 'base' }));
+}
+
+function pkDuoGiftMatches(itemId, ev) {
+  const id = String(itemId || '');
+  if (!id || !ev) return false;
+  if (id.startsWith('master:')) {
+    const typeid = id.slice(7);
+    if (ev.gift_id != null && String(ev.gift_id) === typeid) return true;
+    const gift = pkDuoGiftMeta(id);
+    if (!gift) return false;
+    const evName = normalizeGameplayGiftKey(ev.gift_name);
+    if (evName && normalizeGameplayGiftKey(gift.name) === evName) return true;
+    const evIcon = normalizeGameplayIconUrl(ev.gift_icon || ev.gift_icon_url || ev.gift_url || '');
+    const giftIcon = normalizeGameplayIconUrl(gift.icon || '');
+    return !!evIcon && !!giftIcon && evIcon === giftIcon;
+  }
+  return rankingGiftMatches({ giftItemId: id }, ev);
+}
+
+function pkDuoGiftMeta(itemId) {
+  if (String(itemId || '').startsWith('master:')) {
+    const typeid = String(itemId).slice(7);
+    const g = (masterFullList || []).find(x => String(x.typeid) === typeid);
+    if (!g) return null;
+    return { id: itemId, name: g.gift_name || g.name || `Gift ${typeid}`, icon: g.localIcon || g.icon || g.img_url || '', iconId: typeid };
+  }
+  const found = findItemById(itemId)?.item;
+  if (!found) return null;
+  return { id: itemId, name: getGameplayItemName(found), icon: getGameplayItemIcon(found), iconId: getGameplayItemIconId(found) };
+}
+
+function pkDuoPublicState() {
+  const p = normalizePkDuo();
+  const total = p.scoreA + p.scoreB;
+  const push = total > 0 ? Math.max(-42, Math.min(42, ((p.scoreA - p.scoreB) / total) * 42)) : 0;
+  return { ...p, remainingMs: p.endsAt ? Math.max(0, p.endsAt - Date.now()) : 0, push, teamA: { ...p.teamA, gifts: p.teamA.giftIds.map(pkDuoGiftMeta).filter(Boolean) }, teamB: { ...p.teamB, gifts: p.teamB.giftIds.map(pkDuoGiftMeta).filter(Boolean) } };
+}
+
+function persistPkDuoConfig() {
+  const el = pkDuoEls();
+  const p = normalizePkDuo();
+  const hours = Math.max(0, Math.min(24, parseInt(el.hours?.value, 10) || 0));
+  const minutes = Math.max(0, Math.min(59, parseInt(el.minutes?.value, 10) || 0));
+  const seconds = Math.max(0, Math.min(59, parseInt(el.seconds?.value, 10) || 0));
+  const durationSeconds = Math.max(5, Math.min(86400, hours * 3600 + minutes * 60 + seconds));
+  appSettings.pkDuo = {
+    ...appSettings.pkDuo,
+    prepSeconds: Math.max(0, Math.min(120, parseInt(el.prep?.value, 10) || 0)),
+    delaySeconds: Math.max(0, Math.min(120, parseInt(el.delay?.value, 10) || 0)),
+    durationSeconds,
+    content: String(el.content?.value || 'Vui lòng chờ').trim() || 'Vui lòng chờ',
+    textSize: Math.max(14, Math.min(42, parseInt(el.textSize?.value, 10) || 21)),
+    bgColor: el.bgColor?.value || '#000000',
+    bgOpacity: Math.max(0, Math.min(100, parseInt(el.bgOpacity?.value, 10) || 0)),
+    giftSize: Math.max(28, Math.min(90, parseInt(el.giftSize?.value, 10) || 46)),
+    joinMode: !!el.joinMode?.checked,
+    teamA: { ...p.teamA, name: el.aName?.value || 'ĐỘI A', color: el.aColor?.value || '#d8587c' },
+    teamB: { ...p.teamB, name: el.bName?.value || 'ĐỘI B', color: el.bColor?.value || '#6380ff' },
+  };
+  if (el.bgOpacityVal) el.bgOpacityVal.textContent = `${appSettings.pkDuo.bgOpacity}%`;
+  if (el.giftSizeVal) el.giftSizeVal.textContent = `${appSettings.pkDuo.giftSize}px`;
+  if (el.textSizeVal) el.textSizeVal.textContent = `${appSettings.pkDuo.textSize}px`;
+  saveAppSettings({ pkDuo: appSettings.pkDuo }).catch(() => {});
+  renderPkDuo();
+}
+
+function renderPkDuoGiftList(side) {
+  const p = normalizePkDuo();
+  let ids = side === 'A' ? p.teamA.giftIds : p.teamB.giftIds;
+  if (!ids.length) ids = p.joinMode ? [''] : ['', '', ''];
+  if (p.joinMode) ids = ids.slice(0, 1);
+  const disabledAdd = p.joinMode && ids.length >= 1;
+  return ids.map((id, idx) => {
+    const gift = pkDuoGiftMeta(id);
+    return `<div class="pkduo-gift-row" data-pk-side="${side}" data-pk-idx="${idx}">
+      <button type="button" class="pkduo-gift-picker" data-pk-pick>${gift?.icon ? `<img src="${escapeHtml(gift.icon)}" />` : '<span>🎁</span>'}<b>${escapeHtml(gift?.name || 'Chọn quà')}</b></button>
+      <button type="button" class="tiny primary" data-pk-test title="Test cộng điểm nhanh">TEST</button>
+      <button type="button" class="tiny danger" data-pk-del>🗑</button>
+    </div>`;
+  }).join('') + `<button type="button" class="pkduo-add-gift" data-pk-add="${side}" ${disabledAdd ? 'disabled' : ''}>+</button>`;
+}
+
+function pkDuoBoardHtml(state = pkDuoPublicState()) {
+  const fmt = n => Math.max(0, Math.round(Number(n) || 0)).toLocaleString('en-US');
+  const giftHtml = gift => `<span class="pkduo-gift-icon" title="${escapeHtml(gift.name)}">${gift.icon ? `<img src="${escapeHtml(gift.icon)}" />` : '🎁'}</span>`;
+  const sec = Math.ceil((state.remainingMs || 0) / 1000);
+  const status = state.status === 'prestart' ? `${sec}s` : (state.status === 'running' ? `${sec}s` : (state.status === 'finished' ? 'Kết thúc' : state.content));
+  const urgent = state.status === 'running' && sec <= 10 && sec > 0;
+  return `<div class="pkduo-board status-${escapeHtml(state.status || 'idle')}${urgent ? ' urgent' : ''}" style="--pk-a:${escapeHtml(state.teamA.color)};--pk-b:${escapeHtml(state.teamB.color)};--pk-bg:${pkDuoHexToRgb(state.bgColor)};--pk-bg-opacity:${(state.bgOpacity / 100).toFixed(2)};--pk-gift:${state.giftSize}px;--pk-text:${state.textSize}px;--pk-push:${state.push}%;--pk-a-width:${Math.max(8, Math.min(92, 50 + Number(state.push || 0)))}%">
+    <div class="pkduo-head"><b>${escapeHtml(state.teamA.name)}</b><span>${escapeHtml(status)}</span><b>${escapeHtml(state.teamB.name)}</b></div>
+    <div class="pkduo-gifts"><div>${state.teamA.gifts.map(giftHtml).join('')}</div><i></i><div>${state.teamB.gifts.map(giftHtml).join('')}</div></div>
+    <div class="pkduo-bar"><strong class="score-a">${fmt(state.scoreA)}</strong><span class="pkduo-team-label a">HP MEDIA</span><em class="${state.scoreB > state.scoreA ? 'flip' : ''}"><img src="pk-duo-boost.svg" alt="" /></em><span class="pkduo-team-label b">HP MEDIA</span><strong class="score-b">${fmt(state.scoreB)}</strong></div>
+  </div>`;
+}
+
+function pkDuoHexToRgb(hex) { return rankingHexToRgb(hex, '0,0,0'); }
+
+function renderPkDuo() {
+  const el = pkDuoEls();
+  const p = normalizePkDuo();
+  appSettings.pkDuo = { ...appSettings.pkDuo, ...p };
+  const totalDuration = Math.max(5, Number(p.durationSeconds) || 60);
+  if (el.hours) el.hours.value = Math.floor(totalDuration / 3600);
+  if (el.minutes) el.minutes.value = Math.floor((totalDuration % 3600) / 60);
+  if (el.seconds) el.seconds.value = totalDuration % 60;
+  if (el.prep) el.prep.value = p.prepSeconds;
+  if (el.delay) el.delay.value = p.delaySeconds;
+  if (el.content) el.content.value = p.content;
+  if (el.textSize) el.textSize.value = p.textSize;
+  if (el.textSizeVal) el.textSizeVal.textContent = `${p.textSize}px`;
+  if (el.bgColor) el.bgColor.value = p.bgColor;
+  if (el.bgOpacity) el.bgOpacity.value = p.bgOpacity;
+  if (el.bgOpacityVal) el.bgOpacityVal.textContent = `${p.bgOpacity}%`;
+  if (el.giftSize) el.giftSize.value = p.giftSize;
+  if (el.giftSizeVal) el.giftSizeVal.textContent = `${p.giftSize}px`;
+  if (el.aName) el.aName.value = p.teamA.name;
+  if (el.bName) el.bName.value = p.teamB.name;
+  if (el.aColor) el.aColor.value = p.teamA.color;
+  if (el.bColor) el.bColor.value = p.teamB.color;
+  if (el.startSoundLabel) el.startSoundLabel.value = p.startSoundName || '';
+  if (el.warningSoundLabel) el.warningSoundLabel.value = p.warningSoundName || '';
+  if (el.teamASoundLabel) el.teamASoundLabel.value = p.teamASoundName || '';
+  if (el.teamBSoundLabel) el.teamBSoundLabel.value = p.teamBSoundName || '';
+  if (el.drawSoundLabel) el.drawSoundLabel.value = p.drawSoundName || '';
+  if (el.joinMode) el.joinMode.checked = p.joinMode;
+  if (el.aGifts) el.aGifts.innerHTML = renderPkDuoGiftList('A');
+  if (el.bGifts) el.bGifts.innerHTML = renderPkDuoGiftList('B');
+  const state = pkDuoPublicState();
+  if (el.preview) el.preview.innerHTML = pkDuoBoardHtml(state);
+  if (el.status) el.status.textContent = state.status === 'running' ? 'ĐANG PK' : (state.status === 'prestart' ? 'CHUẨN BỊ' : (state.status === 'finished' ? 'KẾT THÚC' : 'CHỜ'));
+  if (window.bigo?.pkDuoUpdate) window.bigo.pkDuoUpdate(state).catch(() => {});
+}
+
+function pkDuoGiftSide(ev) {
+  const p = normalizePkDuo();
+  const match = id => pkDuoGiftMatches(id, ev);
+  if (p.teamA.giftIds.some(match)) return 'A';
+  if (p.teamB.giftIds.some(match)) return 'B';
+  return '';
+}
+
+function playPkDuoCue(kind) {
+  const cfg = appSettings.pkDuo || {};
+  const src = cfg[`${kind}Sound`];
+  if (!src) return;
+  try {
+    const audio = new Audio(src);
+    audio.volume = Math.max(0, Math.min(1, (appSettings.fxVolume || 100) / 100));
+    audio.play().catch(() => {});
+  } catch {}
+}
+
+function playPkDuoResultSound() {
+  if (pkDuoResultSoundPlayed) return;
+  pkDuoResultSoundPlayed = true;
+  const p = normalizePkDuo();
+  if (p.scoreA > p.scoreB) playPkDuoCue('teamA');
+  else if (p.scoreB > p.scoreA) playPkDuoCue('teamB');
+  else playPkDuoCue('draw');
+}
+
+async function pickPkDuoSound(kind) {
+  const r = await window.bigo.effectsPickFiles();
+  if (!r.ok || !r.files?.length) return;
+  const picked = r.files[0];
+  const soundSrc = picked.fileUrl || picked.file;
+  appSettings.pkDuo[`${kind}Sound`] = soundSrc;
+  appSettings.pkDuo[`${kind}SoundName`] = picked.fileName;
+  renderPkDuo();
+  await saveAppSettings({ pkDuo: { [`${kind}Sound`]: soundSrc, [`${kind}SoundName`]: picked.fileName } });
+}
+
+async function clearPkDuoSound(kind) {
+  appSettings.pkDuo[`${kind}Sound`] = '';
+  appSettings.pkDuo[`${kind}SoundName`] = '';
+  renderPkDuo();
+  await saveAppSettings({ pkDuo: { [`${kind}Sound`]: '', [`${kind}SoundName`]: '' } });
+}
+
+function pkDuoHandleGift(ev) {
+  if (!ev || ev.type !== 'gift') return;
+  const p = normalizePkDuo();
+  if (!p.running || p.status !== 'running') return;
+  const points = giftDiamondPointsFromEvent(ev) || giftTotalCountFromEvent(ev) || 1;
+  const user = String(ev.user || ev.nick_name || ev.user_id || '').trim();
+  let side = pkDuoGiftSide(ev);
+  if (p.joinMode) {
+    if (side && user) appSettings.pkDuo.userTeams = { ...(appSettings.pkDuo.userTeams || {}), [user]: side };
+    if (!side && user) side = appSettings.pkDuo.userTeams?.[user] || '';
+  }
+  if (!side) return;
+  if (side === 'A') appSettings.pkDuo.scoreA = (Number(appSettings.pkDuo.scoreA) || 0) + points;
+  if (side === 'B') appSettings.pkDuo.scoreB = (Number(appSettings.pkDuo.scoreB) || 0) + points;
+  saveAppSettings({ pkDuo: appSettings.pkDuo }).catch(() => {});
+  renderPkDuo();
+}
+
+function pkDuoStart() {
+  const prep = normalizePkDuo().prepSeconds;
+  appSettings.pkDuo.running = true;
+  appSettings.pkDuo.status = prep > 0 ? 'prestart' : 'running';
+  appSettings.pkDuo.endsAt = Date.now() + (prep > 0 ? prep : normalizePkDuo().durationSeconds) * 1000;
+  pkDuoWarningSoundPlayed = false;
+  pkDuoResultSoundPlayed = false;
+  if (!prep) playPkDuoCue('start');
+  if (pkDuoTimer) clearInterval(pkDuoTimer);
+  pkDuoTimer = setInterval(pkDuoTick, 500);
+  saveAppSettings({ pkDuo: appSettings.pkDuo }).catch(() => {});
+  renderPkDuo();
+}
+
+function pkDuoStop() {
+  appSettings.pkDuo.running = false;
+  appSettings.pkDuo.status = 'finished';
+  appSettings.pkDuo.endsAt = 0;
+  playPkDuoResultSound();
+  if (pkDuoTimer) clearInterval(pkDuoTimer);
+  pkDuoTimer = null;
+  saveAppSettings({ pkDuo: appSettings.pkDuo }).catch(() => {});
+  renderPkDuo();
+}
+
+function pkDuoTick() {
+  const p = normalizePkDuo();
+  if (!p.running || !p.endsAt) return renderPkDuo();
+  const remaining = p.endsAt - Date.now();
+  if (p.status === 'running' && remaining <= 10000 && remaining > 0 && !pkDuoWarningSoundPlayed) {
+    pkDuoWarningSoundPlayed = true;
+    playPkDuoCue('warning');
+  }
+  if (remaining > 0) return renderPkDuo();
+  if (p.status === 'prestart') {
+    appSettings.pkDuo.status = 'running';
+    appSettings.pkDuo.endsAt = Date.now() + p.durationSeconds * 1000;
+    playPkDuoCue('start');
+  } else {
+    appSettings.pkDuo.running = false;
+    appSettings.pkDuo.status = 'finished';
+    appSettings.pkDuo.endsAt = 0;
+    playPkDuoResultSound();
+    clearInterval(pkDuoTimer); pkDuoTimer = null;
+  }
+  saveAppSettings({ pkDuo: appSettings.pkDuo }).catch(() => {});
+  renderPkDuo();
+}
+
+function wirePkDuoUi() {
+  const el = pkDuoEls();
+  ['hours','minutes','seconds','prep','delay','bgColor','bgOpacity','giftSize','textSize','aName','bName','aColor','bColor','joinMode'].forEach(k => { if (el[k]) el[k].onchange = persistPkDuoConfig; });
+  ['bgOpacity','giftSize','textSize','content','aName','bName'].forEach(k => { if (el[k]) el[k].oninput = persistPkDuoConfig; });
+  if (el.start) el.start.onclick = pkDuoStart;
+  if (el.stop) el.stop.onclick = pkDuoStop;
+  if (el.reset) el.reset.onclick = () => { appSettings.pkDuo.scoreA = 0; appSettings.pkDuo.scoreB = 0; appSettings.pkDuo.userTeams = {}; appSettings.pkDuo.running = false; appSettings.pkDuo.status = 'idle'; appSettings.pkDuo.endsAt = 0; saveAppSettings({ pkDuo: appSettings.pkDuo }).catch(() => {}); renderPkDuo(); };
+  if (el.save) el.save.onclick = () => { persistPkDuoConfig(); appendLog('[pk-duo] đã lưu cấu hình'); };
+  if (el.copy) el.copy.onclick = async () => { const r = await window.bigo.pkDuoCopyUrl(); if (!r.ok) alert(r.error || 'Không copy được link PK ĐÔI'); };
+  ['start','warning','teamA','teamB','draw'].forEach(kind => {
+    const cap = kind[0].toUpperCase() + kind.slice(1);
+    if (el[`pick${cap}Sound`]) el[`pick${cap}Sound`].onclick = () => pickPkDuoSound(kind);
+    if (el[`clear${cap}Sound`]) el[`clear${cap}Sound`].onclick = () => clearPkDuoSound(kind);
+  });
+  [el.aGifts, el.bGifts].forEach(list => {
+    if (!list) return;
+    list.onclick = e => {
+      const pick = e.target.closest('[data-pk-pick]');
+      if (pick) { const row = pick.closest('[data-pk-side]'); openPkDuoGiftPicker(row.dataset.pkSide, Number(row.dataset.pkIdx) || 0); return; }
+      const sideAdd = e.target.dataset.pkAdd;
+      if (sideAdd) { const key = sideAdd === 'A' ? 'teamA' : 'teamB'; const p = normalizePkDuo(); if (!p.joinMode || p[key].giftIds.length < 1) p[key].giftIds.push(''); appSettings.pkDuo[key] = p[key]; persistPkDuoConfig(); return; }
+      const row = e.target.closest('[data-pk-side]');
+      if (row && e.target.matches('[data-pk-test]')) { pkDuoTestGift(row.dataset.pkSide, Number(row.dataset.pkIdx) || 0); return; }
+      if (row && e.target.matches('[data-pk-del]')) { const side = row.dataset.pkSide; const key = side === 'A' ? 'teamA' : 'teamB'; const p = normalizePkDuo(); p[key].giftIds.splice(Number(row.dataset.pkIdx) || 0, 1); appSettings.pkDuo[key] = p[key]; persistPkDuoConfig(); }
+    };
+  });
+}
+wirePkDuoUi();
+
+function pkDuoTestGift(side, idx) {
+  const p = normalizePkDuo();
+  const key = side === 'A' ? 'teamA' : 'teamB';
+  const id = p[key].giftIds[idx];
+  const gift = pkDuoGiftMeta(id);
+  if (!gift) { alert('Vui lòng chọn quà trước khi test'); return; }
+  const points = 100;
+  if (side === 'A') appSettings.pkDuo.scoreA = (Number(appSettings.pkDuo.scoreA) || 0) + points;
+  else appSettings.pkDuo.scoreB = (Number(appSettings.pkDuo.scoreB) || 0) + points;
+  appSettings.pkDuo.status = p.status === 'idle' ? 'running' : p.status;
+  saveAppSettings({ pkDuo: appSettings.pkDuo }).catch(() => {});
+  renderPkDuo();
+}
+
+function openPkDuoGiftPicker(side, idx) {
+  ensureMasterLoaded().catch(() => {}).finally(() => {
+    removeContextMenu();
+    const p = normalizePkDuo();
+    const picker = document.createElement('div');
+    picker.className = 'ctx-menu pkduo-picker-menu';
+    picker.innerHTML = `<input class="pkduo-picker-search" placeholder="Tìm quà trong ${pkDuoGiftCatalog().length} quà..." /><div class="pkduo-picker-list"></div>`;
+    document.body.appendChild(picker);
+    const input = picker.querySelector('input');
+    const list = picker.querySelector('.pkduo-picker-list');
+    const render = () => {
+      const q = normalizeGameplayGiftKey(input.value);
+      const arr = pkDuoGiftCatalog().filter(g => !q || normalizeGameplayGiftKey(g.name).includes(q) || String(g.iconId || '').includes(q)).slice(0, 250);
+      list.innerHTML = arr.map(g => `<button type="button" data-pk-gift-id="${escapeHtml(g.id)}">${g.icon ? `<img src="${escapeHtml(g.icon)}" />` : '<span>🎁</span>'}<b>${escapeHtml(g.name)}</b><small>${escapeHtml(g.iconId || '')}</small></button>`).join('') || '<div class="score-log-empty">Không tìm thấy quà</div>';
+    };
+    input.oninput = render;
+    list.onclick = e => {
+      const btn = e.target.closest('[data-pk-gift-id]'); if (!btn) return;
+      const id = btn.dataset.pkGiftId;
+      const cur = normalizePkDuo(); const otherIds = side === 'A' ? cur.teamB.giftIds : cur.teamA.giftIds;
+      if (id && otherIds.some(otherId => pkDuoGiftCanonicalId(otherId) === pkDuoGiftCanonicalId(id))) { alert('Quà PK hai đội không được trùng nhau'); return; }
+      const key = side === 'A' ? 'teamA' : 'teamB'; cur[key].giftIds[idx] = id; appSettings.pkDuo[key] = cur[key]; persistPkDuoConfig(); removeContextMenu();
+    };
+    const rect = document.querySelector(`[data-pk-side="${side}"][data-pk-idx="${idx}"]`)?.getBoundingClientRect();
+    picker.style.left = `${Math.max(8, Math.min(window.innerWidth - 360, rect?.left || 80))}px`;
+    picker.style.top = `${Math.max(8, Math.min(window.innerHeight - 520, (rect?.bottom || 120) + 6))}px`;
+    render(); input.focus();
+    setTimeout(() => {
+      document.addEventListener('keydown', escContextMenu, { once: true });
+      document.addEventListener('pointerdown', closePkDuoPickerOnPointer, true);
+      document.addEventListener('contextmenu', closePkDuoPickerOnPointer, true);
+    }, 0);
+  });
+}
 
 if (els.gameplayGroup) {
   els.gameplayGroup.addEventListener('change', () => {

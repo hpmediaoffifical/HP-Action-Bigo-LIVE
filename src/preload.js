@@ -91,6 +91,8 @@ contextBridge.exposeInMainWorld('bigo', {
   rankingCopyUrl: () => ipcRenderer.invoke('ranking:copy-url'),
   rankingGridCopyUrl: () => ipcRenderer.invoke('ranking:grid-copy-url'),
   rankingUpdate: (state) => ipcRenderer.invoke('ranking:update', state),
+  pkDuoCopyUrl: () => ipcRenderer.invoke('pk-duo:copy-url'),
+  pkDuoUpdate: (state) => ipcRenderer.invoke('pk-duo:update', state),
   scoreCopyUrl: () => ipcRenderer.invoke('score:copy-url'),
   scoreUpdate: (state) => ipcRenderer.invoke('score:update', state),
 

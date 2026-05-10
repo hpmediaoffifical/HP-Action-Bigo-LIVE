@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 48">
+  <defs>
+    <linearGradient id="body" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#8fd3ff"/>
+      <stop offset="1" stop-color="#3e7bff"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="0" x2="1">
+      <stop offset="0" stop-color="#fff59e"/>
+      <stop offset="0.55" stop-color="#ff8a2b"/>
+      <stop offset="1" stop-color="#ff2b5f"/>
+    </linearGradient>
+    <filter id="shadow" x="-40%" y="-80%" width="180%" height="260%">
+      <feDropShadow dx="0" dy="3" stdDeviation="2" flood-color="#000" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M7 24c8-10 19-16 35-16 12 0 23 5 31 16-8 11-19 16-31 16C26 40 15 34 7 24Z" fill="url(#body)"/>
+    <path d="M43 8 62 3l-7 11M43 40l19 5-7-11" fill="none" stroke="#ff5a38" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="43" cy="24" r="9" fill="#1a54ff"/>
+    <circle cx="43" cy="24" r="4" fill="#ffffff"/>
+    <path d="M7 24 0 15c7 1 12 4 16 9C12 29 7 33 0 33Z" fill="url(#flame)"/>
+    <path d="M16 14c-6-5-11-7-16-7M16 34c-6 5-11 7-16 7" fill="none" stroke="#ffcf33" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+  </g>
+</svg>

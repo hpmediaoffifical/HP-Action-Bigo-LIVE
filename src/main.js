@@ -1339,6 +1339,16 @@ ipcMain.handle('ranking:update', (_e, state) => {
   if (obsOverlayServer) obsOverlayServer.sendRankingState(state || {});
   return { ok: true };
 });
+ipcMain.handle('pk-duo:copy-url', () => {
+  if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
+  const url = obsOverlayServer.getPkDuoUrl();
+  clipboard.writeText(url);
+  return { ok: true, url };
+});
+ipcMain.handle('pk-duo:update', (_e, state) => {
+  if (obsOverlayServer) obsOverlayServer.sendPkDuoState(state || {});
+  return { ok: true };
+});
 ipcMain.handle('score:copy-url', () => {
   if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
   const url = obsOverlayServer.getScoreUrl();
