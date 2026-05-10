@@ -312,14 +312,18 @@
             </div>
             <details class="score-config-group" open>
               <summary>Vận hành vòng tính điểm</summary>
-              <div class="score-control-grid compact-grid">
-                <label>Tiếng<input id="scoreHours" type="number" min="0" max="24" value="0" /></label>
-                <label>Phút<input id="scoreMinutes" type="number" min="0" max="59" value="3" /></label>
-                <label>Giây<input id="scoreSeconds" type="number" min="0" max="59" value="0" /></label>
-                <label>Độ trễ quà (giây)<input id="scoreDelay" type="number" min="0" max="120" value="5" /></label>
-                <label>Điểm yêu cầu<input id="scoreTarget" type="number" min="1" value="30000" /></label>
-                <label>Quà lớn từ điểm<input id="scoreBigGiftThreshold" type="number" min="1" value="500" /></label>
-                <label>Chuẩn bị trước khi tính (giây)<input id="scorePrepSeconds" type="number" min="0" max="30" value="3" /></label>
+              <div class="score-control-grid compact-grid score-run-grid">
+                <div class="score-run-column">
+                  <label>Tiếng<input id="scoreHours" type="number" min="0" max="24" value="0" /></label>
+                  <label>Phút<input id="scoreMinutes" type="number" min="0" max="59" value="3" /></label>
+                  <label>Giây<input id="scoreSeconds" type="number" min="0" max="59" value="0" /></label>
+                  <label>Chuẩn bị<input id="scorePrepSeconds" type="number" min="0" max="30" value="3" /></label>
+                </div>
+                <div class="score-run-column">
+                  <label>Điểm yêu cầu<input id="scoreTarget" type="number" min="1" value="30000" /></label>
+                  <label>Độ trễ (s)<input id="scoreDelay" type="number" min="0" max="120" value="5" /></label>
+                  <label>Quà lớn từ điểm<input id="scoreBigGiftThreshold" type="number" min="1" value="500" /></label>
+                </div>
               </div>
             </details>
             <details class="score-config-group" open>

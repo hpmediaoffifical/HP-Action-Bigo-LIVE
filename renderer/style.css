@@ -1226,6 +1226,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .score-controls { display: grid; gap: 12px; }
 .score-control-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .score-control-grid.compact-grid { gap: 8px; }
+.score-run-grid { align-items: start; }
+.score-run-column { display: grid; gap: 8px; }
 .score-control-grid .wide { grid-column: 1 / -1; }
 .score-control-grid label { display: flex; flex-direction: column; gap: 5px; color: #aeb6c7; font-size: 12px; font-weight: 700; }
 .score-control-grid input { width: 100%; }
