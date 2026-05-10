@@ -88,6 +88,8 @@ contextBridge.exposeInMainWorld('bigo', {
   gameplayConfig: (cfg) => ipcRenderer.invoke('gameplay:config', cfg),
   gameplayCounts: (counts) => ipcRenderer.invoke('gameplay:counts', counts),
   gameplayEvent: (ev) => ipcRenderer.invoke('gameplay:event', ev),
+  scoreCopyUrl: () => ipcRenderer.invoke('score:copy-url'),
+  scoreUpdate: (state) => ipcRenderer.invoke('score:update', state),
 
   // Popup chats (Tương tác)
   popupOpenChats: () => ipcRenderer.invoke('popup:open-chats'),

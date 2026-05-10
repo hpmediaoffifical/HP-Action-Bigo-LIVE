@@ -19,8 +19,10 @@ class ObsOverlayServer {
     this.server = null;
     this.clients = new Map(); // overlayId -> Set(res)
     this.gameplayClients = new Set();
+    this.scoreClients = new Set();
     this.gameplayConfig = { items: [], orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, slots: [] };
     this.gameplayCounts = {};
+    this.scoreState = {};
     this.media = new Map();   // mediaId -> absolute file path
   }
 
@@ -41,6 +43,8 @@ class ObsOverlayServer {
     this.clients.clear();
     for (const res of this.gameplayClients) { try { res.end(); } catch {} }
     this.gameplayClients.clear();
+    for (const res of this.scoreClients) { try { res.end(); } catch {} }
+    this.scoreClients.clear();
     if (this.server) { try { this.server.close(); } catch {} }
     this.server = null;
   }
@@ -51,6 +55,10 @@ class ObsOverlayServer {
 
   getGameplayUrl() {
     return `http://127.0.0.1:${this.port}/gameplay?token=${encodeURIComponent(this.token)}`;
+  }
+
+  getScoreUrl() {
+    return `http://127.0.0.1:${this.port}/score?token=${encodeURIComponent(this.token)}`;
   }
 
   setGameplayConfig(cfg) {
@@ -65,6 +73,11 @@ class ObsOverlayServer {
   sendGameplayCounts(counts) {
     this.gameplayCounts = counts || {};
     this._sendGameplay('counts', counts || {});
+  }
+
+  sendScoreState(state) {
+    this.scoreState = state || {};
+    this._sendScore('score', this.scoreState);
   }
 
   hasClients(overlayId) {
@@ -103,6 +116,11 @@ class ObsOverlayServer {
     for (const res of this.gameplayClients) { try { res.write(body); } catch {} }
   }
 
+  _sendScore(event, data) {
+    const body = `event: ${event}\ndata: ${JSON.stringify(data || {})}\n\n`;
+    for (const res of this.scoreClients) { try { res.write(body); } catch {} }
+  }
+
   _okToken(reqUrl) {
     return reqUrl.searchParams.get('token') === this.token;
   }
@@ -118,12 +136,18 @@ class ObsOverlayServer {
     if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remote)) return this._reject(res, 403, 'localhost only');
     if (req.method === 'GET' && reqUrl.pathname === '/obs-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'obs-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/gameplay-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'gameplay-overlay.js'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/score-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.js'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/score-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.css'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/logo-hp.png') return this._serveFile(path.join(this.root, 'logo-hp.png'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/favicon.ico') return this._serveFile(path.join(this.root, 'logo-hp.ico'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'overlay.css'), res);
     if (!this._okToken(reqUrl)) return this._reject(res, 401, 'bad token');
 
     if (req.method === 'GET' && reqUrl.pathname.startsWith('/overlay/')) return this._serveOverlay(reqUrl, res);
     if (req.method === 'GET' && reqUrl.pathname === '/gameplay') return this._serveFile(path.join(this.root, 'renderer', 'gameplay-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/gameplay-events') return this._serveGameplayEvents(req, res);
+    if (req.method === 'GET' && reqUrl.pathname === '/score') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.html'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/score-events') return this._serveScoreEvents(req, res);
     if (req.method === 'GET' && reqUrl.pathname.startsWith('/gift-icon/')) return this._serveGiftIcon(reqUrl, res);
     if (req.method === 'GET' && reqUrl.pathname.startsWith('/events/')) return this._serveEvents(reqUrl, req, res);
     if (req.method === 'GET' && reqUrl.pathname.startsWith('/media/')) return this._serveMedia(reqUrl, req, res);
@@ -156,6 +180,16 @@ class ObsOverlayServer {
     res.write(`event: counts\ndata: ${JSON.stringify(this.gameplayCounts || {})}\n\n`);
     this.gameplayClients.add(res);
     req.on('close', () => this.gameplayClients.delete(res));
+  }
+
+  _serveScoreEvents(req, res) {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(`event: score\ndata: ${JSON.stringify(this.scoreState || {})}\n\n`);
+    this.scoreClients.add(res);
+    req.on('close', () => this.scoreClients.delete(res));
   }
 
   _serveFile(filePath, res) {

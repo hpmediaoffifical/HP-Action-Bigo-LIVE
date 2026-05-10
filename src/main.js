@@ -19,6 +19,8 @@ const GIFT_MASTER_TTL = 24 * 3600 * 1000; // 24h
 const ICO_PATH = path.join(ROOT, 'logo-hp.ico');
 const PNG_PATH = path.join(ROOT, 'logo-hp.png');
 const APP_ICON = fs.existsSync(ICO_PATH) ? ICO_PATH : (fs.existsSync(PNG_PATH) ? PNG_PATH : null);
+app.setName('HP Action - Bigo LIVE');
+process.title = 'HP Action - Bigo LIVE';
 
 // Windows: set AppUserModelID để taskbar group đúng và hiện icon
 if (process.platform === 'win32') {
@@ -342,7 +344,7 @@ function createWindow() {
     width: saved.width || 1280,
     height: saved.height || 860,
     x: saved.x, y: saved.y,
-    title: 'HP Action - BIGO Live',
+    title: 'HP Action - Bigo LIVE',
     icon: APP_ICON || undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -1319,5 +1321,15 @@ ipcMain.handle('gameplay:counts', (_e, counts) => {
 });
 ipcMain.handle('gameplay:event', (_e, ev) => {
   if (obsOverlayServer) obsOverlayServer.sendGameplayEvent(ev);
+  return { ok: true };
+});
+ipcMain.handle('score:copy-url', () => {
+  if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
+  const url = obsOverlayServer.getScoreUrl();
+  clipboard.writeText(url);
+  return { ok: true, url };
+});
+ipcMain.handle('score:update', (_e, state) => {
+  if (obsOverlayServer) obsOverlayServer.sendScoreState(state || {});
   return { ok: true };
 });

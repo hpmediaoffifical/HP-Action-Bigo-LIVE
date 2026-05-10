@@ -585,6 +585,7 @@ function checkClearGiftTrigger(ev) {
 
 function pushQueue(ev, matched, playTimes) {
   if (!matched || !hasEffectMedia(matched)) return;
+  scoreHandleGift(ev);
   // Dùng pushPlayBatch để chia tách thành playTimes entries
   pushPlayBatch(matched, ev, playTimes);
 }
@@ -779,7 +780,7 @@ const els = {
   // Embed tab
   embedBigoId: $('embedBigoId'),
   btnConnect: $('btnConnect'), btnEmbedShow: $('btnEmbedShow'),
-  liveInfo: $('liveInfo'),
+  liveInfo: $('liveInfo'), headerLiveInfo: $('headerLiveInfo'),
   metaPanel: $('metaPanel'), metaInfo: $('metaInfo'),
   liveChats: $('liveChats'), liveGifts: $('liveGifts'),
   csViewers: $('csViewers'), csEffects: $('csEffects'), csDiamond: $('csDiamond'), csUsers: $('csUsers'), csGifts: $('csGifts'),
@@ -805,6 +806,7 @@ const els = {
   gameplayTextFont: $('gameplayTextFont'), gameplayTextColor: $('gameplayTextColor'), gameplaySlotNumberColor: $('gameplaySlotNumberColor'), gameplayCountColor: $('gameplayCountColor'), gameplayUppercase: $('gameplayUppercase'), gameplayShowName: $('gameplayShowName'), gameplayShowCount: $('gameplayShowCount'),
   gameplayCenterLargest: $('gameplayCenterLargest'), gameplayGrayInactive: $('gameplayGrayInactive'), gameplayKeepScore: $('gameplayKeepScore'),
   gameplayReview: $('gameplayReview'), gameplayGridEditor: $('gameplayGridEditor'), gameplayItems: $('gameplayItems'), btnGameplayAddCol: $('btnGameplayAddCol'), btnGameplayAddRow: $('btnGameplayAddRow'), btnGameplayDelCol: $('btnGameplayDelCol'), btnGameplayDelRow: $('btnGameplayDelRow'), btnGameplaySave: $('btnGameplaySave'), btnGameplayCopyUrl: $('btnGameplayCopyUrl'),
+  scoreHours: $('scoreHours'), scoreMinutes: $('scoreMinutes'), scoreSeconds: $('scoreSeconds'), scoreDelay: $('scoreDelay'), scoreTarget: $('scoreTarget'), scoreContent: $('scoreContent'), scoreCreatorName: $('scoreCreatorName'), scoreCreatorAvatar: $('scoreCreatorAvatar'), scoreTimeColor: $('scoreTimeColor'), scoreContentColor: $('scoreContentColor'), scoreOverColor: $('scoreOverColor'), scoreBarColor1: $('scoreBarColor1'), scoreBarColor2: $('scoreBarColor2'), scoreWaveColor: $('scoreWaveColor'), scoreBigGiftThreshold: $('scoreBigGiftThreshold'), scoreAutoResetSeconds: $('scoreAutoResetSeconds'), scoreThemePreset: $('scoreThemePreset'), scoreBarStyle: $('scoreBarStyle'), scoreOverlaySize: $('scoreOverlaySize'), scoreCustomMilestones: $('scoreCustomMilestones'), scoreAutoHideSeconds: $('scoreAutoHideSeconds'), scoreShowGiftUser: $('scoreShowGiftUser'), scoreShowMissing: $('scoreShowMissing'), scoreShowTopUsers: $('scoreShowTopUsers'), scoreShowSpeed: $('scoreShowSpeed'), scoreCompactMode: $('scoreCompactMode'), scoreHideAvatar: $('scoreHideAvatar'), scoreHideCreator: $('scoreHideCreator'), scoreShowOnlyActive: $('scoreShowOnlyActive'), scoreStartSoundLabel: $('scoreStartSoundLabel'), scoreWarningSoundLabel: $('scoreWarningSoundLabel'), scoreGoalSoundLabel: $('scoreGoalSoundLabel'), scoreSuccessSoundLabel: $('scoreSuccessSoundLabel'), scoreFailSoundLabel: $('scoreFailSoundLabel'), btnScorePickStartSound: $('btnScorePickStartSound'), btnScoreClearStartSound: $('btnScoreClearStartSound'), btnScorePickWarningSound: $('btnScorePickWarningSound'), btnScoreClearWarningSound: $('btnScoreClearWarningSound'), btnScorePickGoalSound: $('btnScorePickGoalSound'), btnScoreClearGoalSound: $('btnScoreClearGoalSound'), btnScorePickSuccessSound: $('btnScorePickSuccessSound'), btnScoreClearSuccessSound: $('btnScoreClearSuccessSound'), btnScorePickFailSound: $('btnScorePickFailSound'), btnScoreClearFailSound: $('btnScoreClearFailSound'), btnScoreStart: $('btnScoreStart'), btnScoreStop: $('btnScoreStop'), btnScoreReset: $('btnScoreReset'), scoreTestPoints: $('scoreTestPoints'), btnScoreTest: $('btnScoreTest'), btnScoreTestBig: $('btnScoreTestBig'), btnScoreTestWarning: $('btnScoreTestWarning'), btnScoreTestSuccess: $('btnScoreTestSuccess'), btnScoreTestFail: $('btnScoreTestFail'), btnScoreCopyUrl: $('btnScoreCopyUrl'), scorePreview: $('scorePreview'), scoreReviewStatus: $('scoreReviewStatus'), scoreReviewStats: $('scoreReviewStats'), scoreGiftLog: $('scoreGiftLog'), scoreUserTotals: $('scoreUserTotals'),
   // Gift dialog extras
   dlgPauseBgm: $('dlgPauseBgm'), dlgPreFx: $('dlgPreFx'),
   effectQueue: $('effectQueue'), btnClearQueue: $('btnClearQueue'),
@@ -1078,16 +1080,6 @@ if (els.btnResetStats) {
     const next = !document.body.classList.contains('app-locked');
     apply(next);
     try { localStorage.setItem(KEY, next ? '1' : '0'); } catch {}
-  });
-})();
-
-// Brand link → mở hpvn.media trong trình duyệt mặc định (không mở trong app)
-(function wireBrandLink() {
-  const link = document.getElementById('brandLink');
-  if (!link) return;
-  link.addEventListener('click', (e) => {
-    e.preventDefault();
-    try { window.bigo.openExternal('https://hpvn.media'); } catch {}
   });
 })();
 
@@ -1498,12 +1490,13 @@ document.body.addEventListener('click', (e) => {
 // Marquee suffix branding (chữ chạy)
 const LIVE_SUFFIX = ' - Phần mềm Độc quyền thuộc về HP Media | HPVN.MEDIA';
 function setLiveInfo(text, cls) {
-  if (!els.liveInfo) return;
-  els.liveInfo.className = `live-info-inline ${cls || ''}`;
+  const target = els.headerLiveInfo || els.liveInfo;
+  if (!target) return;
+  target.className = `header-live-info ${cls || ''}`;
   const safe = escapeHtml(text);
   const brand = escapeHtml(LIVE_SUFFIX);
   // 2 bản copy để loop seamless via translateX(-50%)
-  els.liveInfo.innerHTML = `<div class="live-marquee">
+  target.innerHTML = `<div class="live-marquee">
     <span>${safe}<span class="brand">${brand}</span></span>
     <span>${safe}<span class="brand">${brand}</span></span>
   </div>`;
@@ -3233,6 +3226,7 @@ function setConnectedUi(yes) {
 
 async function disconnect() {
   stopLiveViewerRefresh();
+  if (typeof scoreStop === 'function') scoreStop();
   await window.bigo.embedStop();
   els.status.textContent = 'disconnected';
   els.status.classList.remove('on');
@@ -3391,9 +3385,21 @@ function escContextMenu(e) { if (e.key === 'Escape') removeContextMenu(); }
 const receivedGifts = [];
 const RECEIVED_MAX = 200;
 
+function giftTotalCountFromEvent(ev) {
+  return ev?.total_count != null ? ev.total_count : ((ev?.gift_count || 1) * (ev?.combo || 1));
+}
+
+function giftDiamondPointsFromEvent(ev) {
+  if (!ev) return 0;
+  if (ev.total_diamond != null) return Math.max(0, Math.round(Number(ev.total_diamond) || 0));
+  if (ev.gift_value != null) return Math.max(0, Math.round((Number(ev.gift_value) || 0) * Math.max(1, giftTotalCountFromEvent(ev) || 1)));
+  return 0;
+}
+
 function addReceivedGift(ev) {
   if (!ev || ev.type !== 'gift') return;
-  const total = ev.total_count != null ? ev.total_count : ((ev.gift_count || 1) * (ev.combo || 1));
+  const total = giftTotalCountFromEvent(ev);
+  const diamond = giftDiamondPointsFromEvent(ev);
   receivedGifts.unshift({
     id: 'rg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
     ts: Date.now(),
@@ -3403,13 +3409,14 @@ function addReceivedGift(ev) {
     gift_id: ev.gift_id,
     gift_icon: ev.gift_icon || ev.gift_icon_url || '',
     count: Math.max(1, total || 1),
-    diamond: ev.total_diamond ?? null,
+    diamond: diamond || null,
     level: ev.level,
     total,
   });
   if (receivedGifts.length > RECEIVED_MAX) receivedGifts.length = RECEIVED_MAX;
   renderReceivedGifts();
   forwardReceivedGiftsSnapshot();
+  scoreHandleGift(ev);
 }
 
 function renderReceivedGifts() {
@@ -3626,7 +3633,7 @@ function renderParsed(ev) {
     // Update session stats (chỉ count gift, không count gift_overlay duplicate)
     if (ev.type === 'gift') {
       sessionStats.giftCount += (ev.gift_count || 1) * (ev.combo || 1);
-      sessionStats.diamond += ev.total_diamond || 0;
+      sessionStats.diamond += giftDiamondPointsFromEvent(ev);
       if (ev.user) sessionStats.users.add(ev.user);
       if (matched && hasEffectMedia(matched)) {
         sessionStats.effects += playTimes;
@@ -3697,6 +3704,7 @@ let appSettings = {
   bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
   gameplay: { groupId: '', useCommonGroup: true, orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', slotNumberColor: '#ffffff', countColor: '#ffffff', countSize: 12, uppercase: false, showName: true, showCount: true, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] },
+  scoreVote: { hours: 0, minutes: 3, seconds: 0, delaySeconds: 5, target: 30000, content: 'Kêu gọi điểm ĐẬU', creatorName: 'Creator', creatorAvatar: '', timeColor: '#ffffff', contentColor: '#f0eef6', overColor: '#ff0000', barColor1: '#b93678', barColor2: '#ff8ed1', waveColor: '#ffffff', bigGiftThreshold: 500, autoResetSeconds: 0, themePreset: 'custom', barStyle: 'pill', overlaySize: 'medium', customMilestones: '', autoHideSeconds: 0, showGiftUser: true, showMissing: true, showTopUsers: true, showSpeed: true, compactMode: false, hideAvatar: false, hideCreator: false, showOnlyActive: false, startSound: '', startSoundName: '', warningSound: '', warningSoundName: '', goalSound: '', goalSoundName: '', successSound: '', successSoundName: '', failSound: '', failSoundName: '' },
   // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
   specialEffects: {
     clearQueue:      { enabled: false, typeid: null, giftName: '', iconUrl: '' },
@@ -3719,6 +3727,7 @@ async function saveAppSettings(patch) {
     if (patch.bgm) s.bgm = { ...(s.bgm || {}), ...patch.bgm };
     if (patch.preFx) s.preFx = { ...(s.preFx || {}), ...patch.preFx };
     if (patch.gameplay) s.gameplay = { ...(s.gameplay || {}), ...patch.gameplay };
+    if (patch.scoreVote) s.scoreVote = { ...(s.scoreVote || {}), ...patch.scoreVote };
     if (patch.specialEffects) {
       s.specialEffects = s.specialEffects || {};
       for (const [k, v] of Object.entries(patch.specialEffects)) {
@@ -3799,6 +3808,7 @@ async function initAppSettings(s) {
   appSettings.bgm = { ...appSettings.bgm, ...(s.bgm || {}) };
   appSettings.preFx = { ...appSettings.preFx, ...(s.preFx || {}) };
   appSettings.gameplay = { ...appSettings.gameplay, ...(s.gameplay || {}) };
+  appSettings.scoreVote = { ...appSettings.scoreVote, ...(s.scoreVote || {}) };
   // Migrate old clearGift → specialEffects.clearQueue (backward compat)
   if (s.clearGift && !s.specialEffects?.clearQueue) {
     appSettings.specialEffects.clearQueue = {
@@ -3842,6 +3852,7 @@ async function initAppSettings(s) {
   if (els.bgmVol) { els.bgmVol.value = appSettings.bgm.volume || 80; els.bgmVolVal.textContent = els.bgmVol.value; }
   if (els.fxVol) { els.fxVol.value = appSettings.fxVolume; els.fxVolVal.textContent = appSettings.fxVolume; }
   if (els.maxListItems) els.maxListItems.value = appSettings.maxListItems;
+  applyScoreSettingsUi();
   // Devices
   await refreshAudioDevices();
   await applyBgmSinkId();
@@ -4725,6 +4736,555 @@ if (els.btnGameplayDelCol) {
 }
 if (els.btnGameplayDelRow) {
   els.btnGameplayDelRow.onclick = () => deleteGameplayGridRow().catch(e => alert('Lỗi xoá hàng: ' + e.message));
+}
+
+// =================== Score Vote Overlay ===================
+let scoreState = {
+  status: 'idle',
+  score: 0,
+  target: 30000,
+  durationMs: 180000,
+  delayMs: 5000,
+  startedAt: 0,
+  endAt: 0,
+  delayEndAt: 0,
+  resultAt: 0,
+  lastAdd: 0,
+  lastAddUser: '',
+  timeText: '03:00',
+};
+let scoreTimer = null;
+let scoreLastAddTimer = null;
+let scoreAutoResetTimer = null;
+let scoreResultSoundPlayed = false;
+let scoreWarningSoundPlayed = false;
+let scoreGoalSoundPlayed = false;
+const scoreGiftLog = [];
+const scoreCountedEventKeys = new Set();
+const scoreUserTotals = new Map();
+const SCORE_LOG_MAX = 40;
+
+function scoreEventKey(ev) {
+  const total = giftTotalCountFromEvent(ev);
+  const points = giftDiamondPointsFromEvent(ev);
+  return [ev?.ts || ev?.time || '', ev?.user || '', ev?.gift_id || '', ev?.gift_name || '', total, points, ev?.raw || ''].join('|');
+}
+
+function clampInt(value, min, max, fallback) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+function scoreReadConfig() {
+  const hours = clampInt(els.scoreHours?.value, 0, 24, 0);
+  const minutes = clampInt(els.scoreMinutes?.value, 0, 59, 3);
+  const seconds = clampInt(els.scoreSeconds?.value, 0, 59, 0);
+  const delaySeconds = clampInt(els.scoreDelay?.value, 0, 120, 5);
+  const target = Math.max(1, parseInt(els.scoreTarget?.value, 10) || 30000);
+  return {
+    hours, minutes, seconds, delaySeconds, target,
+    content: String(els.scoreContent?.value || '').trim() || 'Kêu gọi điểm ĐẬU',
+    creatorName: String(els.scoreCreatorName?.value || '').trim() || 'Creator',
+    creatorAvatar: String(els.scoreCreatorAvatar?.value || '').trim(),
+    timeColor: String(els.scoreTimeColor?.value || '#ffffff').trim(),
+    contentColor: String(els.scoreContentColor?.value || '#f0eef6').trim(),
+    overColor: String(els.scoreOverColor?.value || '#ff0000').trim(),
+    barColor1: String(els.scoreBarColor1?.value || '#b93678').trim(),
+    barColor2: String(els.scoreBarColor2?.value || '#ff8ed1').trim(),
+    waveColor: String(els.scoreWaveColor?.value || '#ffffff').trim(),
+    bigGiftThreshold: Math.max(1, parseInt(els.scoreBigGiftThreshold?.value, 10) || 500),
+    autoResetSeconds: clampInt(els.scoreAutoResetSeconds?.value, 0, 300, 0),
+    themePreset: String(els.scoreThemePreset?.value || 'custom'),
+    barStyle: String(els.scoreBarStyle?.value || 'pill'),
+    overlaySize: String(els.scoreOverlaySize?.value || 'medium'),
+    customMilestones: String(els.scoreCustomMilestones?.value || '').trim(),
+    autoHideSeconds: clampInt(els.scoreAutoHideSeconds?.value, 0, 300, 0),
+    showGiftUser: els.scoreShowGiftUser ? els.scoreShowGiftUser.checked : true,
+    showMissing: els.scoreShowMissing ? els.scoreShowMissing.checked : true,
+    showTopUsers: els.scoreShowTopUsers ? els.scoreShowTopUsers.checked : true,
+    showSpeed: els.scoreShowSpeed ? els.scoreShowSpeed.checked : true,
+    compactMode: els.scoreCompactMode ? els.scoreCompactMode.checked : false,
+    hideAvatar: els.scoreHideAvatar ? els.scoreHideAvatar.checked : false,
+    hideCreator: els.scoreHideCreator ? els.scoreHideCreator.checked : false,
+    showOnlyActive: els.scoreShowOnlyActive ? els.scoreShowOnlyActive.checked : false,
+  };
+}
+function scoreDurationMs(cfg) {
+  const ms = ((cfg.hours * 3600) + (cfg.minutes * 60) + cfg.seconds) * 1000;
+  return Math.max(1000, ms || 180000);
+}
+function formatScoreTime(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+function scorePublicState() {
+  const cfg = scoreReadConfig();
+  const status = scoreState.status || 'idle';
+  const autoHidden = ['success', 'failed'].includes(status) && cfg.autoHideSeconds > 0 && scoreState.resultAt && Date.now() - scoreState.resultAt >= cfg.autoHideSeconds * 1000;
+  const hidden = (cfg.showOnlyActive && status === 'idle') || autoHidden;
+  return { ...scoreState, ...cfg, hidden, topUsers: scoreTopUsers(), customMilestoneValues: scoreMilestoneValues(cfg.customMilestones, cfg.target) };
+}
+
+function scoreMilestoneValues(text, target) {
+  return String(text || '').split(/[;,\s]+/).map(v => Math.round(Number(v) || 0)).filter(v => v > 0 && v < target).slice(0, 8);
+}
+
+function scoreTopUsers(limit = 3) {
+  return [...scoreUserTotals.values()].sort((a, b) => b.points - a.points || b.gifts - a.gifts).slice(0, limit).map(item => ({ user: item.user, points: item.points, gifts: item.gifts }));
+}
+
+function scoreMetrics(state = scorePublicState()) {
+  const target = Math.max(1, Number(state.target) || 1);
+  const score = Math.max(0, Number(state.score) || 0);
+  const elapsedMs = state.startedAt ? Math.max(0, Date.now() - state.startedAt) : 0;
+  const avgPerMin = elapsedMs > 5000 ? Math.round(score / (elapsedMs / 60000)) : 0;
+  const remainingMs = state.status === 'running' ? Math.max(0, state.endAt - Date.now()) : 0;
+  const projected = avgPerMin && remainingMs ? Math.round(score + avgPerMin * (remainingMs / 60000)) : 0;
+  return { missing: Math.max(0, target - score), over: Math.max(0, score - target), pct: Math.max(0, Math.min(100, (score / target) * 100)), avgPerMin, projected };
+}
+
+function playScoreCue(kind) {
+  const cfg = appSettings.scoreVote || {};
+  const src = cfg[`${kind}Sound`];
+  if (!src) return;
+  try {
+    const audio = new Audio(src);
+    audio.volume = Math.max(0, Math.min(1, (appSettings.fxVolume || 100) / 100));
+    audio.play().catch(() => {});
+  } catch {}
+}
+
+function playScoreResultSound(status) {
+  if (scoreResultSoundPlayed) return;
+  scoreResultSoundPlayed = true;
+  playScoreCue(status === 'success' ? 'success' : 'fail');
+}
+
+function setScoreStatus(status) {
+  if (scoreState.status === status) return;
+  scoreState.status = status;
+  if (status === 'success' || status === 'failed') {
+    scoreState.resultAt = Date.now();
+    playScoreResultSound(status);
+    scheduleScoreAutoReset();
+    const cfg = scoreReadConfig();
+    if (cfg.autoHideSeconds > 0) setTimeout(pushScoreState, cfg.autoHideSeconds * 1000 + 80);
+  }
+}
+
+function scheduleScoreAutoReset() {
+  if (scoreAutoResetTimer) clearTimeout(scoreAutoResetTimer);
+  const seconds = Math.max(0, Number(scoreReadConfig().autoResetSeconds) || 0);
+  if (!seconds) return;
+  scoreAutoResetTimer = setTimeout(() => scoreReset(), seconds * 1000);
+}
+
+async function pickScoreSound(kind) {
+  const r = await window.bigo.effectsPickFiles();
+  if (!r.ok || !r.files?.length) return;
+  const picked = r.files[0];
+  const soundSrc = picked.fileUrl || picked.file;
+  appSettings.scoreVote[`${kind}Sound`] = soundSrc;
+  appSettings.scoreVote[`${kind}SoundName`] = picked.fileName;
+  const label = els[`score${kind[0].toUpperCase()}${kind.slice(1)}SoundLabel`];
+  if (label) label.value = picked.fileName;
+  await saveAppSettings({ scoreVote: { [`${kind}Sound`]: soundSrc, [`${kind}SoundName`]: picked.fileName } });
+}
+
+async function clearScoreSound(kind) {
+  appSettings.scoreVote[`${kind}Sound`] = '';
+  appSettings.scoreVote[`${kind}SoundName`] = '';
+  const label = els[`score${kind[0].toUpperCase()}${kind.slice(1)}SoundLabel`];
+  if (label) label.value = '';
+  await saveAppSettings({ scoreVote: { [`${kind}Sound`]: '', [`${kind}SoundName`]: '' } });
+}
+function pushScoreState() {
+  const publicState = scorePublicState();
+  renderScorePreview(publicState);
+  renderScoreMcReview(publicState);
+  updateScoreButtons(publicState.status);
+  if (window.bigo.scoreUpdate) window.bigo.scoreUpdate(publicState).catch(() => {});
+}
+function updateScoreButtons(status = scoreState.status) {
+  const active = status && status !== 'idle';
+  if (els.btnScoreStart) els.btnScoreStart.style.display = active ? 'none' : '';
+  if (els.btnScoreStop) els.btnScoreStop.style.display = active ? '' : 'none';
+}
+function renderScorePreview(state = scorePublicState()) {
+  if (!els.scorePreview) return;
+  const target = Math.max(1, Number(state.target) || 1);
+  const score = Math.max(0, Number(state.score) || 0);
+  const metrics = scoreMetrics(state);
+  const { over, pct, missing, avgPerMin, projected } = metrics;
+  const popLeft = Math.max(11, Math.min(88, pct));
+  const status = state.status || 'idle';
+  const statusText = status === 'success' ? 'THÀNH CÔNG' : (status === 'failed' ? 'KHÔNG HOÀN THÀNH' : (state.timeText || '03:00'));
+  const avatar = state.creatorAvatar || '';
+  const activeRunner = ['running', 'grace'].includes(status) && !!state.lastAdd;
+  const runnerUser = state.showGiftUser !== false && state.lastAddUser ? `${state.lastAddUser} ` : '';
+  const runnerPoints = state.lastAdd ? `+${Number(state.lastAdd).toLocaleString('en-US')}` : '';
+  const runnerAtStart = pct < 28;
+  const remainingMs = status === 'running' ? Math.max(0, state.endAt - Date.now()) : 0;
+  const urgent = ['running', 'grace'].includes(status) && remainingMs <= 10000 && remainingMs > 0;
+  const nearGoal = ['running', 'grace'].includes(status) && pct >= 80 && score < target;
+  const milestoneValues = Array.isArray(state.customMilestoneValues) ? state.customMilestoneValues : [];
+  const milestones = milestoneValues.map(v => `<span class="score-preview-marker ${score >= v ? 'reached' : ''}" style="left:${Math.max(0, Math.min(100, (v / target) * 100))}%"></span>`).join('');
+  const topUsers = Array.isArray(state.topUsers) ? state.topUsers : [];
+  const topText = topUsers.length ? topUsers.map(u => `${escapeHtml(u.user || '?')} ${Number(u.points || 0).toLocaleString('en-US')}`).join(' | ') : '';
+  const predictionText = avgPerMin ? (projected >= target ? 'Dự kiến đạt' : 'Cần tăng tốc') : 'Đang tính tốc độ';
+  els.scorePreview.className = `score-preview status-${status} theme-${state.themePreset || 'custom'} size-${state.overlaySize || 'medium'} bar-${state.barStyle || 'pill'}${state.compactMode ? ' compact' : ''}${activeRunner ? ' has-add' : ''}${urgent ? ' urgent' : ''}${nearGoal ? ' near-goal' : ''}`;
+  els.scorePreview.style.setProperty('--score-time-color', state.timeColor || '#ffffff');
+  els.scorePreview.style.setProperty('--score-content-color', state.contentColor || '#f0eef6');
+  els.scorePreview.style.setProperty('--score-over-color', state.overColor || '#ff0000');
+  els.scorePreview.style.setProperty('--score-bar-color-1', state.barColor1 || '#b93678');
+  els.scorePreview.style.setProperty('--score-bar-color-2', state.barColor2 || '#ff8ed1');
+  els.scorePreview.style.setProperty('--score-wave-color', state.waveColor || '#ffffff');
+  els.scorePreview.innerHTML = `
+    <div class="score-preview-time">${escapeHtml(statusText)}</div>
+    <div class="score-preview-bar" style="--score-pct:${pct}%"><div class="score-preview-fill" style="width:${pct}%"></div><div class="score-preview-flash"></div><div class="score-preview-wave"></div>${milestones}${over > 0 ? `<div class="score-preview-over">+Over: ${over.toLocaleString('en-US')}</div>` : ''}${activeRunner ? `<div class="score-preview-pop ${Number(state.lastAdd) >= Number(state.bigGiftThreshold || 500) ? 'big' : ''} ${runnerAtStart ? 'at-start' : ''}" style="left:${runnerAtStart ? 6 : popLeft}${runnerAtStart ? 'px' : '%'}"><span>${escapeHtml(runnerUser)}${runnerPoints}</span><b>🏃</b></div>` : ''}<div class="score-preview-flag">⚑</div></div>
+    <div class="score-preview-meta">
+      ${state.hideAvatar ? '' : `<div class="score-preview-avatar">${avatar ? `<img src="${escapeHtml(avatar)}" />` : '👤'}</div>`}
+      ${state.hideCreator ? '' : `<b>${escapeHtml(state.creatorName || 'Creator')}</b>`}
+      <span>${escapeHtml(state.content || 'Kêu gọi điểm ĐẬU')}</span>
+      <b>Điểm: ${score.toLocaleString('en-US')}/${target.toLocaleString('en-US')}</b>
+    </div>
+    ${state.showTopUsers !== false && topText ? `<div class="score-preview-extra">Top: ${topText}</div>` : ''}
+    ${state.showSpeed !== false ? `<div class="score-preview-extra">${escapeHtml(predictionText)}</div>` : ''}`;
+}
+function scoreStatusLabel(status) {
+  if (status === 'running') return 'ĐANG CHẠY';
+  if (status === 'grace') return 'ĐANG CHỜ QUÀ TRỄ';
+  if (status === 'success') return 'THÀNH CÔNG';
+  if (status === 'failed') return 'KHÔNG HOÀN THÀNH';
+  return 'CHƯA CHẠY';
+}
+function renderScoreMcReview(state = scorePublicState()) {
+  const target = Math.max(1, Number(state.target) || 1);
+  const score = Math.max(0, Number(state.score) || 0);
+  const { missing, over, pct, avgPerMin, projected } = scoreMetrics(state);
+  const status = state.status || 'idle';
+  if (els.scoreReviewStatus) {
+    els.scoreReviewStatus.textContent = scoreStatusLabel(status);
+    els.scoreReviewStatus.className = `score-review-status status-${status}`;
+  }
+  if (els.scoreReviewStats) {
+    const giftCount = scoreGiftLog.length;
+    const delayText = status === 'grace' ? state.timeText : `${Math.round((state.delayMs || 0) / 1000)}s`;
+    const predictText = avgPerMin ? (projected >= target ? 'Dự kiến đạt' : 'Cần tăng tốc') : '—';
+    els.scoreReviewStats.innerHTML = `
+      <div class="score-stat-card primary"><span>Điểm hiện tại</span><b>${score.toLocaleString('en-US')}</b></div>
+      <div class="score-stat-card ${over > 0 ? 'over' : ''}"><span>${over > 0 ? '+Over: số dư' : 'Còn thiếu'}</span><b>${(over > 0 ? over : missing).toLocaleString('en-US')}</b></div>
+      <div class="score-stat-card"><span>Tiến độ</span><b>${pct.toFixed(1).replace('.0', '')}%</b></div>
+      <div class="score-stat-card"><span>Thời gian</span><b>${escapeHtml(state.timeText || '03:00')}</b></div>
+      <div class="score-stat-card"><span>Trễ quà</span><b>${escapeHtml(delayText)}</b></div>
+      <div class="score-stat-card"><span>Tốc độ</span><b>${avgPerMin ? `${avgPerMin.toLocaleString('en-US')}/phút` : '—'}</b></div>
+      <div class="score-stat-card"><span>Dự đoán</span><b>${escapeHtml(predictText)}</b></div>
+      <div class="score-stat-card"><span>Lượt quà tính</span><b>${giftCount.toLocaleString('en-US')}</b></div>`;
+  }
+  if (els.scoreGiftLog) {
+    if (!scoreGiftLog.length) {
+      els.scoreGiftLog.innerHTML = '<div class="score-log-empty">Chưa có quà nào được tính điểm trong phiên này.</div>';
+    } else {
+      els.scoreGiftLog.innerHTML = scoreGiftLog.map(item => {
+      const icon = item.gift_icon ? `<img class="score-log-icon" src="${escapeHtml(item.gift_icon)}" loading="lazy" />` : '<div class="score-log-icon empty"></div>';
+      const avatar = item.avatar ? `<img class="score-log-avatar" src="${escapeHtml(item.avatar)}" loading="lazy" />` : '';
+      const countText = item.count > 1 ? ` ×${item.count}` : '';
+      return `<div class="score-log-row">
+        ${avatar}${icon}
+        <div class="score-log-main">
+          <div><b>${escapeHtml(item.user || '?')}</b> <span>tặng ${escapeHtml(item.gift_name || '?')}${countText}</span></div>
+          <small>${escapeHtml(item.timeText)}</small>
+        </div>
+        <div class="score-log-points">+${item.points.toLocaleString('en-US')}</div>
+      </div>`;
+      }).join('');
+    }
+  }
+  renderScoreUserTotals();
+}
+
+function renderScoreUserTotals() {
+  if (!els.scoreUserTotals) return;
+  const rows = [...scoreUserTotals.values()].sort((a, b) => b.points - a.points || b.gifts - a.gifts);
+  if (!rows.length) {
+    els.scoreUserTotals.innerHTML = '<div class="score-user-summary">Tổng số người tặng: 0</div><div class="score-log-empty">Chưa có user nào tặng điểm trong vòng đấu.</div>';
+    return;
+  }
+  const totalUsers = rows.length;
+  els.scoreUserTotals.innerHTML = `<div class="score-user-summary">Tổng số người tặng: ${totalUsers.toLocaleString('en-US')}</div>` + rows.map((item, idx) => {
+    const avatar = item.avatar ? `<img class="score-log-avatar" src="${escapeHtml(item.avatar)}" loading="lazy" />` : '<div class="score-log-avatar empty">👤</div>';
+    return `<div class="score-user-row">
+      <div class="score-user-rank">${idx + 1}</div>
+      ${avatar}
+      <div class="score-user-main">
+        <b>${escapeHtml(item.user || '?')}</b>
+        <small>${item.gifts.toLocaleString('en-US')} lượt tặng</small>
+      </div>
+      <div class="score-user-points">${item.points.toLocaleString('en-US')}</div>
+    </div>`;
+  }).join('');
+}
+function applyScoreSettingsUi() {
+  const cfg = appSettings.scoreVote || {};
+  if (els.scoreHours) els.scoreHours.value = cfg.hours ?? 0;
+  if (els.scoreMinutes) els.scoreMinutes.value = cfg.minutes ?? 3;
+  if (els.scoreSeconds) els.scoreSeconds.value = cfg.seconds ?? 0;
+  if (els.scoreDelay) els.scoreDelay.value = cfg.delaySeconds ?? 5;
+  if (els.scoreTarget) els.scoreTarget.value = cfg.target ?? 30000;
+  if (els.scoreContent) els.scoreContent.value = cfg.content || 'Kêu gọi điểm ĐẬU';
+  if (els.scoreCreatorName) els.scoreCreatorName.value = cfg.creatorName || 'Creator';
+  if (els.scoreCreatorAvatar) els.scoreCreatorAvatar.value = cfg.creatorAvatar || '';
+  if (els.scoreTimeColor) els.scoreTimeColor.value = cfg.timeColor || '#ffffff';
+  if (els.scoreContentColor) els.scoreContentColor.value = cfg.contentColor || '#f0eef6';
+  if (els.scoreOverColor) els.scoreOverColor.value = cfg.overColor || '#ff0000';
+  if (els.scoreBarColor1) els.scoreBarColor1.value = cfg.barColor1 || '#b93678';
+  if (els.scoreBarColor2) els.scoreBarColor2.value = cfg.barColor2 || '#ff8ed1';
+  if (els.scoreWaveColor) els.scoreWaveColor.value = cfg.waveColor || '#ffffff';
+  if (els.scoreBigGiftThreshold) els.scoreBigGiftThreshold.value = cfg.bigGiftThreshold ?? 500;
+  if (els.scoreAutoResetSeconds) els.scoreAutoResetSeconds.value = cfg.autoResetSeconds ?? 0;
+  if (els.scoreThemePreset) els.scoreThemePreset.value = cfg.themePreset || 'custom';
+  if (els.scoreBarStyle) els.scoreBarStyle.value = cfg.barStyle || 'pill';
+  if (els.scoreOverlaySize) els.scoreOverlaySize.value = cfg.overlaySize || 'medium';
+  if (els.scoreCustomMilestones) els.scoreCustomMilestones.value = cfg.customMilestones || '';
+  if (els.scoreAutoHideSeconds) els.scoreAutoHideSeconds.value = cfg.autoHideSeconds ?? 0;
+  if (els.scoreShowGiftUser) els.scoreShowGiftUser.checked = cfg.showGiftUser !== false;
+  if (els.scoreShowMissing) els.scoreShowMissing.checked = cfg.showMissing !== false;
+  if (els.scoreShowTopUsers) els.scoreShowTopUsers.checked = cfg.showTopUsers !== false;
+  if (els.scoreShowSpeed) els.scoreShowSpeed.checked = cfg.showSpeed !== false;
+  if (els.scoreCompactMode) els.scoreCompactMode.checked = !!cfg.compactMode;
+  if (els.scoreHideAvatar) els.scoreHideAvatar.checked = !!cfg.hideAvatar;
+  if (els.scoreHideCreator) els.scoreHideCreator.checked = !!cfg.hideCreator;
+  if (els.scoreShowOnlyActive) els.scoreShowOnlyActive.checked = !!cfg.showOnlyActive;
+  if (els.scoreStartSoundLabel) els.scoreStartSoundLabel.value = cfg.startSoundName || '';
+  if (els.scoreWarningSoundLabel) els.scoreWarningSoundLabel.value = cfg.warningSoundName || '';
+  if (els.scoreGoalSoundLabel) els.scoreGoalSoundLabel.value = cfg.goalSoundName || '';
+  if (els.scoreSuccessSoundLabel) els.scoreSuccessSoundLabel.value = cfg.successSoundName || '';
+  if (els.scoreFailSoundLabel) els.scoreFailSoundLabel.value = cfg.failSoundName || '';
+  scoreState.target = cfg.target || 30000;
+  scoreState.durationMs = scoreDurationMs(scoreReadConfig());
+  scoreState.delayMs = (cfg.delaySeconds ?? 5) * 1000;
+  scoreState.timeText = formatScoreTime(scoreState.durationMs);
+  pushScoreState();
+}
+function persistScoreConfig() {
+  const cfg = scoreReadConfig();
+  appSettings.scoreVote = { ...appSettings.scoreVote, ...cfg };
+  saveAppSettings({ scoreVote: cfg }).catch(() => {});
+  scoreState.target = cfg.target;
+  pushScoreState();
+}
+
+function applyScoreThemePreset() {
+  const presets = {
+    douyin: ['#b93678', '#ff8ed1', '#ffffff', '#ff0000'],
+    vip: ['#b76b00', '#ffd36a', '#fff4c1', '#ffea7a'],
+    neon: ['#00a6ff', '#35ffcf', '#e7ffff', '#70fff0'],
+    battle: ['#8f101f', '#ff4b4b', '#ffe1e1', '#ff3b3b'],
+    luxury: ['#4c2a85', '#c79cff', '#f6edff', '#d7b8ff'],
+    minimal: ['#6b7280', '#d1d5db', '#ffffff', '#ffffff'],
+  };
+  const value = els.scoreThemePreset?.value || 'custom';
+  const colors = presets[value];
+  if (!colors) return persistScoreConfig();
+  if (els.scoreBarColor1) els.scoreBarColor1.value = colors[0];
+  if (els.scoreBarColor2) els.scoreBarColor2.value = colors[1];
+  if (els.scoreWaveColor) els.scoreWaveColor.value = colors[2];
+  if (els.scoreOverColor) els.scoreOverColor.value = colors[3];
+  persistScoreConfig();
+}
+function scoreTick() {
+  const now = Date.now();
+  if (scoreState.status === 'running') {
+    const remaining = scoreState.endAt - now;
+    scoreState.timeText = formatScoreTime(remaining);
+    if (remaining <= 10000 && remaining > 0 && !scoreWarningSoundPlayed) {
+      scoreWarningSoundPlayed = true;
+      playScoreCue('warning');
+    }
+    if (remaining <= 0) setScoreStatus(scoreState.delayMs > 0 ? 'grace' : (scoreState.score >= scoreState.target ? 'success' : 'failed'));
+  }
+  if (scoreState.status === 'grace') {
+    const remainingDelay = scoreState.delayEndAt - now;
+    scoreState.timeText = 'ĐANG TÍNH ĐIỂM';
+    if (remainingDelay <= 0) setScoreStatus(scoreState.score >= scoreState.target ? 'success' : 'failed');
+  }
+  pushScoreState();
+  if (!['running', 'grace'].includes(scoreState.status) && scoreTimer) {
+    clearInterval(scoreTimer);
+    scoreTimer = null;
+  }
+}
+function scoreStart() {
+  if (!isConnected) {
+    alert('Vui lòng kết nối LIVE để sử dụng tính năng');
+    return;
+  }
+  const cfg = scoreReadConfig();
+  appSettings.scoreVote = { ...appSettings.scoreVote, ...cfg };
+  saveAppSettings({ scoreVote: cfg }).catch(() => {});
+  const now = Date.now();
+  const durationMs = scoreDurationMs(cfg);
+  const delayMs = cfg.delaySeconds * 1000;
+  scoreCountedEventKeys.clear();
+  if (scoreAutoResetTimer) clearTimeout(scoreAutoResetTimer);
+  scoreResultSoundPlayed = false;
+  scoreWarningSoundPlayed = false;
+  scoreGoalSoundPlayed = false;
+  playScoreCue('start');
+  scoreState = {
+    ...scoreState,
+    status: 'running',
+    target: cfg.target,
+    durationMs,
+    delayMs,
+    startedAt: now,
+    endAt: now + durationMs,
+    delayEndAt: now + durationMs + delayMs,
+    resultAt: 0,
+    lastAdd: 0,
+    lastAddUser: '',
+    timeText: formatScoreTime(durationMs),
+  };
+  if (scoreTimer) clearInterval(scoreTimer);
+  scoreTimer = setInterval(scoreTick, 250);
+  scoreTick();
+}
+function scoreStop() {
+  setScoreStatus('idle');
+  if (scoreTimer) clearInterval(scoreTimer);
+  if (scoreAutoResetTimer) clearTimeout(scoreAutoResetTimer);
+  scoreTimer = null;
+  scoreState.timeText = formatScoreTime(scoreDurationMs(scoreReadConfig()));
+  pushScoreState();
+}
+function scoreReset() {
+  if (scoreAutoResetTimer) clearTimeout(scoreAutoResetTimer);
+  scoreState.score = 0;
+  scoreState.lastAdd = 0;
+  scoreState.lastAddUser = '';
+  setScoreStatus('idle');
+  scoreResultSoundPlayed = false;
+  scoreWarningSoundPlayed = false;
+  scoreGoalSoundPlayed = false;
+  scoreGiftLog.length = 0;
+  scoreCountedEventKeys.clear();
+  scoreUserTotals.clear();
+  if (scoreTimer) clearInterval(scoreTimer);
+  scoreTimer = null;
+  scoreState.timeText = formatScoreTime(scoreDurationMs(scoreReadConfig()));
+  scoreState.resultAt = 0;
+  pushScoreState();
+}
+function scoreAdd(points, ev = null) {
+  const n = Math.max(0, Math.round(Number(points) || 0));
+  if (!n || !['running', 'grace'].includes(scoreState.status)) return;
+  scoreState.score += n;
+  scoreState.lastAdd = n;
+  scoreState.lastAddUser = ev?.user || '';
+  if (!scoreGoalSoundPlayed && scoreState.score >= scoreState.target) {
+    scoreGoalSoundPlayed = true;
+    playScoreCue('goal');
+  }
+  if (ev) {
+    const count = ev.total_count != null ? ev.total_count : ((ev.gift_count || 1) * (ev.combo || 1));
+    const user = ev.user || '?';
+    const currentUserTotal = scoreUserTotals.get(user) || { user, avatar: resolveAvatarForUser(ev.user, ev.user_avatar_url), points: 0, gifts: 0 };
+    currentUserTotal.points += n;
+    currentUserTotal.gifts += 1;
+    if (!currentUserTotal.avatar) currentUserTotal.avatar = resolveAvatarForUser(ev.user, ev.user_avatar_url);
+    scoreUserTotals.set(user, currentUserTotal);
+    scoreGiftLog.unshift({
+      user,
+      avatar: resolveAvatarForUser(ev.user, ev.user_avatar_url),
+      gift_name: ev.gift_name || '?',
+      gift_icon: ev.gift_icon || ev.gift_icon_url || '',
+      count: Math.max(1, count || 1),
+      points: n,
+      timeText: new Date().toLocaleTimeString(),
+    });
+    if (scoreGiftLog.length > SCORE_LOG_MAX) scoreGiftLog.length = SCORE_LOG_MAX;
+  }
+  if (scoreLastAddTimer) clearTimeout(scoreLastAddTimer);
+  scoreLastAddTimer = setTimeout(() => { scoreState.lastAdd = 0; scoreState.lastAddUser = ''; pushScoreState(); }, 2400);
+  pushScoreState();
+}
+function scoreHandleGift(ev) {
+  if (!ev || ev.type !== 'gift') return;
+  const key = scoreEventKey(ev);
+  if (scoreCountedEventKeys.has(key)) return;
+  scoreCountedEventKeys.add(key);
+  if (scoreCountedEventKeys.size > 1200) scoreCountedEventKeys.clear();
+  scoreAdd(giftDiamondPointsFromEvent(ev), ev);
+}
+['scoreHours','scoreMinutes','scoreSeconds','scoreDelay','scoreTarget','scoreContent','scoreCreatorName','scoreCreatorAvatar','scoreTimeColor','scoreContentColor','scoreOverColor','scoreBarColor1','scoreBarColor2','scoreWaveColor','scoreBigGiftThreshold','scoreAutoResetSeconds','scoreThemePreset','scoreBarStyle','scoreOverlaySize','scoreCustomMilestones','scoreAutoHideSeconds','scoreShowGiftUser','scoreShowMissing','scoreShowTopUsers','scoreShowSpeed','scoreCompactMode','scoreHideAvatar','scoreHideCreator','scoreShowOnlyActive'].forEach(id => {
+  const el = els[id];
+  if (el) el.addEventListener('change', id === 'scoreThemePreset' ? applyScoreThemePreset : persistScoreConfig);
+  if (el && ['scoreContent','scoreCreatorName','scoreCreatorAvatar','scoreTimeColor','scoreContentColor','scoreOverColor','scoreBarColor1','scoreBarColor2','scoreWaveColor','scoreCustomMilestones'].includes(id)) el.addEventListener('input', () => { persistScoreConfig(); });
+});
+function scoreEnsureTestRunning() {
+  if (['running', 'grace'].includes(scoreState.status)) return;
+  const cfg = scoreReadConfig();
+  const now = Date.now();
+  scoreResultSoundPlayed = false;
+  scoreWarningSoundPlayed = false;
+  scoreGoalSoundPlayed = false;
+  scoreState = { ...scoreState, status: 'running', target: cfg.target, durationMs: scoreDurationMs(cfg), delayMs: cfg.delaySeconds * 1000, startedAt: now, endAt: now + scoreDurationMs(cfg), delayEndAt: now + scoreDurationMs(cfg) + cfg.delaySeconds * 1000, resultAt: 0, timeText: formatScoreTime(scoreDurationMs(cfg)) };
+  if (scoreTimer) clearInterval(scoreTimer);
+  scoreTimer = setInterval(scoreTick, 250);
+}
+if (els.btnScoreStart) els.btnScoreStart.onclick = scoreStart;
+if (els.btnScoreStop) els.btnScoreStop.onclick = scoreStop;
+if (els.btnScoreReset) els.btnScoreReset.onclick = scoreReset;
+if (els.btnScoreTest) els.btnScoreTest.onclick = () => {
+  const n = Math.max(1, parseInt(els.scoreTestPoints?.value, 10) || 100);
+  scoreEnsureTestRunning();
+  scoreAdd(n, { user: 'MC Test', gift_name: 'Test Đậu', total_count: 1, total_diamond: n });
+};
+if (els.btnScoreTestBig) els.btnScoreTestBig.onclick = () => {
+  const n = Math.max(1, Number(scoreReadConfig().bigGiftThreshold) || 500);
+  scoreEnsureTestRunning();
+  scoreAdd(n, { user: 'User Quà Lớn', gift_name: 'Quà lớn', total_count: 1, total_diamond: n });
+};
+if (els.btnScoreTestWarning) els.btnScoreTestWarning.onclick = () => {
+  scoreEnsureTestRunning();
+  scoreState.endAt = Date.now() + 10000;
+  scoreState.delayEndAt = scoreState.endAt + scoreState.delayMs;
+  scoreWarningSoundPlayed = false;
+  pushScoreState();
+};
+if (els.btnScoreTestSuccess) els.btnScoreTestSuccess.onclick = () => {
+  scoreEnsureTestRunning();
+  scoreState.score = Math.max(scoreState.score, scoreReadConfig().target);
+  setScoreStatus('success');
+  pushScoreState();
+};
+if (els.btnScoreTestFail) els.btnScoreTestFail.onclick = () => {
+  scoreEnsureTestRunning();
+  scoreState.score = Math.min(scoreState.score, scoreReadConfig().target - 1);
+  setScoreStatus('failed');
+  pushScoreState();
+};
+if (els.btnScorePickStartSound) els.btnScorePickStartSound.onclick = () => pickScoreSound('start');
+if (els.btnScoreClearStartSound) els.btnScoreClearStartSound.onclick = () => clearScoreSound('start');
+if (els.btnScorePickWarningSound) els.btnScorePickWarningSound.onclick = () => pickScoreSound('warning');
+if (els.btnScoreClearWarningSound) els.btnScoreClearWarningSound.onclick = () => clearScoreSound('warning');
+if (els.btnScorePickGoalSound) els.btnScorePickGoalSound.onclick = () => pickScoreSound('goal');
+if (els.btnScoreClearGoalSound) els.btnScoreClearGoalSound.onclick = () => clearScoreSound('goal');
+if (els.btnScorePickSuccessSound) els.btnScorePickSuccessSound.onclick = () => pickScoreSound('success');
+if (els.btnScoreClearSuccessSound) els.btnScoreClearSuccessSound.onclick = () => clearScoreSound('success');
+if (els.btnScorePickFailSound) els.btnScorePickFailSound.onclick = () => pickScoreSound('fail');
+if (els.btnScoreClearFailSound) els.btnScoreClearFailSound.onclick = () => clearScoreSound('fail');
+if (els.btnScoreCopyUrl) {
+  els.btnScoreCopyUrl.onclick = async () => {
+    pushScoreState();
+    const r = await window.bigo.scoreCopyUrl().catch(e => ({ ok: false, error: e.message }));
+    if (r?.ok) appendLog('[score] đã copy link OBS: ' + r.url);
+    else alert(r?.error || 'Không copy được link Tính điểm');
+  };
 }
 
 // =================== Group Edit Dialog ===================

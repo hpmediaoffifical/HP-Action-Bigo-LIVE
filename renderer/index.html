@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <title>HP Action - BIGO LIVE</title>
+  <title>HP Action - Bigo LIVE</title>
   <link rel="icon" type="image/png" href="../logo-hp.png" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -28,23 +28,24 @@
       <div class="sidebar-logo" title="BIGO Action">
         <img src="../logo-hp.png" alt="logo" />
       </div>
-      <button class="tab sidebar-tab active" data-tab="embed" title="Tương tác (chat + quà nhận)">💬</button>
-      <button class="tab sidebar-tab" data-tab="queue" title="Hàng đợi hiệu ứng">🎬</button>
-      <button class="tab sidebar-tab" data-tab="gifts" title="Bảng quà">🎁</button>
-      <button class="tab sidebar-tab" data-tab="gameplay" title="GROUP DANCE">👯</button>
-      <button class="tab sidebar-tab" data-tab="overlays" title="Overlay">🪟</button>
-      <button class="tab sidebar-tab" data-tab="special" title="Hiệu Ứng Đặc Biệt">✨</button>
+      <button class="tab sidebar-tab active" data-tab="embed" title="TƯƠNG TÁC" aria-label="TƯƠNG TÁC">💬</button>
+      <button class="tab sidebar-tab" data-tab="queue" title="DANH SÁCH HIỆU ỨNG" aria-label="DANH SÁCH HIỆU ỨNG">🎬</button>
+      <button class="tab sidebar-tab" data-tab="gifts" title="BẢNG QUÀ" aria-label="BẢNG QUÀ">🎁</button>
+      <button class="tab sidebar-tab" data-tab="gameplay" title="GROUP DANCE" aria-label="GROUP DANCE">👯</button>
+      <button class="tab sidebar-tab" data-tab="score" title="TÍNH ĐIỂM" aria-label="TÍNH ĐIỂM">🏁</button>
+      <button class="tab sidebar-tab" data-tab="overlays" title="OVERLAY" aria-label="OVERLAY">🪟</button>
+      <button class="tab sidebar-tab" data-tab="special" title="ĐẶC BIỆT" aria-label="ĐẶC BIỆT">✨</button>
       <div class="sidebar-spacer"></div>
-      <button class="sidebar-tab" id="sidebarBgmToggle" title="Phát / Dừng nhạc nền">🎵</button>
-      <button class="sidebar-tab" id="sidebarLockSettings" title="Khoá cài đặt — chống chỉnh nhầm trong khi stream">🔐</button>
-      <button class="tab sidebar-tab" data-tab="settings" title="Cài đặt chung">⚙️</button>
-      <button class="tab sidebar-tab" data-tab="info" title="Thông tin Nhà Phát Triển">ℹ️</button>
+      <button class="sidebar-tab" id="sidebarBgmToggle" title="MUSIC BACKGROUD" aria-label="MUSIC BACKGROUD">🎵</button>
+      <button class="sidebar-tab" id="sidebarLockSettings" title="KHÓA GIAO DIỆN" aria-label="KHÓA GIAO DIỆN">🔐</button>
+      <button class="tab sidebar-tab" data-tab="settings" title="CÀI ĐẶT CHUNG" aria-label="CÀI ĐẶT CHUNG">⚙️</button>
+      <button class="tab sidebar-tab" data-tab="info" title="NHÀ PHÁT HÀNH" aria-label="NHÀ PHÁT HÀNH">ℹ️</button>
     </aside>
 
     <div class="main-content">
   <header>
     <h1>HP Action - BIGO LIVE <span class="badge" id="status">disconnected</span></h1>
-    <a href="https://hpvn.media" id="brandLink" class="hint brand-link" title="Mở hpvn.media">https://hpvn.media</a>
+    <div id="headerLiveInfo" class="header-live-info">Nhập ID rồi bấm Kết nối</div>
     <div class="header-license" id="headerLicense" style="display:none">
       <div class="hl-row" title="Khách hàng (theo key bản quyền)">
         <span class="hl-icon">👤</span>
@@ -66,7 +67,7 @@
           <input id="embedBigoId" placeholder="vd: 1066691535" class="connect-input" />
           <button id="btnConnect" class="primary">KẾT NỐI</button>
           <button id="btnEmbedShow" disabled>👁 VIEW</button>
-          <span id="liveInfo" class="live-info-inline">Nhập ID rồi bấm Kết nối</span>
+          <span id="liveInfo" class="live-info-inline" style="display:none"></span>
           <div class="connect-stats">
             <span title="Số người xem LIVE hiện tại">👁️ <b id="csViewers">0</b></span>
             <span title="Số lần đã phát hiệu ứng (kể cả phát thử)">🎵 <b id="csEffects">0</b></span>
@@ -146,7 +147,7 @@
     <section class="tab-panel" data-tab="queue">
       <div class="panel" id="effectQueuePanel">
         <div class="panel-head">
-          <h2>📋 HÀNH ĐỘNG</h2>
+          <h2>📋 DANH SÁCH HIỆU ỨNG</h2>
           <div class="queue-stats">
             <span>🎁 quà: <b id="qStatGifts">0</b></span>
             <span><span class="bean-icon inline"></span>đậu: <b id="qStatDiamond">0</b></span>
@@ -175,7 +176,7 @@
     <section class="tab-panel" data-tab="gifts">
       <div class="panel">
         <div class="panel-head">
-          <h2>Bảng quà → hiệu ứng</h2>
+          <h2>🎁 BẢNG QUÀ</h2>
           <div>
             <button id="btnAddGift" class="primary" title="Thêm quà mới + chọn hiệu ứng — chung dialog với Tương tác">+ Thêm quà</button>
             <button id="btnTestGift">🎁 Test phát</button>
@@ -290,11 +291,131 @@
       </div>
     </section>
 
+    <!-- =================== TAB: SCORE VOTE =================== -->
+    <section class="tab-panel" data-tab="score">
+      <div class="panel score-panel">
+        <div class="panel-head">
+          <h2>🏁 TÍNH ĐIỂM</h2>
+          <div style="display:flex;gap:8px">
+            <button id="btnScoreCopyUrl" class="primary">🔗 Copy link OBS</button>
+          </div>
+        </div>
+        <div class="hint small" style="margin-bottom:10px">
+          Khi bấm <b>Bắt đầu</b>, mọi quà có giá trị Đậu sẽ quy đổi 1 Đậu = 1 điểm. Hết giờ vẫn tính thêm trong thời gian trễ quà tặng.
+        </div>
+        <div class="score-layout">
+          <div class="score-controls">
+            <div class="score-actions score-actions-main">
+              <button id="btnScoreStart" class="primary">BẮT ĐẦU</button>
+              <button id="btnScoreStop">NGƯNG</button>
+              <button id="btnScoreReset" class="danger">RESET điểm</button>
+            </div>
+            <details class="score-config-group" open>
+              <summary>Vận hành vòng tính điểm</summary>
+              <div class="score-control-grid compact-grid">
+                <label>Tiếng<input id="scoreHours" type="number" min="0" max="24" value="0" /></label>
+                <label>Phút<input id="scoreMinutes" type="number" min="0" max="59" value="3" /></label>
+                <label>Giây<input id="scoreSeconds" type="number" min="0" max="59" value="0" /></label>
+                <label>Độ trễ quà (giây)<input id="scoreDelay" type="number" min="0" max="120" value="5" /></label>
+                <label>Điểm yêu cầu<input id="scoreTarget" type="number" min="1" value="30000" /></label>
+                <label>Quà lớn từ điểm<input id="scoreBigGiftThreshold" type="number" min="1" value="500" /></label>
+                <label>Tự reset sau (giây)<input id="scoreAutoResetSeconds" type="number" min="0" max="300" value="0" /></label>
+                <label>Tự ẩn kết quả sau (giây)<input id="scoreAutoHideSeconds" type="number" min="0" max="300" value="0" /></label>
+              </div>
+            </details>
+            <details class="score-config-group" open>
+              <summary>Nội dung overlay</summary>
+              <div class="score-control-grid">
+                <label>Nội dung tự nhập<input id="scoreContent" placeholder="VD: Kêu gọi điểm ĐẬU" /></label>
+                <label>Tên Creator<input id="scoreCreatorName" placeholder="Tên Creator" /></label>
+                <label class="wide">Avatar Creator URL<input id="scoreCreatorAvatar" placeholder="Dán link avatar (tuỳ chọn)" /></label>
+              </div>
+            </details>
+            <details class="score-config-group">
+              <summary>Giao diện thanh máu</summary>
+              <div class="score-control-grid compact-grid">
+                <label>Preset giao diện<select id="scoreThemePreset"><option value="custom">Tuỳ chỉnh</option><option value="douyin">Hồng Douyin</option><option value="vip">Vàng VIP</option><option value="neon">Xanh Neon</option><option value="battle">Đỏ Battle</option><option value="luxury">Tím Luxury</option><option value="minimal">Xám Minimal</option></select></label>
+                <label>Kiểu thanh<select id="scoreBarStyle"><option value="pill">Pill bo tròn</option><option value="game">Game HP</option><option value="luxury">Luxury mảnh</option><option value="segments">Chia ô</option></select></label>
+                <label>Kích thước overlay<select id="scoreOverlaySize"><option value="medium">Vừa</option><option value="small">Nhỏ</option><option value="large">Lớn</option></select></label>
+                <label>Mốc điểm tuỳ nhập<input id="scoreCustomMilestones" placeholder="VD: 10000,20000,30000" /></label>
+                <label>Màu thời gian<input id="scoreTimeColor" type="color" value="#ffffff" /></label>
+                <label>Màu nội dung<input id="scoreContentColor" type="color" value="#f0eef6" /></label>
+                <label>Màu số dư +Over<input id="scoreOverColor" type="color" value="#ff0000" /></label>
+                <label>Màu thanh 1<input id="scoreBarColor1" type="color" value="#b93678" /></label>
+                <label>Màu thanh 2<input id="scoreBarColor2" type="color" value="#ff8ed1" /></label>
+                <label>Màu sóng<input id="scoreWaveColor" type="color" value="#ffffff" /></label>
+              </div>
+            </details>
+            <details class="score-config-group">
+              <summary>Hiển thị thông tin</summary>
+              <div class="score-control-grid compact-grid">
+                <label class="score-check-row"><span>Hiện tên user tặng quà</span><input id="scoreShowGiftUser" type="checkbox" checked /></label>
+                <label class="score-check-row"><span>Hiện điểm còn thiếu</span><input id="scoreShowMissing" type="checkbox" checked /></label>
+                <label class="score-check-row"><span>Hiện top user</span><input id="scoreShowTopUsers" type="checkbox" checked /></label>
+                <label class="score-check-row"><span>Hiện tốc độ/dự đoán</span><input id="scoreShowSpeed" type="checkbox" checked /></label>
+                <label class="score-check-row"><span>Overlay gọn</span><input id="scoreCompactMode" type="checkbox" /></label>
+                <label class="score-check-row"><span>Ẩn avatar</span><input id="scoreHideAvatar" type="checkbox" /></label>
+                <label class="score-check-row"><span>Ẩn tên Creator</span><input id="scoreHideCreator" type="checkbox" /></label>
+                <label class="score-check-row"><span>Chỉ hiện khi chạy</span><input id="scoreShowOnlyActive" type="checkbox" /></label>
+              </div>
+            </details>
+            <details class="score-config-group">
+              <summary>Test overlay</summary>
+              <div class="score-actions">
+                <input id="scoreTestPoints" type="number" min="1" value="100" style="width:86px" title="Điểm test" />
+                <button id="btnScoreTest" class="tiny">Test điểm</button>
+                <button id="btnScoreTestBig" class="tiny">Test quà lớn</button>
+                <button id="btnScoreTestWarning" class="tiny">Test 10s cuối</button>
+                <button id="btnScoreTestSuccess" class="tiny primary">Test thành công</button>
+                <button id="btnScoreTestFail" class="tiny danger">Test thất bại</button>
+              </div>
+            </details>
+            <details class="score-config-group">
+              <summary>Âm thanh</summary>
+              <div class="score-sound-grid">
+                <label>Âm thanh BẮT ĐẦU<div class="score-sound-row"><input id="scoreStartSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickStartSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearStartSound" class="tiny danger">🗑</button></div></label>
+                <label>Âm thanh 10 GIÂY CUỐI<div class="score-sound-row"><input id="scoreWarningSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickWarningSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearWarningSound" class="tiny danger">🗑</button></div></label>
+                <label>Âm thanh ĐẠT MỤC TIÊU<div class="score-sound-row"><input id="scoreGoalSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickGoalSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearGoalSound" class="tiny danger">🗑</button></div></label>
+                <label>Âm thanh THÀNH CÔNG<div class="score-sound-row"><input id="scoreSuccessSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickSuccessSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearSuccessSound" class="tiny danger">🗑</button></div></label>
+                <label>Âm thanh KHÔNG THÀNH CÔNG<div class="score-sound-row"><input id="scoreFailSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickFailSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearFailSound" class="tiny danger">🗑</button></div></label>
+              </div>
+            </details>
+          </div>
+          <div class="score-preview-wrap">
+            <div id="scorePreview" class="score-preview"></div>
+            <div class="score-mc-review">
+              <div class="score-review-head">
+                <h3>Review cho MC</h3>
+                <span id="scoreReviewStatus" class="score-review-status">CHƯA CHẠY</span>
+              </div>
+              <div id="scoreReviewStats" class="score-review-stats"></div>
+              <div class="score-review-columns">
+                <div class="score-review-col">
+                  <div class="score-review-log-head">
+                    <b>Quà vừa tính điểm</b>
+                    <span>mới nhất ở trên</span>
+                  </div>
+                  <div id="scoreGiftLog" class="score-gift-log"></div>
+                </div>
+                <div class="score-review-col">
+                  <div class="score-review-log-head">
+                    <b>Tổng điểm theo user</b>
+                    <span>cao nhất ở trên</span>
+                  </div>
+                  <div id="scoreUserTotals" class="score-user-totals"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- =================== TAB: OVERLAYS =================== -->
     <section class="tab-panel" data-tab="overlays">
       <div class="panel">
         <div class="panel-head">
-          <h2>Cửa sổ overlay</h2>
+          <h2>🪟 OVERLAY</h2>
           <button id="btnAddOverlay" class="primary">+ Thêm overlay</button>
         </div>
         <div class="table-wrap">
@@ -329,7 +450,7 @@
     <!-- =================== TAB: HIỆU ỨNG ĐẶC BIỆT =================== -->
     <section class="tab-panel" data-tab="special">
       <div class="panel">
-        <h2>✨ Hiệu Ứng Đặc Biệt</h2>
+        <h2>✨ ĐẶC BIỆT</h2>
         <div class="hint small" style="margin-bottom:10px">
           Gắn quà tặng làm trigger cho action đặc biệt. User trong LIVE tặng đúng quà này → app tự thực hiện.
         </div>
@@ -460,7 +581,7 @@
     <!-- =================== TAB: CÀI ĐẶT CHUNG =================== -->
     <section class="tab-panel" data-tab="settings">
       <div class="panel">
-        <h2>⚙️ Cài đặt chung</h2>
+        <h2>⚙️ CÀI ĐẶT CHUNG</h2>
         <div class="row">
           <label style="flex:2">🎵 Nhạc nền (mp3/wav/ogg)
             <div style="display:flex; gap:6px">
@@ -546,10 +667,10 @@
 
     </section>
 
-    <!-- =================== TAB: THÔNG TIN NHÀ PHÁT TRIỂN =================== -->
+    <!-- =================== TAB: NHÀ PHÁT HÀNH =================== -->
     <section class="tab-panel" data-tab="info">
       <div class="panel">
-        <h2>ℹ️ Phiên bản &amp; Bản quyền</h2>
+        <h2>ℹ️ NHÀ PHÁT HÀNH</h2>
         <div class="dev-info">
           <div class="dev-row"><span class="dev-key">Phiên bản hiện tại:</span><span class="dev-val"><b id="appVersion">—</b></span></div>
           <div class="dev-row">

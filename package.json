@@ -11,7 +11,7 @@
   "license": "ISC",
   "build": {
     "appId": "com.hp.bigoaction",
-    "productName": "BIGO Action",
+    "productName": "HP Action - Bigo LIVE",
     "win": {
       "icon": "logo-hp.ico"
     },
