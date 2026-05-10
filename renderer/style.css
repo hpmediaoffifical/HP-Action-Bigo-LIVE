@@ -1222,6 +1222,15 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .slot-picker-item.muted { color: #8a8f9a; }
 
 /* ============ Score Vote ============ */
+/* ===================== HINT BAR & SUBHEAD (shared by score / pkduo / ranking) ===================== */
+.panel-hint { margin-bottom: 12px; padding: 10px 14px; border: 1px solid #2a3142; border-left: 4px solid #ff8a3d; border-radius: 12px; background: linear-gradient(135deg, rgba(255,138,61,.10), rgba(207,62,134,.06)); color: #d5dae7; font-size: 12px; line-height: 1.55; }
+.panel-hint b { color: #ffd166; font-weight: 950; }
+.score-subhead,.ranking-subhead,.pkduo-subhead { grid-column: 1 / -1; padding: 4px 0 6px; color: #ffd166; font-size: 12px; font-weight: 950; letter-spacing: .04em; text-transform: uppercase; border-bottom: 1px dashed rgba(255,209,102,.32); margin: 4px 0 6px; }
+.score-color-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; padding: 0 12px 12px; }
+.score-color-grid label { display: grid; grid-template-columns: minmax(0,1fr) 56px; gap: 8px; align-items: center; min-height: 38px; padding: 4px 10px; border: 1px solid #262a35; border-radius: 10px; background: #10131b; color: #aeb6c7; font-size: 12px; font-weight: 800; }
+.score-color-grid input[type="color"] { width: 50px; height: 28px; padding: 0; border: 0; background: transparent; }
+@media (max-width: 980px) { .score-color-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 620px) { .score-color-grid { grid-template-columns: 1fr; } }
 .score-layout { display: grid; grid-template-columns: minmax(360px, 520px) 1fr; gap: 16px; align-items: start; }
 .score-controls { display: grid; gap: 12px; }
 .score-control-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -1509,6 +1518,31 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 @media (max-width: 900px) { .ranking-control-grid,.ranking-operation-grid,.ranking-display-grid,.ranking-grid-settings { grid-template-columns: 1fr; } .ranking-title-setting { grid-column: auto; } .ranking-editor-mainline,.ranking-editor-subline { grid-template-columns: 1fr; } .ranking-editor-row > * { min-width: 0; } }
 
 @keyframes rankingNameMarquee { 0%,12% { transform: translateX(0); } 88%,100% { transform: translateX(calc(-100% + 100px)); } }
+
+/* ===================== PK ĐÔI redesign helpers ===================== */
+.pkduo-status-wrap { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 6px 12px; border-radius: 999px; background: rgba(255,209,102,.08); border: 1px solid rgba(255,209,102,.24); color: #aeb6c7; font-size: 12px; font-weight: 800; }
+.pkduo-status-wrap .pkduo-status { color: #ffd166; font-weight: 950; }
+.pkduo-time-grid { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+.pkduo-time-grid .pkduo-mode-toggle { grid-column: span 3; }
+.pkduo-style-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+.pkduo-style-grid .pkduo-content-wide,
+.pkduo-style-grid .pkduo-bg-control { grid-column: span 2; }
+.pkduo-team-head { display: grid; grid-template-columns: 36px minmax(0,1fr); gap: 10px; align-items: center; padding-bottom: 8px; border-bottom: 1px dashed rgba(255,255,255,.08); }
+.pkduo-team-head label { display: grid; gap: 5px; color: #d5dae7; font-size: 12px; font-weight: 850; }
+.pkduo-team-flag { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); font-size: 22px; }
+.pkduo-team-card.team-a .pkduo-team-flag { background: rgba(216,88,124,.18); border-color: rgba(216,88,124,.55); }
+.pkduo-team-card.team-b .pkduo-team-flag { background: rgba(99,128,255,.18); border-color: rgba(99,128,255,.55); }
+.pkduo-team-card.team-a { border-left: 3px solid #d8587c; }
+.pkduo-team-card.team-b { border-left: 3px solid #6380ff; }
+.pkduo-actions.score-actions-main { justify-content: flex-start; gap: 10px; }
+.ranking-top-actions.score-actions-main { justify-content: center; }
+@media (max-width: 900px) { .pkduo-time-grid,.pkduo-style-grid { grid-template-columns: 1fr; } .pkduo-time-grid .pkduo-mode-toggle,.pkduo-style-grid .pkduo-content-wide,.pkduo-style-grid .pkduo-bg-control { grid-column: auto; } }
+
+/* ===================== Ranking redesign helpers ===================== */
+.ranking-toggle-grid { padding-top: 4px; }
+.ranking-preview-section { display: grid; gap: 6px; padding: 12px; border: 1px solid #262a35; border-radius: 14px; background: #10131b; }
+.ranking-preview-section + .ranking-preview-section { margin-top: 12px; }
+.ranking-preview-section .gameplay-section-title { margin: 0 0 4px; color: #ffd166; font-size: 13px; font-weight: 950; letter-spacing: .03em; text-transform: uppercase; }
 
 .pkduo-monitor { margin-bottom: 14px; padding: 12px; border: 1px solid #262a35; border-radius: 16px; background: #10131b; }
 .pkduo-layout { display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start; }

@@ -6,140 +6,21 @@
       "name": "NHÓM CHUNG",
       "type": "gift",
       "enabled": true,
-      "collapsed": false,
+      "collapsed": true,
       "bigoId": "",
-      "items": [
-        {
-          "id": "i_moxb2tre7cfv",
-          "matchKeys": [
-            "1140",
-            "Kiss"
-          ],
-          "alias": "HÔN TÔI ĐI",
-          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/09. Phóng Dây Leo.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false,
-          "preEffect": true,
-          "priority": 0
-        },
-        {
-          "id": "i_moxc5oh9rk0x",
-          "matchKeys": [
-            "2463",
-            "Bell",
-            "7750",
-            "Bell-测试68372/60190"
-          ],
-          "alias": "Bell",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false,
-          "priority": 0
-        },
-        {
-          "id": "i_moxdzuao0rkl",
-          "matchKeys": [
-            "5355",
-            "Duck Box"
-          ],
-          "alias": "Duck Box",
-          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/dance (5).mp3",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": true,
-          "preEffect": true,
-          "priority": 0
-        },
-        {
-          "id": "i_moxf76ewyq6n",
-          "matchKeys": [
-            "504754",
-            "Galaxy Ring"
-          ],
-          "alias": "Galaxy Ring",
-          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/06. Ném Gạch.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false,
-          "preEffect": false,
-          "priority": 0
-        },
-        {
-          "id": "i_moxfttwodyvs",
-          "matchKeys": [
-            "504532",
-            "Red Cap"
-          ],
-          "alias": "Red Cap",
-          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/dance (2).mp3",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": true,
-          "preEffect": false,
-          "priority": 0
-        },
-        {
-          "id": "i_moxg99g7o4l1",
-          "matchKeys": [
-            "500858",
-            "Gold"
-          ],
-          "alias": "Gold",
-          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/dance (4).mp3",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": true,
-          "preEffect": false,
-          "priority": 0
-        }
-      ],
+      "items": [],
       "isCommon": true
     },
     {
       "id": "g_mox8ulzfk04f",
       "name": "NPC",
       "type": "gift",
-      "enabled": true,
-      "collapsed": false,
+      "enabled": false,
+      "collapsed": true,
       "bigoId": "",
-      "items": [
-        {
-          "id": "g_mox5xbantd65",
-          "matchKeys": [
-            "5773",
-            "Heart Lock",
-            "7511"
-          ],
-          "alias": "Heart Lock",
-          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false,
-          "preEffect": true,
-          "priority": 0
-        },
-        {
-          "id": "g_mox4yljml3od",
-          "matchKeys": [
-            "2968",
-            "Blue Flower"
-          ],
-          "alias": "Blue Flower",
-          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/02. Bướm Ảo.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": true,
-          "preEffect": false,
-          "priority": 0
-        },
-        {
-          "id": "g_mox7x2tvggnl",
-          "matchKeys": [
-            "501947",
-            "Star Food Box"
-          ],
-          "alias": "Star Food Box",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false
-        }
-      ],
-      "bgmFile": "file:///G:/MUSIC BG/Đi bộ.mp3",
-      "bgmFileName": "Đi bộ.mp3"
+      "items": [],
+      "bgmFile": "file:///G:/MUSIC BG/HİlXg - Reay kill - YouTube.mp3",
+      "bgmFileName": "HİlXg - Reay kill - YouTube.mp3"
     },
     {
       "id": "g_mox9je2347fw",
@@ -149,6 +30,44 @@
       "collapsed": false,
       "bigoId": "",
       "items": [
+        {
+          "id": "i_moz6mor4q7nf",
+          "matchKeys": [
+            "5877",
+            "💓Heart Rose"
+          ],
+          "alias": "💓Heart Rose",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/02. Bướm Ảo.webm",
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/02. Bướm Ảo.webm"
+          ],
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": false,
+          "priority": 0
+        },
+        {
+          "id": "i_moxb2tre7cfv",
+          "matchKeys": [
+            "1140",
+            "Kiss",
+            "9",
+            "7342",
+            "7758",
+            "Sexy Kiss"
+          ],
+          "alias": "HÔN TÔI ĐI",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/04. Chưởng Năng Lượng.webm",
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/04. Chưởng Năng Lượng.webm",
+            "file:///C:/Users/NCPC/Desktop/Krixi/07. Đóng cửa.webm",
+            "file:///C:/Users/NCPC/Desktop/Krixi/10. Trói Dây Leo 1.webm"
+          ],
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": true,
+          "priority": 0
+        },
         {
           "id": "g_mox4yxkelnd9",
           "matchKeys": [
@@ -172,18 +91,158 @@
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": false,
           "preEffect": false,
+          "priority": 0,
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/Tơ nhện.webm"
+          ]
+        },
+        {
+          "id": "i_moxc5oh9rk0x",
+          "matchKeys": [
+            "2463",
+            "Bell",
+            "7750",
+            "Bell-测试68372/60190"
+          ],
+          "alias": "CHUÔNG XA NGÃ",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/10. Trói Dây Leo 1.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 0,
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/10. Trói Dây Leo 1.webm"
+          ]
+        },
+        {
+          "id": "i_moxdzuao0rkl",
+          "matchKeys": [
+            "5355",
+            "Duck Box"
+          ],
+          "alias": "Duck Box",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/dance (5).mp3",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": true,
+          "priority": 0,
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/dance (5).mp3"
+          ]
+        },
+        {
+          "id": "i_moxf76ewyq6n",
+          "matchKeys": [
+            "504754",
+            "Galaxy Ring"
+          ],
+          "alias": "Galaxy Ring",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/01. Kim Mộc Thủy Hỏa Thổ.webm",
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/01. Kim Mộc Thủy Hỏa Thổ.webm"
+          ],
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
           "priority": 0
-        }
-      ]
-    },
-    {
-      "id": "g_mox9jh2358um",
-      "name": "Ada",
-      "type": "gift",
-      "enabled": true,
-      "collapsed": false,
-      "bigoId": "",
-      "items": [
+        },
+        {
+          "id": "i_moxg99g7o4l1",
+          "matchKeys": [
+            "500858",
+            "Gold"
+          ],
+          "alias": "Gold",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/11. Tức Giận.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 2,
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/11. Tức Giận.webm"
+          ]
+        },
+        {
+          "id": "i_moxfttwodyvs",
+          "matchKeys": [
+            "504532",
+            "Red Cap"
+          ],
+          "alias": "Red Cap",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/dance (2).mp3",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 0,
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/dance (2).mp3"
+          ]
+        },
+        {
+          "id": "g_mox5xbantd65",
+          "matchKeys": [
+            "5773",
+            "Heart Lock",
+            "7511"
+          ],
+          "alias": "Heart Lock",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/Tơ nhện.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": true,
+          "priority": 0,
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/Tơ nhện.webm"
+          ]
+        },
+        {
+          "id": "i_moyckldem98z",
+          "matchKeys": [
+            "504755",
+            "Interstellar Watch"
+          ],
+          "alias": "Interstellar Watch",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/04. Chưởng Năng Lượng.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 0,
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/04. Chưởng Năng Lượng.webm"
+          ]
+        },
+        {
+          "id": "i_moyjykqqw23n",
+          "matchKeys": [
+            "501505",
+            "Golden hourglass"
+          ],
+          "alias": "Golden hourglass",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/03. Chớp Mắt.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 0,
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/03. Chớp Mắt.webm"
+          ]
+        },
+        {
+          "id": "g_mox4yljml3od",
+          "matchKeys": [
+            "2968",
+            "Blue Flower"
+          ],
+          "alias": "Blue Flower",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/02. Bướm Ảo.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 3,
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/02. Bướm Ảo.webm"
+          ]
+        },
         {
           "id": "i_mox9vw2zsv1c",
           "matchKeys": [
@@ -191,11 +250,49 @@
             "Bluelover"
           ],
           "alias": "Bluelover",
-          "mediaFile": "09. Phóng Dây Leo.webm",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/05. Đá Rơi.webm",
           "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false
+          "pauseBgm": false,
+          "preEffect": false,
+          "priority": 0,
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/05. Đá Rơi.webm"
+          ]
+        },
+        {
+          "id": "g_mox7x2tvggnl",
+          "matchKeys": [
+            "501947",
+            "Star Food Box"
+          ],
+          "alias": "Star Food Box",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/07. Đóng cửa.webm",
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/07. Đóng cửa.webm"
+          ],
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": false,
+          "priority": 0
         }
-      ]
+      ],
+      "memberIds": [
+        "mem_1778392676154_h8oda",
+        "mem_1778392683647_keb5j",
+        "mem_1778392688744_wzhcr",
+        "mem_1778393039617_3dj2p"
+      ],
+      "bgmFile": null,
+      "bgmFileName": ""
+    },
+    {
+      "id": "g_mox9jh2358um",
+      "name": "Ada",
+      "type": "gift",
+      "enabled": false,
+      "collapsed": true,
+      "bigoId": "",
+      "items": []
     }
   ],
   "overlays": [
@@ -203,19 +300,20 @@
       "id": "ov_mowzeyw8m6as",
       "name": "WEBM 1",
       "bgColor": "#b1f1b1",
-      "opacity": 0,
+      "opacity": 0.52,
       "bounds": {
-        "x": 1856,
-        "y": 1139,
-        "width": 473,
-        "height": 849
+        "x": 1952,
+        "y": 928,
+        "width": 492,
+        "height": 864
       },
-      "alwaysOnTop": true,
+      "alwaysOnTop": false,
       "clickThrough": false,
       "autoHide": false,
-      "lockRatio": true,
-      "autoOpen": true,
-      "autoFocus": true
+      "lockRatio": false,
+      "autoOpen": false,
+      "autoFocus": false,
+      "target": "obs"
     }
   ]
 }

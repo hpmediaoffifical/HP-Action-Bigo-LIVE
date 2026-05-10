@@ -300,30 +300,24 @@
           <h2>👑 BẢNG XẾP HẠNG (BXH)</h2>
           <div style="display:flex;gap:8px">
             <button id="btnRankingSave" class="primary">💾 LƯU</button>
-            <button id="btnRankingCopyUrl" class="primary">🔗 Copy link OBS</button>
+            <button id="btnRankingCopyUrl" class="primary">🔗 Copy OBS dọc</button>
             <button id="btnRankingGridCopyUrl" class="primary">🔗 Copy OBS ngang</button>
           </div>
         </div>
-        <div class="hint small" style="margin-bottom:10px">
-          Chọn idol từ nhóm thành viên đã lưu, chọn quà cho từng idol, chọn người đang biểu diễn để LIVE lên quà tự cộng KC và làm nổi bật trên OBS.
+        <div class="hint small panel-hint">
+          📌 Chọn idol từ nhóm thành viên đã lưu, gán quà cho từng idol, chọn người đang biểu diễn để khi LIVE quà sẽ tự cộng KC và làm nổi bật trên OBS.
         </div>
-        <div class="ranking-top-actions">
-          <button id="btnRankingStartRound" class="primary" type="button">BẮT ĐẦU</button>
-          <button id="btnRankingReset" class="danger" type="button">Reset BXH</button>
-          <button id="btnRankingStopRound" type="button" hidden>⏹ Dừng lượt</button>
+        <div class="ranking-top-actions score-actions-main">
+          <button id="btnRankingStartRound" class="primary" type="button">▶ BẮT ĐẦU LƯỢT</button>
+          <button id="btnRankingStopRound" type="button" hidden>⏹ DỪNG LƯỢT</button>
+          <button id="btnRankingReset" class="danger" type="button">↺ RESET BXH</button>
         </div>
         <div class="ranking-layout">
           <div class="ranking-controls">
-            <details class="score-config-group">
-              <summary>Cài đặt chung BXH</summary>
+            <details class="score-config-group" open>
+              <summary>🛠️ Cài đặt chung BXH</summary>
               <div class="ranking-display-grid">
                 <label class="ranking-title-setting">Tiêu đề BXH<input id="rankingTitle" value="Ranking list" /></label>
-                <label class="ranking-toggle"><span>STT</span><input id="rankingShowRank" type="checkbox" checked /></label>
-                <label class="ranking-toggle"><span>Avatar</span><input id="rankingShowAvatar" type="checkbox" checked /></label>
-                <label class="ranking-toggle"><span>Icon Quà</span><input id="rankingShowGift" type="checkbox" checked /></label>
-                <label class="ranking-toggle"><span>Round</span><input id="rankingShowRound" type="checkbox" checked /></label>
-                <label class="ranking-toggle"><span>Ẩn điểm hàng loạt</span><input id="rankingHideAllScores" type="checkbox" /></label>
-                <label class="ranking-toggle"><span>Liên kết TÍNH ĐIỂM</span><input id="rankingLinkScoreTimer" type="checkbox" checked /></label>
                 <label>Từ hạng<input id="rankingRankStart" type="number" min="0" value="1" /></label>
                 <label>Đến hạng<input id="rankingRankEnd" type="number" min="0" max="100" value="20" /></label>
                 <label>Tên dài
@@ -334,13 +328,22 @@
                 </label>
                 <label>Màu nền card creator<input id="rankingOverlayBgColor" type="color" value="#2a2d37" /></label>
                 <label>Trong suốt card <span id="rankingOverlayBgOpacityVal">74%</span><input id="rankingOverlayBgOpacity" type="range" min="0" max="100" value="74" /></label>
+              </div>
+              <div class="ranking-subhead">Cột hiển thị</div>
+              <div class="ranking-display-grid ranking-toggle-grid">
+                <label class="ranking-toggle"><span>STT</span><input id="rankingShowRank" type="checkbox" checked /></label>
+                <label class="ranking-toggle"><span>Avatar</span><input id="rankingShowAvatar" type="checkbox" checked /></label>
+                <label class="ranking-toggle"><span>Icon Quà</span><input id="rankingShowGift" type="checkbox" checked /></label>
+                <label class="ranking-toggle"><span>Round</span><input id="rankingShowRound" type="checkbox" checked /></label>
+                <label class="ranking-toggle"><span>Ẩn điểm hàng loạt</span><input id="rankingHideAllScores" type="checkbox" /></label>
+                <label class="ranking-toggle"><span>Liên kết TÍNH ĐIỂM</span><input id="rankingLinkScoreTimer" type="checkbox" checked /></label>
                 <label class="ranking-toggle"><span>Hiện review dọc</span><input id="rankingShowVerticalPreview" type="checkbox" checked /></label>
                 <label class="ranking-toggle"><span>Hiện review ngang</span><input id="rankingShowGridPreview" type="checkbox" checked /></label>
                 <label class="ranking-toggle"><span>Rút gọn review</span><input id="rankingCompactPreview" type="checkbox" checked /></label>
               </div>
             </details>
-            <details class="score-config-group" open>
-              <summary>BXH ngang / lưới OBS riêng</summary>
+            <details class="score-config-group">
+              <summary>🔢 BXH ngang / lưới OBS riêng</summary>
               <div class="ranking-grid-settings">
                 <label>Số hàng <span id="rankingGridRowsHint" class="ranking-suggest-number">(3)</span><input id="rankingGridRows" type="number" min="1" max="20" value="3" /></label>
                 <label>Số cột <span id="rankingGridColsHint" class="ranking-suggest-number">(3)</span><input id="rankingGridCols" type="number" min="1" max="10" value="3" /></label>
@@ -356,24 +359,24 @@
                 <span id="rankingGridSuggestionText">Đề xuất: 3 hàng x 3 cột</span>
                 <button id="btnRankingGridUseSuggestion" class="tiny" type="button">Dùng đề xuất</button>
               </div>
-              <div class="hint small" style="padding:0 12px 12px">Overlay riêng dùng cùng điểm, VOTE và liên kết TÍNH ĐIỂM. Từ hạng - Đến hạng vẫn lọc trước khi xếp vào lưới.</div>
+              <div class="hint small" style="padding:0 12px 12px">Overlay riêng dùng cùng điểm, VOTE và liên kết TÍNH ĐIỂM. <b>Từ hạng - Đến hạng</b> vẫn lọc trước khi xếp vào lưới.</div>
             </details>
             <div class="ranking-list-head">
               <div>
-                <b>Danh sách creator</b>
+                <b>👥 Danh sách creator</b>
                 <small>Creator đã tạo, cuộn chuột để xem thêm</small>
               </div>
-              <button id="btnRankingAddManual" class="primary" type="button">TẠO MỚI</button>
+              <button id="btnRankingAddManual" class="primary" type="button">＋ TẠO MỚI</button>
             </div>
             <div id="rankingRows" class="ranking-editor-list"></div>
           </div>
           <div class="ranking-preview-wrap">
-            <div id="rankingVerticalPreviewSection">
-              <h3 class="gameplay-section-title">Review BXH dọc</h3>
+            <div id="rankingVerticalPreviewSection" class="ranking-preview-section">
+              <h3 class="gameplay-section-title">📊 Review BXH dọc</h3>
               <div id="rankingPreview" class="ranking-board-preview"></div>
             </div>
-            <div id="rankingGridPreviewSection">
-              <h3 class="gameplay-section-title ranking-grid-preview-title">Review BXH ngang / lưới</h3>
+            <div id="rankingGridPreviewSection" class="ranking-preview-section">
+              <h3 class="gameplay-section-title ranking-grid-preview-title">🔲 Review BXH ngang / lưới</h3>
               <div id="rankingGridPreview" class="ranking-grid-board-preview"></div>
             </div>
           </div>
@@ -391,59 +394,70 @@
             <button id="btnPkDuoCopyUrl" class="primary">🔗 Copy link OBS</button>
           </div>
         </div>
+        <div class="hint small panel-hint">
+          📌 Hai đội A &amp; B đối đầu trên thanh PK chia đôi. Mũi tên động chỉ hướng đội đang dẫn điểm. Cấu hình thời gian, giao diện, âm thanh và quà cho từng đội bên dưới.
+        </div>
         <div class="pkduo-monitor">
-          <h3 class="gameplay-section-title">Review PK ĐÔI</h3>
+          <h3 class="gameplay-section-title">⚔️ Review PK ĐÔI</h3>
           <div id="pkDuoPreview" class="pkduo-preview"></div>
         </div>
         <div class="pkduo-layout">
           <div class="pkduo-controls">
-            <div class="pkduo-actions">
-              <button id="btnPkDuoStart" class="primary" type="button">BẮT ĐẦU</button>
-              <button id="btnPkDuoStop" class="danger" type="button">DỪNG</button>
-              <button id="btnPkDuoReset" class="danger" type="button">RESET</button>
-              <span id="pkDuoStatus" class="pkduo-status">CHỜ</span>
+            <div class="pkduo-actions score-actions-main">
+              <button id="btnPkDuoStart" class="primary" type="button">▶ BẮT ĐẦU</button>
+              <button id="btnPkDuoStop" class="danger" type="button">⏹ DỪNG</button>
+              <button id="btnPkDuoReset" class="danger" type="button">↺ RESET</button>
+              <span class="pkduo-status-wrap">Trạng thái: <span id="pkDuoStatus" class="pkduo-status">CHỜ</span></span>
             </div>
             <details class="score-config-group" open>
-              <summary>Trận đấu</summary>
-              <div class="pkduo-config-grid">
+              <summary>⏱️ Thời gian trận đấu</summary>
+              <div class="pkduo-config-grid pkduo-time-grid">
                 <label>Tiếng<input id="pkDuoHours" type="number" min="0" max="24" value="0" /></label>
                 <label>Phút<input id="pkDuoMinutes" type="number" min="0" max="59" value="1" /></label>
                 <label>Giây<input id="pkDuoSeconds" type="number" min="0" max="59" value="0" /></label>
-                <label>Chuẩn bị<input id="pkDuoPrepSeconds" type="number" min="0" max="120" value="10" /></label>
-                <label>Độ trễ (s)<input id="pkDuoDelaySeconds" type="number" min="0" max="120" value="5" /></label>
-                <label>Nội dung hiển thị<input id="pkDuoContent" value="Vui lòng chờ" /></label>
+                <label>Chuẩn bị (s)<input id="pkDuoPrepSeconds" type="number" min="0" max="120" value="10" /></label>
+                <label>Độ trễ tính quà (s)<input id="pkDuoDelaySeconds" type="number" min="0" max="120" value="5" /></label>
+                <label class="ranking-toggle pkduo-mode-toggle"><span>Chọn Phe (user tự chọn)</span><input id="pkDuoJoinMode" type="checkbox" /></label>
+              </div>
+            </details>
+            <details class="score-config-group" open>
+              <summary>🎨 Giao diện overlay</summary>
+              <div class="pkduo-config-grid pkduo-style-grid">
+                <label class="pkduo-content-wide">Nội dung hiển thị<input id="pkDuoContent" value="Vui lòng chờ" /></label>
                 <label>Kích thước chữ <span id="pkDuoTextSizeVal">21px</span><input id="pkDuoTextSize" type="range" min="14" max="42" value="21" /></label>
+                <label>Kích thước quà <span id="pkDuoGiftSizeVal">46px</span><input id="pkDuoGiftSize" type="range" min="28" max="90" value="46" /></label>
                 <label class="pkduo-color-compact">Màu đội A<input id="pkDuoTeamAColor" type="color" value="#d8587c" /></label>
                 <label class="pkduo-color-compact">Màu đội B<input id="pkDuoTeamBColor" type="color" value="#6380ff" /></label>
                 <label class="pkduo-bg-control">Nền overlay
                   <span class="pkduo-bg-editor"><input id="pkDuoBgColor" type="color" value="#000000" /><span>Độ đặc <b id="pkDuoBgOpacityVal">88%</b></span><input id="pkDuoBgOpacity" type="range" min="0" max="100" value="88" /></span>
                 </label>
-                <label>Kích thước quà <span id="pkDuoGiftSizeVal">46px</span><input id="pkDuoGiftSize" type="range" min="28" max="90" value="46" /></label>
-                <label class="ranking-toggle"><span>Chọn Phe</span><input id="pkDuoJoinMode" type="checkbox" /></label>
               </div>
             </details>
             <details class="score-config-group">
-              <summary>Âm thanh</summary>
+              <summary>🔊 Âm thanh sự kiện</summary>
               <div class="score-sound-grid pkduo-sound-grid">
-                <label>Âm thanh BẮT ĐẦU<div class="score-sound-row"><input id="pkDuoStartSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickStartSound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearStartSound" class="tiny danger">🗑</button></div></label>
-                <label>Âm thanh 10 GIÂY CUỐI<div class="score-sound-row"><input id="pkDuoWarningSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickWarningSound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearWarningSound" class="tiny danger">🗑</button></div></label>
-                <label>Âm thanh ĐỘI A THẮNG<div class="score-sound-row"><input id="pkDuoTeamASoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickTeamASound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearTeamASound" class="tiny danger">🗑</button></div></label>
-                <label>Âm thanh ĐỘI B THẮNG<div class="score-sound-row"><input id="pkDuoTeamBSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickTeamBSound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearTeamBSound" class="tiny danger">🗑</button></div></label>
-                <label>Âm thanh HÒA / KẾT THÚC<div class="score-sound-row"><input id="pkDuoDrawSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickDrawSound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearDrawSound" class="tiny danger">🗑</button></div></label>
+                <label>🚀 BẮT ĐẦU<div class="score-sound-row"><input id="pkDuoStartSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickStartSound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearStartSound" class="tiny danger">🗑</button></div></label>
+                <label>⚠️ 10 GIÂY CUỐI<div class="score-sound-row"><input id="pkDuoWarningSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickWarningSound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearWarningSound" class="tiny danger">🗑</button></div></label>
+                <label>🅰️ ĐỘI A THẮNG<div class="score-sound-row"><input id="pkDuoTeamASoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickTeamASound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearTeamASound" class="tiny danger">🗑</button></div></label>
+                <label>🅱️ ĐỘI B THẮNG<div class="score-sound-row"><input id="pkDuoTeamBSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickTeamBSound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearTeamBSound" class="tiny danger">🗑</button></div></label>
+                <label>🤝 HÒA / KẾT THÚC<div class="score-sound-row"><input id="pkDuoDrawSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnPkDuoPickDrawSound" class="tiny">📁 Chọn</button><button type="button" id="btnPkDuoClearDrawSound" class="tiny danger">🗑</button></div></label>
               </div>
             </details>
-            <div class="pkduo-teams">
-              <div class="pkduo-team-card team-a">
-                <label>Tên đội A<input id="pkDuoTeamAName" value="ĐỘI A" /></label>
-                <div class="pkduo-team-title">Quà đội A</div>
-                <div id="pkDuoTeamAGifts" class="pkduo-gift-list"></div>
+            <details class="score-config-group" open>
+              <summary>🥊 Hai đội thi đấu</summary>
+              <div class="pkduo-teams">
+                <div class="pkduo-team-card team-a">
+                  <div class="pkduo-team-head"><span class="pkduo-team-flag">🅰️</span><label>Tên đội A<input id="pkDuoTeamAName" value="ĐỘI A" /></label></div>
+                  <div class="pkduo-team-title">🎁 Quà đội A</div>
+                  <div id="pkDuoTeamAGifts" class="pkduo-gift-list"></div>
+                </div>
+                <div class="pkduo-team-card team-b">
+                  <div class="pkduo-team-head"><span class="pkduo-team-flag">🅱️</span><label>Tên đội B<input id="pkDuoTeamBName" value="ĐỘI B" /></label></div>
+                  <div class="pkduo-team-title">🎁 Quà đội B</div>
+                  <div id="pkDuoTeamBGifts" class="pkduo-gift-list"></div>
+                </div>
               </div>
-              <div class="pkduo-team-card team-b">
-                <label>Tên đội B<input id="pkDuoTeamBName" value="ĐỘI B" /></label>
-                <div class="pkduo-team-title">Quà đội B</div>
-                <div id="pkDuoTeamBGifts" class="pkduo-gift-list"></div>
-              </div>
-            </div>
+            </details>
           </div>
         </div>
       </div>
@@ -458,49 +472,53 @@
             <button id="btnScoreCopyUrl" class="primary">🔗 Copy link OBS</button>
           </div>
         </div>
-        <div class="hint small" style="margin-bottom:10px">
-          Khi bấm <b>Bắt đầu</b>, mọi quà có giá trị Đậu sẽ quy đổi 1 Đậu = 1 điểm. Hết giờ vẫn tính thêm trong thời gian trễ quà tặng.
+        <div class="hint small panel-hint">
+          📌 Khi bấm <b>BẮT ĐẦU</b>, mọi quà có giá trị Đậu sẽ quy đổi <b>1 Đậu = 1 điểm</b>. Hết giờ vẫn tính thêm trong thời gian trễ quà tặng.
         </div>
         <div class="score-layout">
           <div class="score-controls">
             <div class="score-actions score-actions-main">
-              <button id="btnScoreStart" class="primary">BẮT ĐẦU</button>
-              <button id="btnScoreStop">NGƯNG</button>
-              <button id="btnScoreReset" class="danger">RESET điểm</button>
+              <button id="btnScoreStart" class="primary">▶ BẮT ĐẦU</button>
+              <button id="btnScoreStop">⏸ NGƯNG</button>
+              <button id="btnScoreReset" class="danger">↺ RESET ĐIỂM</button>
             </div>
             <details class="score-config-group" open>
-              <summary>Vận hành vòng tính điểm</summary>
+              <summary>⏱️ Thời gian &amp; mục tiêu</summary>
               <div class="score-control-grid compact-grid score-run-grid">
                 <div class="score-run-column">
+                  <div class="score-subhead">Đếm ngược trận</div>
                   <label>Tiếng<input id="scoreHours" type="number" min="0" max="24" value="0" /></label>
                   <label>Phút<input id="scoreMinutes" type="number" min="0" max="59" value="3" /></label>
                   <label>Giây<input id="scoreSeconds" type="number" min="0" max="59" value="0" /></label>
-                  <label>Chuẩn bị<input id="scorePrepSeconds" type="number" min="0" max="30" value="3" /></label>
+                  <label>Chuẩn bị (s)<input id="scorePrepSeconds" type="number" min="0" max="30" value="3" /></label>
                 </div>
                 <div class="score-run-column">
+                  <div class="score-subhead">Mục tiêu &amp; ngưỡng</div>
                   <label>Điểm yêu cầu<input id="scoreTarget" type="number" min="1" value="30000" /></label>
-                  <label>Độ trễ (s)<input id="scoreDelay" type="number" min="0" max="120" value="5" /></label>
+                  <label>Độ trễ tính quà (s)<input id="scoreDelay" type="number" min="0" max="120" value="5" /></label>
                   <label>Quà lớn từ điểm<input id="scoreBigGiftThreshold" type="number" min="1" value="500" /></label>
                 </div>
               </div>
             </details>
             <details class="score-config-group" open>
-              <summary>Nội dung overlay</summary>
+              <summary>👤 Thông tin Creator &amp; nội dung</summary>
               <div class="score-control-grid">
                 <label>Nhóm thành viên<select id="scoreMemberGroup"><option value="">Không chọn nhóm</option></select></label>
                 <label>Thành viên<select id="scoreMember"><option value="">Không chọn thành viên</option></select></label>
-                <label>Nội dung tự nhập<input id="scoreContent" placeholder="VD: Kêu gọi điểm ĐẬU" /></label>
-                <label>Tên Creator<input id="scoreCreatorName" placeholder="Tên Creator" /></label>
+                <label>Tên Creator<input id="scoreCreatorName" placeholder="VD: HP Media" /></label>
+                <label>Nội dung overlay<input id="scoreContent" placeholder="VD: Kêu gọi điểm ĐẬU" /></label>
                 <input id="scoreCreatorAvatar" type="hidden" />
               </div>
             </details>
             <details class="score-config-group">
-              <summary>Giao diện thanh máu</summary>
+              <summary>🎨 Giao diện thanh máu</summary>
               <div class="score-control-grid compact-grid">
                 <label>Preset giao diện<select id="scoreThemePreset"><option value="custom">Tuỳ chỉnh</option><option value="douyin">Hồng Douyin</option><option value="vip">Vàng VIP</option><option value="neon">Xanh Neon</option><option value="battle">Đỏ Battle</option><option value="luxury">Tím Luxury</option><option value="minimal">Xám Minimal</option></select></label>
                 <label>Kiểu thanh<select id="scoreBarStyle"><option value="pill">Pill bo tròn</option><option value="game">Game HP</option><option value="luxury">Luxury mảnh</option><option value="segments">Chia ô</option></select></label>
                 <label>Kích thước overlay<select id="scoreOverlaySize"><option value="medium">Vừa</option><option value="small">Nhỏ</option><option value="large">Lớn</option></select></label>
-                <label>Mốc điểm tuỳ nhập<input id="scoreCustomMilestones" placeholder="VD: 10000,20000,30000" /></label>
+                <label class="wide">Mốc điểm tuỳ nhập<input id="scoreCustomMilestones" placeholder="VD: 10000,20000,30000" /></label>
+              </div>
+              <div class="score-color-grid">
                 <label>Màu thời gian<input id="scoreTimeColor" type="color" value="#ffffff" /></label>
                 <label>Màu nội dung<input id="scoreContentColor" type="color" value="#f0eef6" /></label>
                 <label>Màu số dư +Over<input id="scoreOverColor" type="color" value="#ff0000" /></label>
@@ -510,19 +528,29 @@
               </div>
             </details>
             <details class="score-config-group">
-              <summary>Hiển thị thông tin</summary>
+              <summary>👁️ Hiển thị thông tin trên overlay</summary>
               <div class="score-control-grid compact-grid">
                 <label class="score-check-row"><span>Hiện tên user tặng quà</span><input id="scoreShowGiftUser" type="checkbox" checked /></label>
                 <label class="score-check-row"><span>Hiện điểm còn thiếu</span><input id="scoreShowMissing" type="checkbox" checked /></label>
                 <label class="score-check-row"><span>Hiện top user</span><input id="scoreShowTopUsers" type="checkbox" checked /></label>
-                <label class="score-check-row"><span>Hiện tốc độ/dự đoán</span><input id="scoreShowSpeed" type="checkbox" checked /></label>
+                <label class="score-check-row"><span>Hiện tốc độ / dự đoán</span><input id="scoreShowSpeed" type="checkbox" checked /></label>
                 <label class="score-check-row"><span>Overlay gọn</span><input id="scoreCompactMode" type="checkbox" /></label>
-                <label class="score-check-row"><span>Ẩn avatar</span><input id="scoreHideAvatar" type="checkbox" /></label>
+                <label class="score-check-row"><span>Ẩn avatar Creator</span><input id="scoreHideAvatar" type="checkbox" /></label>
                 <label class="score-check-row"><span>Ẩn tên Creator</span><input id="scoreHideCreator" type="checkbox" /></label>
               </div>
             </details>
             <details class="score-config-group">
-              <summary>Test overlay</summary>
+              <summary>🔊 Âm thanh sự kiện</summary>
+              <div class="score-sound-grid">
+                <label>🚀 BẮT ĐẦU<div class="score-sound-row"><input id="scoreStartSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickStartSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearStartSound" class="tiny danger">🗑</button></div></label>
+                <label>⚠️ 10 GIÂY CUỐI<div class="score-sound-row"><input id="scoreWarningSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickWarningSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearWarningSound" class="tiny danger">🗑</button></div></label>
+                <label>🎯 ĐẠT MỤC TIÊU<div class="score-sound-row"><input id="scoreGoalSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickGoalSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearGoalSound" class="tiny danger">🗑</button></div></label>
+                <label>🏆 THÀNH CÔNG<div class="score-sound-row"><input id="scoreSuccessSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickSuccessSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearSuccessSound" class="tiny danger">🗑</button></div></label>
+                <label>💔 KHÔNG THÀNH CÔNG<div class="score-sound-row"><input id="scoreFailSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickFailSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearFailSound" class="tiny danger">🗑</button></div></label>
+              </div>
+            </details>
+            <details class="score-config-group">
+              <summary>🧪 Kiểm tra overlay</summary>
               <div class="score-actions">
                 <input id="scoreTestPoints" type="number" min="1" value="100" style="width:86px" title="Điểm test" />
                 <button id="btnScoreTest" class="tiny">Test điểm</button>
@@ -530,16 +558,6 @@
                 <button id="btnScoreTestWarning" class="tiny">Test 10s cuối</button>
                 <button id="btnScoreTestSuccess" class="tiny primary">Test thành công</button>
                 <button id="btnScoreTestFail" class="tiny danger">Test thất bại</button>
-              </div>
-            </details>
-            <details class="score-config-group">
-              <summary>Âm thanh</summary>
-              <div class="score-sound-grid">
-                <label>Âm thanh BẮT ĐẦU<div class="score-sound-row"><input id="scoreStartSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickStartSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearStartSound" class="tiny danger">🗑</button></div></label>
-                <label>Âm thanh 10 GIÂY CUỐI<div class="score-sound-row"><input id="scoreWarningSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickWarningSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearWarningSound" class="tiny danger">🗑</button></div></label>
-                <label>Âm thanh ĐẠT MỤC TIÊU<div class="score-sound-row"><input id="scoreGoalSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickGoalSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearGoalSound" class="tiny danger">🗑</button></div></label>
-                <label>Âm thanh THÀNH CÔNG<div class="score-sound-row"><input id="scoreSuccessSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickSuccessSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearSuccessSound" class="tiny danger">🗑</button></div></label>
-                <label>Âm thanh KHÔNG THÀNH CÔNG<div class="score-sound-row"><input id="scoreFailSoundLabel" placeholder="Chưa chọn file" readonly /><button type="button" id="btnScorePickFailSound" class="tiny">📁 Chọn</button><button type="button" id="btnScoreClearFailSound" class="tiny danger">🗑</button></div></label>
               </div>
             </details>
           </div>
