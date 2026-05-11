@@ -21,12 +21,10 @@ class ObsOverlayServer {
     this.gameplayClients = new Set();
     this.rankingClients = new Set();
     this.scoreClients = new Set();
-    this.pkDuoClients = new Set();
     this.gameplayConfig = { items: [], orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, slots: [] };
     this.gameplayCounts = {};
     this.rankingState = {};
     this.scoreState = {};
-    this.pkDuoState = {};
     this.media = new Map();   // mediaId -> absolute file path
   }
 
@@ -51,8 +49,6 @@ class ObsOverlayServer {
     this.rankingClients.clear();
     for (const res of this.scoreClients) { try { res.end(); } catch {} }
     this.scoreClients.clear();
-    for (const res of this.pkDuoClients) { try { res.end(); } catch {} }
-    this.pkDuoClients.clear();
     if (this.server) { try { this.server.close(); } catch {} }
     this.server = null;
   }
@@ -77,10 +73,6 @@ class ObsOverlayServer {
     return `http://127.0.0.1:${this.port}/ranking-grid?token=${encodeURIComponent(this.token)}`;
   }
 
-  getPkDuoUrl() {
-    return `http://127.0.0.1:${this.port}/pk-duo?token=${encodeURIComponent(this.token)}`;
-  }
-
   setGameplayConfig(cfg) {
     this.gameplayConfig = cfg || { items: [], orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, slots: [] };
     this._sendGameplay('config', this.gameplayConfig);
@@ -103,11 +95,6 @@ class ObsOverlayServer {
   sendRankingState(state) {
     this.rankingState = state || {};
     this._sendRanking('ranking', this.rankingState);
-  }
-
-  sendPkDuoState(state) {
-    this.pkDuoState = state || {};
-    this._sendPkDuo('pkduo', this.pkDuoState);
   }
 
   hasClients(overlayId) {
@@ -156,11 +143,6 @@ class ObsOverlayServer {
     for (const res of this.rankingClients) { try { res.write(body); } catch {} }
   }
 
-  _sendPkDuo(event, data) {
-    const body = `event: ${event}\ndata: ${JSON.stringify(data || {})}\n\n`;
-    for (const res of this.pkDuoClients) { try { res.write(body); } catch {} }
-  }
-
   _okToken(reqUrl) {
     return reqUrl.searchParams.get('token') === this.token;
   }
@@ -180,11 +162,6 @@ class ObsOverlayServer {
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'ranking-overlay.css'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-grid-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'ranking-grid-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-grid-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'ranking-grid-overlay.css'), res);
-    if (req.method === 'GET' && reqUrl.pathname === '/pk-duo-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'pk-duo-overlay.js'), res);
-    if (req.method === 'GET' && reqUrl.pathname === '/pk-duo-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'pk-duo-overlay.css'), res);
-    if (req.method === 'GET' && reqUrl.pathname === '/pk-duo-arrow.svg') return this._serveFile(path.join(this.root, 'renderer', 'pk-duo-arrow.svg'), res);
-    if (req.method === 'GET' && reqUrl.pathname === '/pk-duo-boost.svg') return this._serveFile(path.join(this.root, 'renderer', 'pk-duo-boost.svg'), res);
-    if (req.method === 'GET' && reqUrl.pathname === '/pk-duo-neutral.svg') return this._serveFile(path.join(this.root, 'renderer', 'pk-duo-neutral.svg'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/score-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/score-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.css'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/logo-hp.png') return this._serveFile(path.join(this.root, 'logo-hp.png'), res);
@@ -198,8 +175,6 @@ class ObsOverlayServer {
     if (req.method === 'GET' && reqUrl.pathname === '/ranking') return this._serveFile(path.join(this.root, 'renderer', 'ranking-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-grid') return this._serveFile(path.join(this.root, 'renderer', 'ranking-grid-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-events') return this._serveRankingEvents(req, res);
-    if (req.method === 'GET' && reqUrl.pathname === '/pk-duo') return this._serveFile(path.join(this.root, 'renderer', 'pk-duo-overlay.html'), res);
-    if (req.method === 'GET' && reqUrl.pathname === '/pk-duo-events') return this._servePkDuoEvents(req, res);
     if (req.method === 'GET' && reqUrl.pathname === '/score') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/score-events') return this._serveScoreEvents(req, res);
     if (req.method === 'GET' && reqUrl.pathname.startsWith('/gift-icon/')) return this._serveGiftIcon(reqUrl, res);
@@ -254,16 +229,6 @@ class ObsOverlayServer {
     res.write(`event: ranking\ndata: ${JSON.stringify(this.rankingState || {})}\n\n`);
     this.rankingClients.add(res);
     req.on('close', () => this.rankingClients.delete(res));
-  }
-
-  _servePkDuoEvents(req, res) {
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    });
-    res.write(`event: pkduo\ndata: ${JSON.stringify(this.pkDuoState || {})}\n\n`);
-    this.pkDuoClients.add(res);
-    req.on('close', () => this.pkDuoClients.delete(res));
   }
 
   _serveFile(filePath, res) {

@@ -19,8 +19,8 @@ const GIFT_MASTER_TTL = 24 * 3600 * 1000; // 24h
 const ICO_PATH = path.join(ROOT, 'logo-hp.ico');
 const PNG_PATH = path.join(ROOT, 'logo-hp.png');
 const APP_ICON = fs.existsSync(ICO_PATH) ? ICO_PATH : (fs.existsSync(PNG_PATH) ? PNG_PATH : null);
-app.setName('Action - Bigo LIVE');
-process.title = 'Action - Bigo LIVE';
+app.setName('HP Action - Bigo LIVE');
+process.title = 'HP Action - Bigo LIVE';
 
 // Windows: set AppUserModelID để taskbar group đúng và hiện icon
 if (process.platform === 'win32') {
@@ -350,7 +350,7 @@ function createWindow() {
     resizable: true,
     maximizable: true,
     x: saved.x, y: saved.y,
-    title: 'Action - Bigo LIVE',
+    title: 'HP Action - Bigo LIVE',
     icon: APP_ICON || undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -372,7 +372,7 @@ function createWindow() {
       buttons: ['Hủy', 'Thoát'],
       defaultId: 0,
       cancelId: 0,
-      title: 'Action - BIGO LIVE',
+      title: 'HP Action - BIGO LIVE',
       message: 'Thoát ứng dụng?',
       detail: 'Mọi session/queue/chat đang chạy sẽ bị mất. Bạn chắc chắn muốn thoát?',
     });
@@ -1354,16 +1354,6 @@ ipcMain.handle('ranking:grid-copy-url', () => {
 });
 ipcMain.handle('ranking:update', (_e, state) => {
   if (obsOverlayServer) obsOverlayServer.sendRankingState(state || {});
-  return { ok: true };
-});
-ipcMain.handle('pk-duo:copy-url', () => {
-  if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
-  const url = obsOverlayServer.getPkDuoUrl();
-  clipboard.writeText(url);
-  return { ok: true, url };
-});
-ipcMain.handle('pk-duo:update', (_e, state) => {
-  if (obsOverlayServer) obsOverlayServer.sendPkDuoState(state || {});
   return { ok: true };
 });
 ipcMain.handle('score:copy-url', () => {
