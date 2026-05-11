@@ -234,6 +234,17 @@ function processElement(rootEl, opts = {}) {
         }
         currentGiftBatchKeys.add(giftKey);
       }
+      // Layer B (gift remove+add evidence): nếu chat row vừa bị REMOVED khỏi
+      // DOM trong 500ms qua rồi NEW element same-text được added → đó là
+      // React re-render (remove + add pattern). MutationObserver PASS 1 đã
+      // set recentRemovedText cho mọi removedNode. Cửa sổ ngắn 500ms KHÔNG
+      // drop quà thật re-tặng vì user tap cách nhau >500ms vẫn fire (BIGO
+      // UI cap tap rate, taps liền nhau Bigo gộp thành combo X<n>).
+      const removedTime = recentRemovedText.get(text);
+      if (removedTime && nowMs - removedTime < REMOVE_RERENDER_WINDOW_MS) {
+        elementContent.set(el, text);
+        continue;
+      }
       // KHÔNG hash-dedup cho gifts — tin tưởng WeakMap elementContent đã handle
       // per-element dedup (skip nếu cùng element + cùng text). 2 chat rows khác
       // (kể cả cùng content) là 2 elements khác → cả 2 fire. Virtualized list
