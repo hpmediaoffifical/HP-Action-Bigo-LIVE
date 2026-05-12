@@ -871,7 +871,14 @@
       <div class="panel">
         <h2>ℹ️ NHÀ PHÁT HÀNH</h2>
         <div class="dev-info">
-          <div class="dev-row"><span class="dev-key">Phiên bản hiện tại:</span><span class="dev-val"><b id="appVersion">—</b></span></div>
+          <div class="dev-row">
+            <span class="dev-key">Phiên bản hiện tại:</span>
+            <span class="dev-val" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center">
+              <b id="appVersion">—</b>
+              <button type="button" id="btnCheckUpdate" class="tiny primary" title="Kiểm tra phiên bản mới trên GitHub">🔄 Kiểm tra cập nhật</button>
+              <span id="updateStatus" style="font-size:12px; opacity:.85"></span>
+            </span>
+          </div>
           <div class="dev-row">
             <span class="dev-key">Key bản quyền:</span>
             <span class="dev-val" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">

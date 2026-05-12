@@ -6,6 +6,7 @@ const { BigoClient } = require('./bigo-client');
 const { BigoWebListener } = require('./web-embed');
 const { OverlayManager } = require('./overlay-manager');
 const { ObsOverlayServer } = require('./obs-overlay-server');
+const autoUpdater = require('./auto-updater');
 
 const ROOT = path.join(__dirname, '..');
 const CONFIG_PATH = path.join(ROOT, 'config', 'settings.json');
@@ -447,6 +448,8 @@ app.whenReady().then(async () => {
     if (win && !win.isDestroyed()) win.webContents.send('bigo:log', `[obs-overlay] ${e.message}`);
   });
   createWindow();
+  // Auto-update: chỉ chạy ở bản đã đóng gói. Dev mode (npm start) bỏ qua.
+  try { autoUpdater.init(win); } catch (e) { console.warn('auto-updater init failed:', e); }
   // Auto-open overlays với cfg.autoOpen = true sau khi app sẵn sàng
   setTimeout(() => {
     for (const ov of (mapping.overlays || [])) {
@@ -499,6 +502,16 @@ ipcMain.handle('shell:open-external', (_e, url) => shell.openExternal(url));
 ipcMain.handle('app:get-version', () => {
   try { return require(path.join(ROOT, 'package.json')).version || '0.0.0'; } catch { return '0.0.0'; }
 });
+
+// =================== Auto-updater IPC ===================
+ipcMain.handle('updater:check', async () => {
+  return await autoUpdater.checkManually();
+});
+ipcMain.handle('updater:download', () => {
+  autoUpdater.startDownload();
+  return { ok: true };
+});
+ipcMain.handle('updater:state', () => autoUpdater.getState());
 
 // =================== License (Google Apps Script) ===================
 const LICENSE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwOuL0jR7HL9oMwNkebX1JRKI8lf5-RafKZsqsIQmuHpuME5fGlsXsuqDv_r3VhP_Anuw/exec';

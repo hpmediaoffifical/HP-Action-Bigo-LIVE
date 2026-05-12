@@ -5,24 +5,81 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev"
+    "dev": "electron . --dev",
+    "dist": "electron-builder --win nsis --publish never",
+    "release": "electron-builder --win nsis --publish always"
   },
   "author": "Phụng",
   "license": "ISC",
   "build": {
     "appId": "com.hp.bigoaction",
-    "productName": "HP Action - Bigo LIVE",
+    "productName": "Action - BIGO LIVE",
+    "asar": true,
+    "asarUnpack": [
+      "config/**",
+      "assets/**",
+      "logo-hp.ico",
+      "logo-hp.png"
+    ],
+    "files": [
+      "src/**",
+      "renderer/**",
+      "config/**",
+      "logo-hp.ico",
+      "logo-hp.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": ["**/*"]
+      }
+    ],
     "win": {
-      "icon": "logo-hp.ico"
+      "icon": "logo-hp.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "Action-BIGO-LIVE-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Action - BIGO LIVE",
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "logo-hp.ico",
+      "uninstallerIcon": "logo-hp.ico",
+      "installerHeaderIcon": "logo-hp.ico",
+      "license": "README.md"
     },
     "mac": {
       "icon": "logo-hp.png"
     },
     "linux": {
       "icon": "logo-hp.png"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "hpmediaoffifical",
+        "repo": "bigo-action",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
   }
 }

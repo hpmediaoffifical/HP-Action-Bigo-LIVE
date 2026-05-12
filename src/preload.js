@@ -54,6 +54,12 @@ contextBridge.exposeInMainWorld('bigo', {
   appGetVersion: () => ipcRenderer.invoke('app:get-version'),
   windowSizeLock: (locked) => ipcRenderer.invoke('app:window-size-lock', locked),
 
+  // Auto-updater
+  updaterCheck: () => ipcRenderer.invoke('updater:check'),
+  updaterDownload: () => ipcRenderer.invoke('updater:download'),
+  updaterState: () => ipcRenderer.invoke('updater:state'),
+  onUpdaterStatus: (cb) => ipcRenderer.on('updater:status', (_e, payload) => cb(payload)),
+
   // Heart Goal overlay (vòng tròn progress)
   heartOverlayShow: () => ipcRenderer.invoke('heart-overlay:show'),
   heartOverlayHide: () => ipcRenderer.invoke('heart-overlay:hide'),
