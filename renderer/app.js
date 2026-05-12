@@ -1433,8 +1433,64 @@ async function ensureLicenseGate() {
 (async function wireInfoTab() {
   const verEl = document.getElementById('appVersion');
   if (verEl && window.bigo.appGetVersion) {
-    try { verEl.textContent = await window.bigo.appGetVersion(); } catch { verEl.textContent = '?'; }
+    try { verEl.textContent = 'v' + (await window.bigo.appGetVersion()); } catch { verEl.textContent = '?'; }
   }
+
+  // --- Auto-updater UI ---
+  const upBtn = document.getElementById('btnCheckUpdate');
+  const upStatus = document.getElementById('updateStatus');
+  const setUpText = (txt, color) => {
+    if (!upStatus) return;
+    upStatus.textContent = txt || '';
+    upStatus.style.color = color || '';
+  };
+  if (window.bigo.onUpdaterStatus) {
+    window.bigo.onUpdaterStatus((s) => {
+      if (!s) return;
+      switch (s.state) {
+        case 'checking':
+          setUpText('🔄 Đang kiểm tra...', '#888');
+          break;
+        case 'not-available':
+          setUpText('✅ Đã là bản mới nhất', '#2ecc71');
+          if (upBtn) upBtn.disabled = false;
+          break;
+        case 'available':
+          setUpText(`⬇️ Có bản mới v${s.version}`, '#e67e22');
+          break;
+        case 'downloading': {
+          const pct = s.percent != null ? `${s.percent}%` : '...';
+          const kbs = s.bytesPerSecond ? ` · ${Math.round(s.bytesPerSecond / 1024)} KB/s` : '';
+          setUpText(`⬇️ Đang tải: ${pct}${kbs}`, '#3498db');
+          if (upBtn) upBtn.disabled = true;
+          break;
+        }
+        case 'downloaded':
+          setUpText(`📦 Đã tải xong v${s.version} — chờ cài đặt`, '#2ecc71');
+          if (upBtn) upBtn.disabled = false;
+          break;
+        case 'error':
+          setUpText(`⚠️ Lỗi: ${s.message || 'unknown'}`, '#e74c3c');
+          if (upBtn) upBtn.disabled = false;
+          break;
+      }
+    });
+  }
+  if (upBtn && window.bigo.updaterCheck) {
+    upBtn.onclick = async () => {
+      upBtn.disabled = true;
+      setUpText('🔄 Đang kiểm tra...', '#888');
+      try {
+        const r = await window.bigo.updaterCheck();
+        if (r && r.dev) setUpText('💻 Dev mode — chỉ bản setup mới có updater', '#888');
+      } catch (e) {
+        setUpText(`⚠️ ${e?.message || e}`, '#e74c3c');
+      } finally {
+        upBtn.disabled = false;
+      }
+    };
+  }
+
   const keyInput = document.getElementById('licenseKey');
   const verifyBtn = document.getElementById('btnVerifyLicense');
   const activateBtn = document.getElementById('btnActivateLicense');

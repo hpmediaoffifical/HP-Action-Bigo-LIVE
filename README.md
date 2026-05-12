@@ -73,3 +73,46 @@ BIGO Action/
 ## Stack
 
 Electron 33 thuần, không build tool. Mọi logic trong vanilla JS.
+
+## Build Setup Installer (.exe) + Auto-update
+
+App tự động kiểm tra cập nhật từ **GitHub Releases** (`hpmediaoffifical/bigo-action`) khi khởi động. Flow:
+
+```
+Mở app → check update → có bản mới? → hỏi user → tải → cài & restart → check lại → dùng
+```
+
+Cấu hình ở [package.json](package.json) (block `build`) + logic ở [src/auto-updater.js](src/auto-updater.js).
+
+### Build local (test installer, không upload)
+
+```powershell
+npm install
+npm run dist        # output: dist\Action-BIGO-LIVE-Setup-0.1.0.exe
+```
+
+Chạy file `.exe` đó → NSIS wizard (chọn thư mục cài) → app launch → vào tab **NHÀ PHÁT HÀNH** thấy nút **🔄 Kiểm tra cập nhật**.
+
+> Chế độ `npm start` (dev) sẽ **không** chạy updater — đó là chủ ý, chỉ bản đã `npm run dist` rồi cài mới thực sự auto-update.
+
+### Release lên GitHub (để user khác auto-update)
+
+1. **Đăng nhập GitHub CLI** hoặc set token:
+   ```powershell
+   $env:GH_TOKEN = "ghp_xxx_token_với_repo_scope"
+   ```
+2. **Bump version** trong `package.json` (vd `0.1.0` → `0.1.1`).
+3. **Build + publish**:
+   ```powershell
+   npm run release
+   ```
+   Lệnh này build NSIS `.exe` + tạo `latest.yml` + upload lên GitHub Releases dưới dạng **draft**.
+4. Vào GitHub → tab **Releases** → mở draft → bấm **Publish release**.
+5. Mọi user đã cài bản cũ, lần mở app kế tiếp sẽ nhận dialog *"Có cập nhật mới v0.1.1 — Cập nhật ngay?"*.
+
+### Lưu ý cho người cài thử (sử dụng thử)
+
+- Installer ghi vào `%LOCALAPPDATA%\Programs\Action - BIGO LIVE\` (không cần quyền admin).
+- File cấu hình user (`config/gift-mapping.json`, `config/settings.json`) hiện đang nằm trong thư mục cài. Mỗi lần update, **mapping/settings sẽ bị reset** — đây là hạn chế của bản beta đầu tiên. Trước khi cập nhật, dùng nút **Export cấu hình** trong tab CÀI ĐẶT để giữ lại.
+- Khi gỡ cài, NSIS giữ lại file user (`deleteAppDataOnUninstall: false`).
+- Updater chỉ build trên Windows (x64) — Mac/Linux chưa cấu hình target.
