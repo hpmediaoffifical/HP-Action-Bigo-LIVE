@@ -59,6 +59,8 @@ contextBridge.exposeInMainWorld('bigo', {
   updaterDownload: () => ipcRenderer.invoke('updater:download'),
   updaterState: () => ipcRenderer.invoke('updater:state'),
   onUpdaterStatus: (cb) => ipcRenderer.on('updater:status', (_e, payload) => cb(payload)),
+  onUpdaterDialog: (cb) => ipcRenderer.on('updater:dialog', (_e, payload) => cb(payload)),
+  updaterDialogResponse: (id, response) => ipcRenderer.send('updater:dialog-response', { id, response }),
 
   // Heart Goal overlay (vòng tròn progress)
   heartOverlayShow: () => ipcRenderer.invoke('heart-overlay:show'),

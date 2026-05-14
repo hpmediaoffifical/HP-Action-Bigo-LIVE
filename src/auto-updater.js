@@ -12,13 +12,56 @@
 // Dev mode (electron .) sẽ KHÔNG check vì app.isPackaged = false — đó là hành vi mong muốn,
 // chỉ build NSIS mới có updater hoạt động thật.
 
-const { app, dialog, BrowserWindow } = require('electron');
+const { app, dialog, BrowserWindow, ipcMain } = require('electron');
 
 let autoUpdater = null;
 let mainWinRef = null;
 let isCheckingManually = false;
 let downloadInProgress = false;
 let pendingUpdateInfo = null;
+
+// Custom modal dialog: gửi IPC tới renderer hiển thị HTML modal đồng bộ theme app.
+// Fallback về native dialog nếu renderer chưa sẵn sàng (lúc startup sớm).
+let dialogIdCounter = 0;
+const pendingDialogs = new Map();
+let dialogIpcRegistered = false;
+function ensureDialogIpc() {
+  if (dialogIpcRegistered) return;
+  dialogIpcRegistered = true;
+  ipcMain.on('updater:dialog-response', (_e, payload) => {
+    if (!payload) return;
+    const { id, response } = payload;
+    const resolve = pendingDialogs.get(id);
+    if (resolve) {
+      pendingDialogs.delete(id);
+      resolve({ response });
+    }
+  });
+}
+function showAppDialog(opts) {
+  return new Promise((resolve) => {
+    const w = mainWinRef;
+    if (!w || w.isDestroyed() || !w.webContents) {
+      dialog.showMessageBox(undefined, opts).then(resolve).catch(() => resolve({ response: opts.cancelId ?? 0 }));
+      return;
+    }
+    const id = `dlg_${++dialogIdCounter}`;
+    pendingDialogs.set(id, resolve);
+    // Timeout phòng renderer crash hoặc chưa load — fallback sau 30s
+    setTimeout(() => {
+      if (pendingDialogs.has(id)) {
+        pendingDialogs.delete(id);
+        resolve({ response: opts.cancelId ?? 0 });
+      }
+    }, 30000);
+    try {
+      w.webContents.send('updater:dialog', { id, ...opts });
+    } catch {
+      pendingDialogs.delete(id);
+      dialog.showMessageBox(w, opts).then(resolve).catch(() => resolve({ response: opts.cancelId ?? 0 }));
+    }
+  });
+}
 
 function log(msg) {
   try { console.log('[updater]', msg); } catch {}
@@ -56,16 +99,13 @@ function bindEvents(au) {
     sendStatus({ state: 'error', message: err?.message || String(err) });
     if (isCheckingManually) {
       isCheckingManually = false;
-      const w = mainWinRef;
-      if (w && !w.isDestroyed()) {
-        dialog.showMessageBox(w, {
-          type: 'error',
-          title: 'Kiểm tra cập nhật',
-          message: 'Không kiểm tra được cập nhật',
-          detail: err?.message || String(err),
-          buttons: ['Đóng'],
-        }).catch(() => {});
-      }
+      showAppDialog({
+        type: 'error',
+        title: 'Kiểm tra cập nhật',
+        message: 'Không kiểm tra được cập nhật',
+        detail: err?.message || String(err),
+        buttons: ['Đóng'],
+      }).catch(() => {});
     }
   });
 
@@ -79,16 +119,13 @@ function bindEvents(au) {
     sendStatus({ state: 'not-available', version: info?.version });
     if (isCheckingManually) {
       isCheckingManually = false;
-      const w = mainWinRef;
-      if (w && !w.isDestroyed()) {
-        dialog.showMessageBox(w, {
-          type: 'info',
-          title: 'Kiểm tra cập nhật',
-          message: 'Bạn đang dùng bản mới nhất',
-          detail: `Phiên bản hiện tại: v${app.getVersion()}`,
-          buttons: ['OK'],
-        }).catch(() => {});
-      }
+      showAppDialog({
+        type: 'info',
+        title: 'Kiểm tra cập nhật',
+        message: 'Bạn đang dùng bản mới nhất',
+        detail: `Phiên bản hiện tại: v${app.getVersion()}`,
+        buttons: ['OK'],
+      }).catch(() => {});
     }
   });
 
@@ -97,21 +134,20 @@ function bindEvents(au) {
     pendingUpdateInfo = info;
     sendStatus({ state: 'available', version: info?.version, notes: info?.releaseNotes });
     if (downloadInProgress) return;
-    const w = mainWinRef;
     const wasManual = isCheckingManually;
     isCheckingManually = false;
-    const choice = await dialog.showMessageBox(w && !w.isDestroyed() ? w : undefined, {
-      type: 'question',
-      title: 'Có cập nhật mới',
-      message: `Đã có bản v${info?.version}`,
+    const choice = await showAppDialog({
+      type: 'update-available',
+      title: 'Có bản cập nhật mới',
+      message: `Phiên bản v${info?.version} đã sẵn sàng`,
       detail: [
         `Phiên bản hiện tại: v${app.getVersion()}`,
-        `Phiên bản mới:     v${info?.version}`,
+        `Phiên bản mới: v${info?.version}`,
         '',
-        'Bạn có muốn tải về và cập nhật ngay không?',
-        '(Sau khi tải xong app sẽ tự cài và khởi động lại.)',
+        'Tải về và cập nhật ngay?',
+        'Sau khi tải xong app sẽ tự cài và khởi động lại.',
       ].join('\n'),
-      buttons: ['Cập nhật ngay', 'Để sau'],
+      buttons: ['🚀 Cập nhật ngay', 'Để sau'],
       defaultId: 0,
       cancelId: 1,
     }).catch(() => ({ response: 1 }));
@@ -119,8 +155,6 @@ function bindEvents(au) {
       startDownload();
     } else {
       log('User chọn để sau.');
-      // Nếu user trigger thủ công và từ chối, không làm gì thêm.
-      // Lần khởi động sau, app sẽ tự hỏi lại.
       void wasManual;
     }
   });
@@ -142,13 +176,12 @@ function bindEvents(au) {
     downloadInProgress = false;
     log(`Đã tải xong v${info?.version}.`);
     sendStatus({ state: 'downloaded', version: info?.version });
-    const w = mainWinRef;
-    const choice = await dialog.showMessageBox(w && !w.isDestroyed() ? w : undefined, {
-      type: 'question',
+    const choice = await showAppDialog({
+      type: 'update-ready',
       title: 'Sẵn sàng cài đặt',
       message: `Bản v${info?.version} đã tải xong`,
       detail: 'App sẽ đóng lại để cài đặt rồi tự khởi động lại. Tiếp tục?',
-      buttons: ['Cài đặt và khởi động lại', 'Để sau (cài khi thoát app)'],
+      buttons: ['✓ Cài đặt và khởi động lại', 'Để sau (cài khi thoát app)'],
       defaultId: 0,
       cancelId: 1,
     }).catch(() => ({ response: 0 }));
@@ -180,16 +213,13 @@ function startDownload() {
     downloadInProgress = false;
     log(`Tải lỗi: ${e?.message || e}`);
     sendStatus({ state: 'error', message: e?.message || String(e) });
-    const w = mainWinRef;
-    if (w && !w.isDestroyed()) {
-      dialog.showMessageBox(w, {
-        type: 'error',
-        title: 'Lỗi tải cập nhật',
-        message: 'Không tải được bản cập nhật',
-        detail: e?.message || String(e),
-        buttons: ['Đóng'],
-      }).catch(() => {});
-    }
+    showAppDialog({
+      type: 'error',
+      title: 'Lỗi tải cập nhật',
+      message: 'Không tải được bản cập nhật',
+      detail: e?.message || String(e),
+      buttons: ['Đóng'],
+    }).catch(() => {});
   });
 }
 
@@ -200,6 +230,7 @@ function startDownload() {
  */
 function init(mainWindow) {
   mainWinRef = mainWindow;
+  ensureDialogIpc();
   if (!app.isPackaged) {
     log('Bỏ qua updater: app chưa được đóng gói (dev mode).');
     return;
@@ -220,16 +251,13 @@ function init(mainWindow) {
  */
 async function checkManually() {
   if (!app.isPackaged) {
-    const w = mainWinRef;
-    if (w && !w.isDestroyed()) {
-      await dialog.showMessageBox(w, {
-        type: 'info',
-        title: 'Kiểm tra cập nhật',
-        message: 'Tính năng cập nhật chỉ chạy trên bản đã cài đặt',
-        detail: `Bạn đang chạy chế độ dev (npm start). Hãy build setup .exe để dùng auto-update.\nPhiên bản hiện tại: v${app.getVersion()}`,
-        buttons: ['OK'],
-      }).catch(() => {});
-    }
+    await showAppDialog({
+      type: 'info',
+      title: 'Kiểm tra cập nhật',
+      message: 'Tính năng cập nhật chỉ chạy trên bản đã cài đặt',
+      detail: `Bạn đang chạy chế độ dev (npm start). Hãy build setup .exe để dùng auto-update.\nPhiên bản hiện tại: v${app.getVersion()}`,
+      buttons: ['OK'],
+    }).catch(() => {});
     return { ok: false, dev: true };
   }
   const au = tryRequireUpdater();

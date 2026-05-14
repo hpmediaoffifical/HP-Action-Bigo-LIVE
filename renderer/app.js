@@ -44,6 +44,83 @@ if (window.bigo && window.bigo.onWarnNoObs) {
   });
 }
 
+// =================== Updater dialog modal ===================
+// Main process gọi qua IPC khi cần hỏi user (có cập nhật / sẵn sàng cài / lỗi / info).
+// Modal phong cách giống app-confirm pattern: dark card, accent orange, blur backdrop.
+const UPDATER_DIALOG_VARIANTS = {
+  'update-available': { icon: '⬇️', accent: 'orange', primaryStyle: 'success' },
+  'update-ready':     { icon: '🚀', accent: 'green',  primaryStyle: 'success' },
+  'info':             { icon: 'ℹ',  accent: 'blue',   primaryStyle: 'neutral' },
+  'error':            { icon: '⚠',  accent: 'red',    primaryStyle: 'danger' },
+  'question':         { icon: '?',  accent: 'orange', primaryStyle: 'neutral' },
+};
+function showUpdaterModal({ id, type, title, message, detail, buttons, defaultId, cancelId }) {
+  const variant = UPDATER_DIALOG_VARIANTS[type] || UPDATER_DIALOG_VARIANTS.info;
+  const respond = (idx) => {
+    if (window.bigo && window.bigo.updaterDialogResponse) {
+      window.bigo.updaterDialogResponse(id, idx);
+    }
+    document.removeEventListener('keydown', onKey);
+    try { backdrop.remove(); } catch {}
+  };
+  const backdrop = document.createElement('div');
+  backdrop.className = 'upd-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="upd-modal-card upd-accent-${variant.accent}" role="dialog" aria-modal="true">
+      <button type="button" class="upd-modal-close" aria-label="Đóng">✕</button>
+      <div class="upd-modal-icon">${variant.icon}</div>
+      <div class="upd-modal-body">
+        <div class="upd-modal-title"></div>
+        <div class="upd-modal-message"></div>
+        <pre class="upd-modal-detail"></pre>
+      </div>
+      <div class="upd-modal-actions"></div>
+    </div>
+  `;
+  backdrop.querySelector('.upd-modal-title').textContent = title || '';
+  backdrop.querySelector('.upd-modal-message').textContent = message || '';
+  const detailEl = backdrop.querySelector('.upd-modal-detail');
+  if (detail) detailEl.textContent = detail; else detailEl.style.display = 'none';
+  const actions = backdrop.querySelector('.upd-modal-actions');
+  const btns = (Array.isArray(buttons) && buttons.length ? buttons : ['OK']);
+  const dId = typeof defaultId === 'number' ? defaultId : 0;
+  const cId = typeof cancelId === 'number' ? cancelId : (btns.length > 1 ? btns.length - 1 : 0);
+  btns.forEach((label, idx) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    if (idx === dId) {
+      b.className = `upd-btn upd-btn-primary upd-btn-${variant.primaryStyle}`;
+    } else {
+      b.className = 'upd-btn upd-btn-secondary';
+    }
+    b.textContent = label;
+    b.onclick = () => respond(idx);
+    actions.appendChild(b);
+  });
+  backdrop.querySelector('.upd-modal-close').onclick = () => respond(cId);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) respond(cId); });
+  const onKey = (e) => {
+    if (e.key === 'Escape') respond(cId);
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      respond(dId);
+    }
+  };
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(backdrop);
+  // Focus default button cho dễ Enter
+  setTimeout(() => {
+    const defBtn = actions.children[dId];
+    if (defBtn) try { defBtn.focus(); } catch {}
+  }, 30);
+}
+if (window.bigo && window.bigo.onUpdaterDialog) {
+  window.bigo.onUpdaterDialog((payload) => {
+    if (!payload) return;
+    showUpdaterModal(payload);
+  });
+}
+
 // =================== Helper: groups & items ===================
 // v3: mapping.groups = [{ id, name, type, enabled, collapsed, bigoId, items: [...] }]
 // Backward-compat: nếu mapping.gifts (v2 flat) tồn tại, treat như 1 group default
