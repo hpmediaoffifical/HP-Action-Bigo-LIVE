@@ -5,6 +5,13 @@ assets/gift-icons/
 assets/effects/*
 !assets/effects/.gitkeep
 dist/
+release/
 *.log
 .DS_Store
 Thumbs.db
+.claude/
+*.original.ico
+*.original.png
+logo-256.png
+npm start.txt
+PK_DUO_NOTES.md

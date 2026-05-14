@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <title>Action - Bigo LIVE</title>
+  <title>HP Action - BIGO LIVE</title>
   <link rel="icon" type="image/png" href="../logo-hp.png" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -10,7 +10,7 @@
   <section id="licenseGate" class="license-gate" aria-label="Nhập KEY bản quyền">
     <div class="license-card">
       <div class="license-logo-wrap"><img src="../logo-hp.png" alt="HP Action" /></div>
-      <h1>Action - BIGO LIVE</h1>
+      <h1>HP Action - BIGO LIVE</h1>
       <p class="license-subtitle">Nhập KEY bản quyền để sử dụng phần mềm trên thiết bị này.</p>
       <form id="licenseGateForm" class="license-form">
         <input id="licenseGateKey" type="password" autocomplete="off" placeholder="Nhập KEY bản quyền" />
@@ -18,11 +18,12 @@
       </form>
       <div id="licenseGateMessage" class="license-message">Đang kiểm tra KEY...</div>
       <div class="license-developer">
-        <div>Action - Bigo LIVE by HP Media</div>
+        <div>HP Action - BIGO LIVE by HP Media</div>
         <a href="https://www.facebook.com/hpvn.media" data-ext="https://www.facebook.com/hpvn.media">Liên hệ bản quyền</a>
       </div>
     </div>
   </section>
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
   <div class="app-layout">
     <aside class="sidebar">
       <button class="tab sidebar-tab active" data-tab="embed" title="TƯƠNG TÁC" aria-label="TƯƠNG TÁC">💬</button>
@@ -871,7 +872,21 @@
       <div class="panel">
         <h2>ℹ️ NHÀ PHÁT HÀNH</h2>
         <div class="dev-info">
-          <div class="dev-row"><span class="dev-key">Phiên bản hiện tại:</span><span class="dev-val"><b id="appVersion">—</b></span></div>
+          <div class="dev-row">
+            <span class="dev-key">Phiên bản hiện tại:</span>
+            <span class="dev-val" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center">
+              <b id="appVersion">—</b>
+              <button type="button" id="btnCheckUpdate" class="tiny primary" title="Kiểm tra phiên bản mới trên GitHub">🔄 Kiểm tra cập nhật</button>
+              <span id="updateStatus" style="font-size:12px; opacity:.85"></span>
+            </span>
+          </div>
+          <div class="dev-row" id="updateProgressRow" style="display:none">
+            <span class="dev-key">Tiến trình tải:</span>
+            <span class="dev-val" style="display:flex; flex-direction:column; gap:4px; flex:1">
+              <progress id="updateProgressBar" max="100" value="0" style="width:100%; height:12px"></progress>
+              <span id="updateProgressMeta" style="font-size:11px; opacity:.75; font-family:monospace"></span>
+            </span>
+          </div>
           <div class="dev-row">
             <span class="dev-key">Key bản quyền:</span>
             <span class="dev-val" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
@@ -891,7 +906,7 @@
       <div class="panel">
         <h2>👨‍💻 Thông tin Nhà Phát Triển</h2>
         <div class="dev-info">
-          <div class="dev-row"><span class="dev-key">Tên ứng dụng:</span><span class="dev-val"><b>Action - BIGO LIVE</b></span></div>
+          <div class="dev-row"><span class="dev-key">Tên ứng dụng:</span><span class="dev-val"><b>HP Action - BIGO LIVE</b></span></div>
           <div class="dev-row"><span class="dev-key">Phát triển bởi:</span><span class="dev-val"><b>HP Media</b></span></div>
           <div class="dev-row"><span class="dev-key">Người thực hiện:</span><span class="dev-val"><b>Nguyễn Hoàng Phụng</b></span></div>
           <div class="dev-row"><span class="dev-key">Website:</span><span class="dev-val"><a href="#" data-ext="https://hpvn.media" class="dev-link">https://hpvn.media</a></span></div>

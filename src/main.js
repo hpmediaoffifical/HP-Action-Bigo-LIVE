@@ -6,21 +6,60 @@ const { BigoClient } = require('./bigo-client');
 const { BigoWebListener } = require('./web-embed');
 const { OverlayManager } = require('./overlay-manager');
 const { ObsOverlayServer } = require('./obs-overlay-server');
+const autoUpdater = require('./auto-updater');
 
 const ROOT = path.join(__dirname, '..');
-const CONFIG_PATH = path.join(ROOT, 'config', 'settings.json');
-const MAPPING_PATH = path.join(ROOT, 'config', 'gift-mapping.json');
-const GIFT_MASTER_PATH = path.join(ROOT, 'config', 'gift-master.json');
-const EFFECTS_DIR = path.join(ROOT, 'assets', 'effects');
-const GIFT_ICONS_DIR = path.join(ROOT, 'assets', 'gift-icons');
+
+// Khi packaged, app.asar là read-only file (không phải directory) — không thể write
+// config/settings.json vào trong đó. Chuyển sang userData (Windows convention).
+// Dev mode: vẫn dùng folder config/ trong repo để dev sửa trực tiếp dễ hơn.
+const USER_DATA_DIR = app.getPath('userData');
+const CONFIG_DIR = app.isPackaged
+  ? path.join(USER_DATA_DIR, 'config')
+  : path.join(ROOT, 'config');
+const USER_ASSETS_DIR = app.isPackaged
+  ? path.join(USER_DATA_DIR, 'assets')
+  : path.join(ROOT, 'assets');
+const SHIPPED_ASSETS_DIR = app.isPackaged
+  ? path.join(process.resourcesPath, 'assets')
+  : path.join(ROOT, 'assets');
+const SHIPPED_CONFIG_DIR = app.isPackaged
+  ? path.join(process.resourcesPath, 'app.asar.unpacked', 'config')
+  : path.join(ROOT, 'config');
+
+const CONFIG_PATH = path.join(CONFIG_DIR, 'settings.json');
+const MAPPING_PATH = path.join(CONFIG_DIR, 'gift-mapping.json');
+const GIFT_MASTER_PATH = path.join(CONFIG_DIR, 'gift-master.json');
+const EFFECTS_DIR = path.join(SHIPPED_ASSETS_DIR, 'effects');
+const GIFT_ICONS_DIR = path.join(USER_ASSETS_DIR, 'gift-icons');
 const GIFT_MASTER_TTL = 24 * 3600 * 1000; // 24h
 
-// App icon — Windows ưu tiên .ico, fallback .png
-const ICO_PATH = path.join(ROOT, 'logo-hp.ico');
-const PNG_PATH = path.join(ROOT, 'logo-hp.png');
+function bootstrapUserDirs() {
+  try { fs.mkdirSync(CONFIG_DIR, { recursive: true }); } catch {}
+  try { fs.mkdirSync(GIFT_ICONS_DIR, { recursive: true }); } catch {}
+  if (app.isPackaged) {
+    for (const f of ['gift-mapping.json', 'gift-master.json']) {
+      const dst = path.join(CONFIG_DIR, f);
+      const src = path.join(SHIPPED_CONFIG_DIR, f);
+      if (!fs.existsSync(dst) && fs.existsSync(src)) {
+        try { fs.copyFileSync(src, dst); } catch {}
+      }
+    }
+  }
+}
+bootstrapUserDirs();
+
+// App icon — Windows ưu tiên .ico, fallback .png. Khi packaged đọc từ resources.
+const ICO_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, 'app.asar.unpacked', 'logo-hp.ico')
+  : path.join(ROOT, 'logo-hp.ico');
+const PNG_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, 'app.asar.unpacked', 'logo-hp.png')
+  : path.join(ROOT, 'logo-hp.png');
 const APP_ICON = fs.existsSync(ICO_PATH) ? ICO_PATH : (fs.existsSync(PNG_PATH) ? PNG_PATH : null);
-app.setName('Action - Bigo LIVE');
-process.title = 'Action - Bigo LIVE';
+// Không gọi setName — Electron tự dùng productName từ package.json,
+// đảm bảo userData path đồng bộ với tên hiển thị.
+process.title = 'HP Action - BIGO LIVE';
 
 // Windows: set AppUserModelID để taskbar group đúng và hiện icon
 if (process.platform === 'win32') {
@@ -448,6 +487,8 @@ app.whenReady().then(async () => {
   });
   createWindow();
   // Auto-open overlays với cfg.autoOpen = true sau khi app sẵn sàng
+  // Auto-update: chỉ chạy ở bản đã đóng gói. Dev mode (npm start) bỏ qua.
+  try { autoUpdater.init(win); } catch (e) { console.warn('auto-updater init failed:', e); }
   setTimeout(() => {
     for (const ov of (mapping.overlays || [])) {
       if (ov.autoOpen) {
@@ -499,6 +540,16 @@ ipcMain.handle('shell:open-external', (_e, url) => shell.openExternal(url));
 ipcMain.handle('app:get-version', () => {
   try { return require(path.join(ROOT, 'package.json')).version || '0.0.0'; } catch { return '0.0.0'; }
 });
+
+// =================== Auto-updater IPC ===================
+ipcMain.handle('updater:check', async () => {
+  return await autoUpdater.checkManually();
+});
+ipcMain.handle('updater:download', () => {
+  autoUpdater.startDownload();
+  return { ok: true };
+});
+ipcMain.handle('updater:state', () => autoUpdater.getState());
 
 // =================== License (Google Apps Script) ===================
 const LICENSE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwOuL0jR7HL9oMwNkebX1JRKI8lf5-RafKZsqsIQmuHpuME5fGlsXsuqDv_r3VhP_Anuw/exec';
@@ -1303,6 +1354,8 @@ ipcMain.handle('overlay:play', (_e, { overlayId, file, fileUrl: rawUrl }) => {
     const sentToObs = obsOverlayServer ? obsOverlayServer.play(overlayId, fullPath) : false;
     if (!sentToObs && win && !win.isDestroyed()) {
       try { win.webContents.send('bigo:log', `[obs-overlay] ${cfg.name || overlayId}: chưa có OBS Browser Source kết nối, bỏ qua 1 hiệu ứng`); } catch {}
+      // Toast cảnh báo dễ thấy hơn log panel. Renderer tự throttle để không spam.
+      try { win.webContents.send('warn:no-obs', { overlayId, overlayName: cfg.name || overlayId }); } catch {}
       setTimeout(() => { try { win.webContents.send('overlay:effect-ended'); } catch {} }, 50);
     }
   } else if (target === 'both') {

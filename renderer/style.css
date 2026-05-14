@@ -1,4 +1,44 @@
 * { box-sizing: border-box; }
+
+/* Toast notifications — floating ở góc phải dưới */
+.toast-container {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  max-width: 380px;
+}
+.toast {
+  background: #2c2c2e;
+  color: #fff;
+  padding: 12px 14px;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .45);
+  border-left: 4px solid #888;
+  font-size: 13px;
+  line-height: 1.4;
+  animation: toast-in .25s ease-out;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.toast.toast-warn { border-left-color: #f39c12; background: #3a2e1a; }
+.toast.toast-error { border-left-color: #e74c3c; background: #3a1e1a; }
+.toast.toast-info { border-left-color: #3498db; background: #1a2a3a; }
+.toast .toast-title { font-weight: 600; margin-bottom: 3px; }
+.toast .toast-body { opacity: .9; }
+.toast.fading { animation: toast-out .35s ease-in forwards; }
+@keyframes toast-in {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes toast-out {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(20px); opacity: 0; }
+}
 :root {
   --bigo-bean-icon: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAArlBMVEUAAADvogDjkgDpnADqnwD/xQDikgDikQDikwDjkgDjkwD8ugD5tgD4tAD4tAD2sQDikgD2sQDomgDikgDyrgDyrQDupQDpnAD6uADzrADhkgDikgD3swDikgD0rgDzrADjkgDkkgD4swDlkgD/vwDhkQD////+vgDvpgD/6KPtogDnmwD/1Vr/1FL/ySX5twD1sAD/8cf/4Yf/xRnklwD/9t7/9t3/23L/wxD7uQCbM/aIAAAAJHRSTlMAFpgdCwT53311SPXl29PKuquMaEI4JfTr49fLu6aQe2xUTTHDAjF8AAAA7klEQVQoz6XS2ZLCIBAFUEI0xn0bnX3vBmKMxmUW///HVFqhg755n1J16uZSFOLmTIa9bv8tuka1Ptjo7uTSHsmKYgMv9QCltrZSSmX/D3G1eG9toY75WbSnHFszhmoF7YjhR06Tv6Rz6LDd5pY254QZwNDjGJdUzc6o7/wmGqCs6bcAHYcRoj7p5m9d2I8vp09U5ek5TBF3AWp34Bgx14H6I0nEWYDvDuMEw9kRuwc8dDXfTIXP4KD50qMZM4waeCyfWBtsCZbYKuamLEuzxaQmKvqMLFJUUx95a1w+telrQja4/gw/Uymb3+LW7AE5TzPk9VvkZAAAAABJRU5ErkJggg==");
 }

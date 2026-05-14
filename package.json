@@ -1,28 +1,88 @@
 {
   "name": "bigo-action",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Bigo Live gift effect player — nhận quà từ phòng live qua Bigo Open API rồi phát mp3/mp4/webm hiệu ứng",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev"
+    "dev": "electron . --dev",
+    "dist": "electron-builder --win nsis --publish never",
+    "release": "electron-builder --win nsis --publish always"
   },
   "author": "Phụng",
   "license": "ISC",
   "build": {
     "appId": "com.hp.bigoaction",
-    "productName": "HP Action - Bigo LIVE",
+    "productName": "HP Action - BIGO LIVE",
+    "directories": {
+      "output": "release"
+    },
+    "asar": true,
+    "asarUnpack": [
+      "config/**",
+      "assets/**",
+      "logo-hp.ico",
+      "logo-hp.png"
+    ],
+    "files": [
+      "src/**",
+      "renderer/**",
+      "config/**",
+      "logo-hp.ico",
+      "logo-hp.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": ["**/*"]
+      }
+    ],
     "win": {
-      "icon": "logo-hp.ico"
+      "icon": "logo-hp.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "HP-Action-BIGO-LIVE-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "HP Action - BIGO LIVE",
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "logo-hp.ico",
+      "uninstallerIcon": "logo-hp.ico",
+      "installerHeaderIcon": "logo-hp.ico",
+      "license": "LICENSE.txt"
     },
     "mac": {
       "icon": "logo-hp.png"
     },
     "linux": {
       "icon": "logo-hp.png"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "hpmediaoffifical",
+        "repo": "HP-Action-Bigo-LIVE",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
   }
 }

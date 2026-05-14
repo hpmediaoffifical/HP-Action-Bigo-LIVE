@@ -4,6 +4,46 @@ const $ = (id) => document.getElementById(id);
 let mapping = { version: 3, groups: [], overlays: [] };
 let effects = [];
 
+// =================== Toast notifications ===================
+const _toastSeen = new Map();
+function showToast({ key, title, body, type = 'info', ttl = 6000, throttle = 10000 }) {
+  if (key) {
+    const last = _toastSeen.get(key) || 0;
+    if (Date.now() - last < throttle) return;
+    _toastSeen.set(key, Date.now());
+  }
+  const container = $('toastContainer');
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.innerHTML = `
+    ${title ? `<div class="toast-title"></div>` : ''}
+    ${body ? `<div class="toast-body"></div>` : ''}
+  `;
+  if (title) el.querySelector('.toast-title').textContent = title;
+  if (body) el.querySelector('.toast-body').textContent = body;
+  const remove = () => {
+    el.classList.add('fading');
+    setTimeout(() => { try { el.remove(); } catch {} }, 350);
+  };
+  el.onclick = remove;
+  container.appendChild(el);
+  setTimeout(remove, ttl);
+}
+if (window.bigo && window.bigo.onWarnNoObs) {
+  window.bigo.onWarnNoObs((payload) => {
+    if (!payload) return;
+    showToast({
+      key: `no-obs-${payload.overlayId || 'default'}`,
+      title: '⚠️ Chưa kết nối OBS',
+      body: `Overlay "${payload.overlayName}" đang gửi qua OBS nhưng chưa có Browser Source kết nối — hiệu ứng bị bỏ qua. Mở OBS Studio và thêm Browser Source với URL của overlay này.`,
+      type: 'warn',
+      ttl: 8000,
+      throttle: 15000,
+    });
+  });
+}
+
 // =================== Helper: groups & items ===================
 // v3: mapping.groups = [{ id, name, type, enabled, collapsed, bigoId, items: [...] }]
 // Backward-compat: nếu mapping.gifts (v2 flat) tồn tại, treat như 1 group default
@@ -1433,8 +1473,100 @@ async function ensureLicenseGate() {
 (async function wireInfoTab() {
   const verEl = document.getElementById('appVersion');
   if (verEl && window.bigo.appGetVersion) {
-    try { verEl.textContent = await window.bigo.appGetVersion(); } catch { verEl.textContent = '?'; }
+    try { verEl.textContent = 'v' + (await window.bigo.appGetVersion()); } catch { verEl.textContent = '?'; }
   }
+
+  // --- Auto-updater UI ---
+  const upBtn = document.getElementById('btnCheckUpdate');
+  const upStatus = document.getElementById('updateStatus');
+  const upProgRow = document.getElementById('updateProgressRow');
+  const upProgBar = document.getElementById('updateProgressBar');
+  const upProgMeta = document.getElementById('updateProgressMeta');
+  const setUpText = (txt, color) => {
+    if (!upStatus) return;
+    upStatus.textContent = txt || '';
+    upStatus.style.color = color || '';
+  };
+  const showProgress = (visible) => {
+    if (upProgRow) upProgRow.style.display = visible ? '' : 'none';
+  };
+  const fmtMB = (bytes) => (bytes / (1024 * 1024)).toFixed(1);
+  const fmtSpeed = (bps) => {
+    if (!bps) return '';
+    const mbs = bps / (1024 * 1024);
+    if (mbs >= 1) return `${mbs.toFixed(2)} MB/s`;
+    return `${Math.round(bps / 1024)} KB/s`;
+  };
+  const fmtEta = (bps, remaining) => {
+    if (!bps || !remaining) return '';
+    const sec = Math.max(0, Math.round(remaining / bps));
+    if (sec < 60) return `còn ${sec}s`;
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return `còn ${m}p${String(s).padStart(2, '0')}`;
+  };
+  if (window.bigo.onUpdaterStatus) {
+    window.bigo.onUpdaterStatus((s) => {
+      if (!s) return;
+      switch (s.state) {
+        case 'checking':
+          setUpText('🔄 Đang kiểm tra...', '#888');
+          showProgress(false);
+          break;
+        case 'not-available':
+          setUpText('✅ Đã là bản mới nhất', '#2ecc71');
+          showProgress(false);
+          if (upBtn) upBtn.disabled = false;
+          break;
+        case 'available':
+          setUpText(`⬇️ Có bản mới v${s.version}`, '#e67e22');
+          showProgress(false);
+          break;
+        case 'downloading': {
+          const pct = s.percent != null ? s.percent : 0;
+          setUpText(`⬇️ Đang tải bản mới...`, '#3498db');
+          showProgress(true);
+          if (upProgBar) upProgBar.value = pct;
+          if (upProgMeta) {
+            const speed = fmtSpeed(s.bytesPerSecond);
+            const remaining = (s.total || 0) - (s.transferred || 0);
+            const eta = fmtEta(s.bytesPerSecond, remaining);
+            const sizes = (s.transferred && s.total)
+              ? `${fmtMB(s.transferred)} / ${fmtMB(s.total)} MB`
+              : '';
+            upProgMeta.textContent = [`${pct}%`, sizes, speed, eta].filter(Boolean).join(' · ');
+          }
+          if (upBtn) upBtn.disabled = true;
+          break;
+        }
+        case 'downloaded':
+          setUpText(`📦 Đã tải xong v${s.version} — chờ cài đặt`, '#2ecc71');
+          if (upProgBar) upProgBar.value = 100;
+          if (upProgMeta) upProgMeta.textContent = '100% — sẵn sàng cài đặt';
+          if (upBtn) upBtn.disabled = false;
+          break;
+        case 'error':
+          setUpText(`⚠️ Lỗi: ${s.message || 'unknown'}`, '#e74c3c');
+          showProgress(false);
+          if (upBtn) upBtn.disabled = false;
+          break;
+      }
+    });
+  }
+  if (upBtn && window.bigo.updaterCheck) {
+    upBtn.onclick = async () => {
+      upBtn.disabled = true;
+      setUpText('🔄 Đang kiểm tra...', '#888');
+      try {
+        const r = await window.bigo.updaterCheck();
+        if (r && r.dev) setUpText('💻 Dev mode — chỉ bản setup mới có updater', '#888');
+      } catch (e) {
+        setUpText(`⚠️ ${e?.message || e}`, '#e74c3c');
+      } finally {
+        upBtn.disabled = false;
+      }
+    };
+  }
+
   const keyInput = document.getElementById('licenseKey');
   const verifyBtn = document.getElementById('btnVerifyLicense');
   const activateBtn = document.getElementById('btnActivateLicense');
