@@ -25,6 +25,11 @@ contextBridge.exposeInMainWorld('bigo', {
   giftsMasterList: () => ipcRenderer.invoke('gifts:master-list'),
   giftsMasterRefresh: () => ipcRenderer.invoke('gifts:master-refresh'),
   giftsLookup: (q) => ipcRenderer.invoke('gifts:lookup', q),
+
+  // VN gifts (override giá KC theo khu vực Việt Nam)
+  vnGiftsStatus: () => ipcRenderer.invoke('vn-gifts:status'),
+  vnGiftsList: () => ipcRenderer.invoke('vn-gifts:list'),
+  vnGiftsHas: (typeid) => ipcRenderer.invoke('vn-gifts:has', typeid),
   giftsIconsStatus: () => ipcRenderer.invoke('gifts:icons-status'),
   giftsDownloadIcons: () => ipcRenderer.invoke('gifts:download-icons'),
   giftsOnDownloadProgress: (cb) => ipcRenderer.on('gifts:download-progress', (_e, p) => cb(p)),

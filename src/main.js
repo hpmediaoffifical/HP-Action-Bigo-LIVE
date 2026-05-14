@@ -30,6 +30,11 @@ const SHIPPED_CONFIG_DIR = app.isPackaged
 const CONFIG_PATH = path.join(CONFIG_DIR, 'settings.json');
 const MAPPING_PATH = path.join(CONFIG_DIR, 'gift-mapping.json');
 const GIFT_MASTER_PATH = path.join(CONFIG_DIR, 'gift-master.json');
+const VN_GIFTS_PATH = path.join(CONFIG_DIR, 'vietnam-gifts.json');
+// Shipped fallback nếu user chưa override file VN gifts
+const SHIPPED_VN_GIFTS_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, 'app.asar.unpacked', 'config', 'vietnam-gifts.json')
+  : path.join(ROOT, 'config', 'vietnam-gifts.json');
 const EFFECTS_DIR = path.join(SHIPPED_ASSETS_DIR, 'effects');
 const GIFT_ICONS_DIR = path.join(USER_ASSETS_DIR, 'gift-icons');
 const GIFT_MASTER_TTL = 24 * 3600 * 1000; // 24h
@@ -38,7 +43,7 @@ function bootstrapUserDirs() {
   try { fs.mkdirSync(CONFIG_DIR, { recursive: true }); } catch {}
   try { fs.mkdirSync(GIFT_ICONS_DIR, { recursive: true }); } catch {}
   if (app.isPackaged) {
-    for (const f of ['gift-mapping.json', 'gift-master.json']) {
+    for (const f of ['gift-mapping.json', 'gift-master.json', 'vietnam-gifts.json']) {
       const dst = path.join(CONFIG_DIR, f);
       const src = path.join(SHIPPED_CONFIG_DIR, f);
       if (!fs.existsSync(dst) && fs.existsSync(src)) {
@@ -48,6 +53,31 @@ function bootstrapUserDirs() {
   }
 }
 bootstrapUserDirs();
+
+// =================== VN gifts (override giá KC theo khu vực Việt Nam) ===================
+// File: config/vietnam-gifts.json — bundled trong installer, user có thể replace bằng IPC import.
+// Khi 1 gift typeid match → ưu tiên giá KC từ file VN, để hiển thị đúng giá khu vực.
+let vnGifts = { byTypeId: new Map(), gifts: [], source: null, fetchedAt: 0 };
+function loadVnGifts() {
+  let raw = loadJson(VN_GIFTS_PATH, null);
+  if (!raw || !Array.isArray(raw.gifts) || raw.gifts.length === 0) {
+    raw = loadJson(SHIPPED_VN_GIFTS_PATH, null);
+  }
+  if (!raw || !Array.isArray(raw.gifts)) {
+    vnGifts = { byTypeId: new Map(), gifts: [], source: null, fetchedAt: 0 };
+    return;
+  }
+  const m = new Map();
+  for (const g of raw.gifts) {
+    if (g.typeid != null) m.set(Number(g.typeid), g);
+  }
+  vnGifts = {
+    byTypeId: m,
+    gifts: raw.gifts,
+    source: raw.source || 'vietnam-gifts.json',
+    fetchedAt: raw.fetchedAt || 0,
+  };
+}
 
 // App icon — Windows ưu tiên .ico, fallback .png. Khi packaged đọc từ resources.
 const ICO_PATH = app.isPackaged
@@ -284,6 +314,14 @@ function enrichGiftEvent(ev) {
     ev.gift_value = rateToDiamonds(meta.vm_exchange_rate); // ĐÚNG: chia 100
     if (!ev.gift_icon) ev.gift_icon = localIconUrl(meta.typeid) || meta.img_url;
   }
+  // VN override: nếu typeid có trong vietnam-gifts.json → ưu tiên giá KC khu vực VN.
+  // Giữ vm_exchange_rate global trong meta, chỉ override gift_value xuống dòng dưới.
+  if (ev.gift_id && vnGifts.byTypeId && vnGifts.byTypeId.has(ev.gift_id)) {
+    const vn = vnGifts.byTypeId.get(ev.gift_id);
+    ev.vn_match = true;
+    if (vn.diamonds != null) ev.gift_value = vn.diamonds;
+    if (vn.name) ev.gift_name_vn = vn.name;
+  }
   // Tổng = (count × combo) × giá 1 quà.  combo 1 nếu không có.
   const totalCount = (ev.gift_count || 1) * (ev.combo || 1);
   ev.total_count = totalCount;
@@ -448,6 +486,7 @@ app.on('second-instance', () => {
 
 app.whenReady().then(async () => {
   mapping = loadMapping();
+  loadVnGifts();
   overlayManager = new OverlayManager({
     onBoundsChanged: (overlayId, b) => {
       const ov = mapping.overlays.find(o => o.id === overlayId);
@@ -844,14 +883,31 @@ ipcMain.handle('bigo:check-live', async (_e, bigoId) => {
 
 // =================== Gift master IPC ===================
 function decorateGift(g) {
+  const vn = vnGifts.byTypeId && g.typeid ? vnGifts.byTypeId.get(g.typeid) : null;
   return {
     ...g,
-    diamonds: rateToDiamonds(g.vm_exchange_rate),
+    diamonds: vn?.diamonds != null ? vn.diamonds : rateToDiamonds(g.vm_exchange_rate),
+    diamondsGlobal: rateToDiamonds(g.vm_exchange_rate),
     localIcon: localIconUrl(g.typeid),
+    vn_match: !!vn,
+    vn_name: vn?.name || null,
+    vn_diamonds: vn?.diamonds ?? null,
   };
 }
 
 ipcMain.handle('gifts:master-list', () => (giftMaster.gifts || []).map(decorateGift));
+
+// =================== VN gifts IPC ===================
+ipcMain.handle('vn-gifts:status', () => ({
+  count: vnGifts.gifts.length,
+  source: vnGifts.source,
+  fetchedAt: vnGifts.fetchedAt,
+}));
+ipcMain.handle('vn-gifts:list', () => vnGifts.gifts.slice());
+ipcMain.handle('vn-gifts:has', (_e, typeid) => {
+  const id = Number(typeid);
+  return !!(vnGifts.byTypeId && vnGifts.byTypeId.has(id));
+});
 ipcMain.handle('gifts:master-refresh', async () => ensureGiftMaster(true));
 ipcMain.handle('gifts:lookup', (_e, query) => {
   if (!query) return [];

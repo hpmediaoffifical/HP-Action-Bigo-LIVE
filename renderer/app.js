@@ -2996,10 +2996,14 @@ function sortMasterArr(arr, key) {
   }
 }
 
-// Heuristic detect quà Việt Nam: tên chứa từ khoá VN hoặc dấu Việt
+// Detect quà Việt Nam: ưu tiên flag vn_match từ main process (chính xác — match theo
+// file vietnam-gifts.json đã import). Heuristic regex chỉ dùng fallback cho master
+// records cũ chưa có flag (vd điểm release cũ).
 const VN_KEYWORDS = /việt|vietnam|tết|sài\s?gòn|hà\s?nội|đà\s?nẵng|phở|áo\s?dài|hoa\s?sen|trống|nón\s?lá|VN|hp\s|HPMedia/i;
 const VN_ACCENTS = /[àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
 function isVnGift(g) {
+  if (!g) return false;
+  if (g.vn_match) return true;
   const n = String(g.name || '');
   return VN_KEYWORDS.test(n) || VN_ACCENTS.test(n);
 }
@@ -3040,11 +3044,14 @@ function renderMasterTable() {
   els.dlgMasterTableBody.innerHTML = display.map(g => {
     const src = g.localIcon || g.img_url || '';
     const isFav = giftFavorites.has(g.typeid);
+    const vnBadge = g.vn_match
+      ? `<span class="vn-badge" title="Quà có trong danh mục khu vực Việt Nam">🇻🇳 VN</span>`
+      : '';
     return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
       <td><img src="${escapeHtml(src)}" loading="lazy" draggable="true" data-typeid="${g.typeid}" title="Kéo ra desktop = ${g.typeid}.png" /></td>
       <td><span class="id">${g.typeid}</span></td>
       <td><span class="price">${beanIconHtml('small')} ${g.diamonds ?? '?'}</span></td>
-      <td><span class="name">${escapeHtml(g.name)}</span></td>
+      <td><span class="name">${escapeHtml(g.name)} ${vnBadge}</span></td>
       <td><button class="fav-btn ${isFav ? 'on' : ''}" data-fav="${g.typeid}" title="Đánh dấu yêu thích">${isFav ? '⭐' : '☆'}</button></td>
     </tr>`;
   }).join('');

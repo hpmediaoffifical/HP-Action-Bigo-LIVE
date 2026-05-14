@@ -193,6 +193,23 @@
   from { transform: scale(.94) translateY(8px); opacity: 0; }
   to { transform: scale(1) translateY(0); opacity: 1; }
 }
+
+/* ============ VN gift badge ============ */
+.vn-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #da251d, #ff8a3d);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(218, 37, 29, 0.32);
+  vertical-align: 1px;
+}
 :root {
   --bigo-bean-icon: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAArlBMVEUAAADvogDjkgDpnADqnwD/xQDikgDikQDikwDjkgDjkwD8ugD5tgD4tAD4tAD2sQDikgD2sQDomgDikgDyrgDyrQDupQDpnAD6uADzrADhkgDikgD3swDikgD0rgDzrADjkgDkkgD4swDlkgD/vwDhkQD////+vgDvpgD/6KPtogDnmwD/1Vr/1FL/ySX5twD1sAD/8cf/4Yf/xRnklwD/9t7/9t3/23L/wxD7uQCbM/aIAAAAJHRSTlMAFpgdCwT53311SPXl29PKuquMaEI4JfTr49fLu6aQe2xUTTHDAjF8AAAA7klEQVQoz6XS2ZLCIBAFUEI0xn0bnX3vBmKMxmUW///HVFqhg755n1J16uZSFOLmTIa9bv8tuka1Ptjo7uTSHsmKYgMv9QCltrZSSmX/D3G1eG9toY75WbSnHFszhmoF7YjhR06Tv6Rz6LDd5pY254QZwNDjGJdUzc6o7/wmGqCs6bcAHYcRoj7p5m9d2I8vp09U5ek5TBF3AWp34Bgx14H6I0nEWYDvDuMEw9kRuwc8dDXfTIXP4KD50qMZM4waeCyfWBtsCZbYKuamLEuzxaQmKvqMLFJUUx95a1w+telrQja4/gw/Uymb3+LW7AE5TzPk9VvkZAAAAABJRU5ErkJggg==");
 }

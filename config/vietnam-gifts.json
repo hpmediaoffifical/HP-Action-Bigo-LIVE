@@ -1,0 +1,725 @@
+{
+  "region": "vn",
+  "source": "Qùa NPC_14052026.xlsx",
+  "fetchedAt": 1778756978126,
+  "sheetSummary": {
+    "1-10-50-100-1000-5000": 78,
+    "Quà mệnh giá lẻ": 24
+  },
+  "gifts": [
+    {
+      "typeid": 1,
+      "name": "Flower",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/g2/M09/00/AE/nXfpA1hjcFWIOfPLAABawR7L2_oAADcPAASpkMAAFrZ604.png?token=ak_yycall:dqaswszAmgU5p780ijG0Am_9ZAA=:0",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 9,
+      "name": "Kiss",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/g1/M08/02/36/LXz8F1hkgTaIbE5NAABU8DbBR8EAADdPQCSJjgAAFUI577.png?token=ak_yycall:AmJsfvbZfcnZ37KSBFJhMUe-hMs=:0",
+      "diamonds": 2,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 1023,
+      "name": "Swarovski",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/g1/M09/02/36/LXz8F1hkgRuIC2stAABfzSiHFN0AADdOAI8GP4AAF_l719.png?token=ak_yycall:-18ft0gvB3IolapDIP3gKvafxxY=:0",
+      "diamonds": 30,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 1270,
+      "name": "Flowers",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/g2/M0B/02/8A/nXfpA1o3jHmIZJtnAADLHbHBJsoAAMwBwP39KIAAMs1071.png",
+      "diamonds": 50,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 1935,
+      "name": "Kiss me",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/7h1/M0A/6F/C3/tPobAFxUWdqIFFcLAAAd9hRhY7cAAAYMQDxHXgAAB4O464.png",
+      "diamonds": 500,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 2200,
+      "name": "Rose Box",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/7h1/M07/BB/4C/svobAFy9kh-Ibf91AACz-5mVg2kAAsRrAB-4U8AALQT772.png",
+      "diamonds": 199,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 2211,
+      "name": "Star Goddess",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/7h1/M08/B8/AB/s_obAFzAAIGIEUHFAADZ5udKNtQAAzfgwD9738AANn-514.png",
+      "diamonds": 200,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 2784,
+      "name": "Love Balloon",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/7h4/M09/39/CE/bPsbAF2nQ-6IFXDRAACVU4wIlQsAA2iQgMb9IwAAJVr852.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 3122,
+      "name": "Car",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/7h2/M04/2E/A2/8fobAF4j9rqIFBrWAAAwBwWnTzkAA2cTwPfuGsAADAf196.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 3123,
+      "name": "Rose Rocket",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/7h2/M0A/2E/E5/8fobAF4j9-qITCh6AAAsawNsR-oAA2cvQGD3ooAACyD185.png",
+      "diamonds": 1000,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 3279,
+      "name": "magic mask",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/7h6/M01/CB/EF/6vsbAF5ltmyIBB8lAADBHCH88LMAAUH5gL8J1wAAME0259.png",
+      "diamonds": 99,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 3353,
+      "name": "Dragon King",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4h7/1EsP1V.png",
+      "diamonds": 9999,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 3482,
+      "name": "Double Love",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4h6/2DE7mi.png",
+      "diamonds": 5,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 3915,
+      "name": "Treasures",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/3s2/089So0.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 4214,
+      "name": "Gala's Flower",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/3s2/04o72w.png",
+      "diamonds": 10,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 4215,
+      "name": "Gala's Firework",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/3s2/01mAEo.png",
+      "diamonds": 50,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 4350,
+      "name": "Crystal ball",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/3s1/02hKmz.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 4519,
+      "name": "RG REVO",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/3s3/0c7yNw.png",
+      "diamonds": 10,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 4648,
+      "name": "Throwing coins",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/3s3/0sPBa0.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 4774,
+      "name": "Cupid's arrow",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/3s4/179C0V.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 4864,
+      "name": "Mecha vehicle",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/3s4/0MiRuO.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 5357,
+      "name": "Yellow Duck",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/3s2/01NlMMy.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 5415,
+      "name": "Flower Gifting",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/3s4/08imvq.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 5469,
+      "name": "Best Host",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4he/11umjPDMm7h8.png",
+      "diamonds": 10,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 5773,
+      "name": "Heart Lock",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4h9/0FxSn3.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 5774,
+      "name": "Crush",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4h2/26lnKs.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 5894,
+      "name": "love you",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4h9/2FYTu3.png",
+      "diamonds": 10,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 5962,
+      "name": "firework",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4ha/1CcHRQ.png",
+      "diamonds": 20,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 5965,
+      "name": "Disco Dancing",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4ha/2Fqu9A.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 5970,
+      "name": "Luxury Car",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hc/2TPue4.png",
+      "diamonds": 1000,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 5976,
+      "name": "The Protector",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4h2/2U49ZB.png",
+      "diamonds": 50,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 6136,
+      "name": "Lovely heart",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hb/05XPSQ.png",
+      "diamonds": 10,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 6138,
+      "name": "Love bubbles",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hc/2KmcFe.png",
+      "diamonds": 50,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 6182,
+      "name": "Dance with the Knight",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hb/2TN6s9.png",
+      "diamonds": 1000,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 6210,
+      "name": "Shaved Ice",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hc/1Urb3v.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 6211,
+      "name": "Summer Suitcase",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hb/0CIdlk.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 6212,
+      "name": "Summer Surfing",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hb/0x3P66.png",
+      "diamonds": 1000,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 6216,
+      "name": "Lucky Dino",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hb/26zYPb.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 6314,
+      "name": "Purple flowers",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hc/0b8Epr.png",
+      "diamonds": 299,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 6422,
+      "name": "Mace X GALA",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hb/1QW94t.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 7572,
+      "name": "Angry Egg",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hc/2M81Fy.png",
+      "diamonds": 7,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 7592,
+      "name": "Full-screen Coins",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hc/1X9XJM.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 7758,
+      "name": "Sexy Kiss",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hd/2lOavJ.png",
+      "diamonds": 25,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 7852,
+      "name": "7th Anniv. Badge",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hd/04LnVJ.png",
+      "diamonds": 177,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 7862,
+      "name": "Funny Joker",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hd/2KYggx.png",
+      "diamonds": 20,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 500028,
+      "name": "Mechanic Horse",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hb/14MVXl.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 500146,
+      "name": "Marry Me",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hc/01sE4ob2Dusx.png",
+      "diamonds": 500,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 500148,
+      "name": "Garland",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hb/11sE4qIL8M0f.png",
+      "diamonds": 300,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 500418,
+      "name": "Luv Letter",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hd/01sTI2l9Uwqak.png",
+      "diamonds": 299,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 500420,
+      "name": "Love U Twice",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hd/11sTI7TWuJOa5.png",
+      "diamonds": 199,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 500790,
+      "name": "Super UFO",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hc/0XlMXp.png",
+      "diamonds": 200,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 501211,
+      "name": "Supercar",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4he/01tSwRe2swb6.png",
+      "diamonds": 5000,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 501222,
+      "name": "Knight's wings",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hb/0CKM0Y.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 501223,
+      "name": "Bigo Helicopter",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/3s4/0PHOc0.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 501224,
+      "name": "Planet War Rocket",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hd/1dwCv6.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 501225,
+      "name": "Pink Heart",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hd/01tQSID4Xk8UP.png",
+      "diamonds": 50,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 501245,
+      "name": "Bubbles",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hd/11tSYfOGmCosx.png",
+      "diamonds": 120,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 501247,
+      "name": "Retro Car",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hp/1u6Q2ua7a43aa58d1d4674802b1a0c28521fe8ph.png",
+      "diamonds": 6000,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 501496,
+      "name": "Cupid's fountain",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/3s4/07Sdlm.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 501505,
+      "name": "Golden hourglass",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hp/1ti2yw46b7c324428649e8b8ade46e67b8b94eph.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 501652,
+      "name": "Crystal Bear Cake",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4he/21tp2yRUZSUB.png",
+      "diamonds": 1000,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 501847,
+      "name": "MISS BIGO Crown",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hp/1ty0Wi0f25e97b15184c5faadb5247b49ad972ph.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 502014,
+      "name": "Rabbit ears",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hp/1u4azD899b435ee0cb4fb19d40f9ba4ac773c3ph.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 502016,
+      "name": "Face Pinching",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hp/1u4acP8078ef5e17a54fc39a68b58775a6ddb0ph.png",
+      "diamonds": 300,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 502017,
+      "name": "Kiss on the face",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hp/1u4az16404823244da4e038237cac634ae2d15ph.png",
+      "diamonds": 199,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 502019,
+      "name": "Butterfly Wings",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hp/1u4ahxc71c676a568a4b40875e6050cbacd40bph.png",
+      "diamonds": 1000,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 502081,
+      "name": "Sea Compass",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hp/1u886K0dcf2ae5bb8e4deab35d8e3af5eb5236ph.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 502618,
+      "name": "Water Dragon",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4hp/1ua8zYc4bd051240cf45fb983d89ad30322e13ph.png",
+      "diamonds": 500,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 502695,
+      "name": "Roses",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/7h3/M06/4D/97/LvsbAF0R35yIDMNLAAB9U61U2s0AAPe6gAjfBoAAH1r081.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503044,
+      "name": "Flower Guardian",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4he/21uwcLYJ171y.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503046,
+      "name": "Phoenix Wings",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/4he/21uwayUM459P.png",
+      "diamonds": 300,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 503436,
+      "name": "Wings of Light",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsz/1vGzmG00y33lYHC0TOw7d.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503567,
+      "name": "LeapTime",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsx/1vR7VM00y33lYHC0urIqo.png",
+      "diamonds": 200,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 503568,
+      "name": "Melody Love",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsy/1vR6fF00y33lYHC0HSHFB.png",
+      "diamonds": 10,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503569,
+      "name": "StarJump",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsx/1vR7yZ00y2TWPL027ldJx.png",
+      "diamonds": 10,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503612,
+      "name": "Sweet Rush",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsy/1vTEIv00y33lYHC0VsR3D.png",
+      "diamonds": 5000,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503619,
+      "name": "Bunny DINO",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsx/1vTGFy00y33lYHC19cPOR.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503620,
+      "name": "Fox DINO",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsx/1vTGIB00y33lYHC01rglE.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503633,
+      "name": "Ashkin DINO",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsz/1vV7mi00y33lYHC1loz3w.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503634,
+      "name": "Spark Rider",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsz/1vV8Eb00y33lYHC1p7DR7.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503898,
+      "name": "Snowboarding",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsy/1vhlzc00y2TWPL01NATnw.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503899,
+      "name": "Skating",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsy/1vhm1N00y2TWPL00vc8Kt.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503900,
+      "name": "Dino Sledding",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsx/1vhm2p00y2TWPL01pWE88.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503928,
+      "name": "Meow Rose",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsy/1viZCC00y2TWPL01YuGBn.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503929,
+      "name": "Wiggle Hearts",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsz/1viZDF00y33lYHC1jVo9B.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 503930,
+      "name": "Purr Rub",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsx/1viZEt00y33lYHC1cjE00.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504059,
+      "name": "Pink Launch",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsx/1voHag00y33lYHC19ilTa.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504077,
+      "name": "Sapphire Tiger",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsz/1vpMqp00y33lYHC28Fwoh.png",
+      "diamonds": 5000,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504141,
+      "name": "Kiss me",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsx/1vq7wW00y33lYHC1e2RId.png",
+      "diamonds": 500,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504166,
+      "name": "Checkered Flag Trophy",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsz/1vqU3Q00y2TWPL00nuHr6.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504168,
+      "name": "Speed Supply",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsx/1vq0Vu00y2TWPL00Sxg9n.png",
+      "diamonds": 5000,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504198,
+      "name": "Mauve Wing",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsy/1vwzrw00y2TWPL00ETbRw.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504200,
+      "name": "Pink Phoenix Rise",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsy/1vxcaY00y33lYHC25b99z.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504203,
+      "name": "Hat Trick",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsz/1vxcaz00y33lYHC1mymu0.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504275,
+      "name": "Firework",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsz/1vzZLO00y33lYHC0xscTw.png",
+      "diamonds": 1000,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504318,
+      "name": "Champagne Tower",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsx/1w24Jx00y2TWPL02GXyVF.png",
+      "diamonds": 120,
+      "sheet": "Quà mệnh giá lẻ"
+    },
+    {
+      "typeid": 504464,
+      "name": "Sky Copter",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsy/1w5jAl00y2TWPL01fhJIX.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504511,
+      "name": "Hope Blossom",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsx/1w7ovH00y2TWPL00DyTQM.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504532,
+      "name": "Red Cap",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsy/1w7y1U00y33lYHC0ruRrw.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504635,
+      "name": "Earth",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsy/1wCDWP00y2TWPL01T09J0.png",
+      "diamonds": 1,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504636,
+      "name": "Co-Plant",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsx/1wCDYE00y2TWPL01dW8gX.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    },
+    {
+      "typeid": 504638,
+      "name": "Co-Clean",
+      "img_url": "https://static-comm.bigolive.tv/as/pgc-live-manage/lpsy/1wCDbh00y33lYHC0cxI73.png",
+      "diamonds": 100,
+      "sheet": "1-10-50-100-1000-5000"
+    }
+  ]
+}
