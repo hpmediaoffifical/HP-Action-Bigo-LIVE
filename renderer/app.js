@@ -3799,21 +3799,63 @@ if (window.bigo.onReceivedGiftsRequestSnapshot) {
 // =================== Embed parsed events ===================
 function findGiftByName(name) {
   if (!name) return null;
-  const lower = name.toLowerCase();
+  const target = normEv(name);
   for (const item of getEnabledGiftItems()) {
-    if ((item.matchKeys || []).some(k => String(k).toLowerCase() === lower)) return item;
+    const keys = [...(item.matchKeys || []), item.alias || ''];
+    if (keys.some(k => normEv(k) === target)) return item;
   }
   return null;
 }
 
 function findGiftByEvent(ev) {
-  // Ưu tiên match theo gift_id (chính xác nhất sau enrich master)
-  if (ev.gift_id != null) {
-    for (const item of getEnabledGiftItems()) {
-      if ((item.matchKeys || []).some(k => String(k) === String(ev.gift_id))) return item;
+  const enabledItems = getEnabledGiftItems();
+  const allGiftItems = getAllItems().filter(item => item.type !== 'comment');
+  const matchInItems = (items) => {
+    if (ev.gift_id != null) {
+      const id = String(ev.gift_id).trim();
+      const byId = items.find(item => (item.matchKeys || []).some(k => String(k).trim() === id));
+      if (byId) return byId;
     }
+    const names = [ev.gift_name, ev.gift_name_vn].map(normEv).filter(Boolean);
+    if (names.length) {
+      const byName = items.find(item => {
+        const keys = [...(item.matchKeys || []), item.alias || ''].map(normEv).filter(Boolean);
+        return names.some(name => keys.includes(name));
+      });
+      if (byName) return byName;
+    }
+    const evIcon = normalizeGameplayIconUrl(ev.gift_icon || ev.gift_icon_url || ev.gift_url || '');
+    if (evIcon) {
+      const byIcon = items.find(item => normalizeGameplayIconUrl(getGameplayItemIcon(item)) === evIcon);
+      if (byIcon) return byIcon;
+    }
+    return null;
+  };
+  // Ưu tiên match theo gift_id (chính xác nhất sau enrich master)
+  const enabledMatch = matchInItems(enabledItems);
+  if (enabledMatch) return enabledMatch;
+  const fallbackMatch = matchInItems(allGiftItems);
+  if (fallbackMatch) {
+    appendLog(`[gift match] "${ev.gift_name || ev.gift_id || '?'}" match trong nhóm đang tắt (${fallbackMatch._group?.name || 'không rõ'}) → vẫn đưa vào HÀNH ĐỘNG`);
+    return fallbackMatch;
   }
-  return findGiftByName(ev.gift_name);
+  return null;
+}
+
+function logGiftQueueSkip(ev, matched) {
+  if (!ev || ev.type !== 'gift') return;
+  const name = ev.gift_name || ev.gift_name_vn || ev.gift_id || '?';
+  if (!matched) {
+    appendLog(`[gift no-match] ${name} #${ev.gift_id || '?'}: chưa có hiệu ứng nào có match key/tên/icon tương ứng`);
+    return;
+  }
+  if (!hasEffectMedia(matched)) {
+    appendLog(`[gift skip] ${name}: hiệu ứng "${matched.alias || matched.matchKeys?.[0] || '?'}" chưa có file media`);
+    return;
+  }
+  if (!matched.overlayId) {
+    appendLog(`[gift skip] ${name}: hiệu ứng "${matched.alias || matched.matchKeys?.[0] || '?'}" chưa chọn overlay`);
+  }
 }
 
 // Strong normalize: strip invisible Unicode + collapse whitespace
@@ -3922,6 +3964,8 @@ function renderParsed(ev) {
       // Pre-effect: phát ÂM THANH/VIDEO trước MỘT LẦN (không lặp theo combo)
       maybeDispatchPreEffect(matched);
       pushQueue(ev, matched, playTimes);
+    } else if (ev.type === 'gift') {
+      logGiftQueueSkip(ev, matched);
     }
   }
 }
