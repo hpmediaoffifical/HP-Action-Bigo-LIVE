@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('bigo', {
   // Settings
@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('bigo', {
   effectsPickFiles: () => ipcRenderer.invoke('effects:pick-files'),
   effectsOpenFolder: () => ipcRenderer.invoke('effects:open-folder'),
   effectsExists: (mediaFile) => ipcRenderer.invoke('effects:exists', mediaFile),
+  getPathForFile: (file) => webUtils.getPathForFile(file),
   pickBgmFile: () => ipcRenderer.invoke('bgm:pick-file'),
   pickPreFxFile: () => ipcRenderer.invoke('preFx:pick-file'),
 

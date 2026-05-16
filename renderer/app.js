@@ -1963,7 +1963,8 @@ function renderDialogMediaList() {
 
 function mediaFileFromDroppedFile(file) {
   if (!file) return '';
-  if (file.path) return fileUrlFromPath(file.path);
+  const filePath = (window.bigo.getPathForFile ? window.bigo.getPathForFile(file) : '') || file.path || '';
+  if (filePath) return fileUrlFromPath(filePath);
   return '';
 }
 

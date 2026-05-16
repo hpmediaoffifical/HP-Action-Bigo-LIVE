@@ -1,6 +1,6 @@
 {
   "name": "bigo-action",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Bigo Live gift effect player — nhận quà từ phòng live qua Bigo Open API rồi phát mp3/mp4/webm hiệu ứng",
   "main": "src/main.js",
   "scripts": {
