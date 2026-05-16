@@ -3810,31 +3810,40 @@ function findGiftByName(name) {
 function findGiftByEvent(ev) {
   const enabledItems = getEnabledGiftItems();
   const allGiftItems = getAllItems().filter(item => item.type !== 'comment');
-  const matchInItems = (items) => {
+  const matchScore = (item) => {
+    let score = 0;
     if (ev.gift_id != null) {
       const id = String(ev.gift_id).trim();
-      const byId = items.find(item => (item.matchKeys || []).some(k => String(k).trim() === id));
-      if (byId) return byId;
+      if ((item.matchKeys || []).some(k => String(k).trim() === id)) score = Math.max(score, 300);
     }
     const names = [ev.gift_name, ev.gift_name_vn].map(normEv).filter(Boolean);
     if (names.length) {
-      const byName = items.find(item => {
-        const keys = [...(item.matchKeys || []), item.alias || ''].map(normEv).filter(Boolean);
-        return names.some(name => keys.includes(name));
-      });
-      if (byName) return byName;
+      const keys = [...(item.matchKeys || []), item.alias || ''].map(normEv).filter(Boolean);
+      if (names.some(name => keys.includes(name))) score = Math.max(score, 200);
     }
     const evIcon = normalizeGameplayIconUrl(ev.gift_icon || ev.gift_icon_url || ev.gift_url || '');
     if (evIcon) {
-      const byIcon = items.find(item => normalizeGameplayIconUrl(getGameplayItemIcon(item)) === evIcon);
-      if (byIcon) return byIcon;
+      if (normalizeGameplayIconUrl(getGameplayItemIcon(item)) === evIcon) score = Math.max(score, 100);
     }
-    return null;
+    if (!score) return 0;
+    if (hasEffectMedia(item) && item.overlayId) score += 10000;
+    else if (hasEffectMedia(item)) score += 1000;
+    if (item._group?.isCommon || item._group?.enabled !== false) score += 100;
+    return score;
+  };
+  const bestMatch = (items) => {
+    let best = null;
+    let bestScore = 0;
+    for (const item of items) {
+      const score = matchScore(item);
+      if (score > bestScore) { best = item; bestScore = score; }
+    }
+    return best;
   };
   // Ưu tiên match theo gift_id (chính xác nhất sau enrich master)
-  const enabledMatch = matchInItems(enabledItems);
+  const enabledMatch = bestMatch(enabledItems);
   if (enabledMatch) return enabledMatch;
-  const fallbackMatch = matchInItems(allGiftItems);
+  const fallbackMatch = bestMatch(allGiftItems);
   if (fallbackMatch) {
     appendLog(`[gift match] "${ev.gift_name || ev.gift_id || '?'}" match trong nhóm đang tắt (${fallbackMatch._group?.name || 'không rõ'}) → vẫn đưa vào HÀNH ĐỘNG`);
     return fallbackMatch;
