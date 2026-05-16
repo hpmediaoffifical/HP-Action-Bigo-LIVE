@@ -216,11 +216,50 @@ function migrateMapping(raw) {
   return defaultMapping();
 }
 
+function mediaBasename(mediaFile) {
+  let s = String(mediaFile || '').trim();
+  if (!s) return '';
+  if (/^file:\/\//i.test(s)) {
+    try { s = decodeURIComponent(new URL(s).pathname).replace(/^\/(?=[A-Za-z]:)/, ''); } catch {}
+  }
+  return path.basename(s.replace(/\\/g, path.sep));
+}
+
+function migrateMissingMediaToBundledEffects(m) {
+  let changed = false;
+  const resolveExisting = (mediaFile) => {
+    if (!mediaFile) return '';
+    let p = String(mediaFile);
+    if (/^file:\/\//i.test(p)) {
+      try { p = decodeURIComponent(new URL(p).pathname).replace(/^\/(?=[A-Za-z]:)/, ''); } catch {}
+    } else if (!path.isAbsolute(p)) {
+      p = path.join(EFFECTS_DIR, p);
+    }
+    try { if (fs.existsSync(p)) return mediaFile; } catch {}
+    const base = mediaBasename(mediaFile);
+    if (base && fs.existsSync(path.join(EFFECTS_DIR, base))) {
+      changed = true;
+      return base;
+    }
+    return mediaFile;
+  };
+  for (const group of (m.groups || [])) {
+    for (const item of (group.items || [])) {
+      const files = Array.isArray(item.mediaFiles) ? item.mediaFiles.map(resolveExisting) : [];
+      const primary = resolveExisting(item.mediaFile || files[0] || '');
+      if (files.length) item.mediaFiles = files;
+      if (primary) item.mediaFile = primary;
+    }
+  }
+  return changed;
+}
+
 function loadMapping() {
   const raw = loadJson(MAPPING_PATH, null);
   const m = migrateMapping(raw);
   ensureCommonGroup(m);  // Đảm bảo NHÓM CHUNG luôn ở đầu
-  if (!raw || raw.version !== 3 || !raw.groups?.some?.(g => g.isCommon)) {
+  const mediaMigrated = migrateMissingMediaToBundledEffects(m);
+  if (!raw || raw.version !== 3 || !raw.groups?.some?.(g => g.isCommon) || mediaMigrated) {
     saveJson(MAPPING_PATH, m);
   }
   return m;

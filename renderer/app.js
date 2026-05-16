@@ -1906,14 +1906,15 @@ async function validateConfiguredMediaFiles() {
         if (exists) valid.push(file);
         else missing.push(`${item.alias || (item.matchKeys || [])[0] || 'Quà'}: ${fileDisplayLabel(file)}`);
       }
-      item.mediaFiles = valid;
-      item.mediaFile = valid[0] || '';
+      if (valid.length) {
+        item.mediaFiles = valid;
+        item.mediaFile = valid[0] || '';
+      }
     }
   }
   if (!missing.length) return;
-  await persistMapping();
   renderGiftTable();
-  const msg = `Thiếu dữ liệu nhạc/video:\n${missing.slice(0, 12).join('\n')}${missing.length > 12 ? `\n... và ${missing.length - 12} file khác` : ''}\n\nApp đã xoá tên file bị thiếu khỏi cấu hình để bạn chọn lại.`;
+  const msg = `Thiếu dữ liệu nhạc/video:\n${missing.slice(0, 12).join('\n')}${missing.length > 12 ? `\n... và ${missing.length - 12} file khác` : ''}\n\nApp giữ nguyên cấu hình để bạn có thể cắm lại ổ đĩa, import/copy file hiệu ứng hoặc dùng bản đã đóng gói kèm assets/effects.`;
   appendLog('[media] ' + msg.replace(/\n/g, ' | '));
   setTimeout(() => alert(msg), 300);
 }
