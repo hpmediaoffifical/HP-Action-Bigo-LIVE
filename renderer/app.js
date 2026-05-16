@@ -3081,7 +3081,8 @@ function renderMasterTable() {
       if (e.target.classList && e.target.classList.contains('fav-btn')) return;
       const name = row.dataset.name;
       const typeid = row.dataset.typeid;
-      const cur = els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean);
+      const multiGift = !!document.getElementById('dlgMultiGift')?.checked;
+      const cur = multiGift ? els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean) : [];
       if (!cur.includes(typeid)) cur.push(typeid);
       if (!cur.includes(name)) cur.push(name);
       els.dlgMatchKeys.value = cur.join(', ');
@@ -3187,6 +3188,8 @@ async function openGiftDialog(gift = null, groupId = null) {
   els.giftDialog.dataset.editingGroupId = groupId || '';
   els.dlgMasterFilter.value = '';
   els.dlgMasterSort.value = 'kc-asc';
+  const multiGift = document.getElementById('dlgMultiGift');
+  if (multiGift) multiGift.checked = false;
   // refresh overlay options
   els.dlgOverlay.innerHTML = mapping.overlays.length
     ? mapping.overlays.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('')
