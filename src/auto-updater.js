@@ -14,6 +14,8 @@
 
 const { app, dialog, BrowserWindow, ipcMain } = require('electron');
 
+const UPDATE_FEED_URL = 'https://github.com/hpmediaoffifical/HP-Action-Bigo-LIVE/releases/latest/download';
+
 let autoUpdater = null;
 let mainWinRef = null;
 let isCheckingManually = false;
@@ -86,6 +88,7 @@ function tryRequireUpdater() {
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = false;
     autoUpdater.allowDowngrade = false;
+    autoUpdater.setFeedURL({ provider: 'generic', url: UPDATE_FEED_URL });
     return autoUpdater;
   } catch (e) {
     log(`Không nạp được electron-updater: ${e.message}. Chạy "npm install" để cài.`);
