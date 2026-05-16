@@ -2522,10 +2522,11 @@ function renderGameplayGridEditor(group) {
     const icon = item ? getGameplayItemIcon(item) : '';
     const name = item ? getGameplayItemName(item) : 'Chọn quà';
     const visible = !!item && slot.visible !== false;
-    const pickerItems = items.map(pickerItem => {
+    const pickerItems = prioritizeVnGifts(items, isVnMappingItem).map(pickerItem => {
       const pickerIcon = getGameplayItemIcon(pickerItem);
       const pickerName = getGameplayItemName(pickerItem);
-      return `<button type="button" class="slot-picker-item" data-slot-pick="${idx}" data-item-id="${escapeHtml(pickerItem.id)}">${pickerIcon ? `<img src="${escapeHtml(pickerIcon)}" loading="lazy" />` : '<span class="slot-picker-empty"></span>'}<span>${escapeHtml(pickerName)}</span></button>`;
+      const vnBadge = isVnMappingItem(pickerItem) ? '<small class="vn-badge">VN</small>' : '';
+      return `<button type="button" class="slot-picker-item" data-slot-pick="${idx}" data-item-id="${escapeHtml(pickerItem.id)}">${pickerIcon ? `<img src="${escapeHtml(pickerIcon)}" loading="lazy" />` : '<span class="slot-picker-empty"></span>'}<span>${escapeHtml(pickerName)} ${vnBadge}</span></button>`;
     }).join('');
     return `<div class="gameplay-grid-slot ${visible ? '' : 'slot-hidden'}" draggable="true" data-slot="${idx}">
       <div class="slot-topline">
@@ -3008,6 +3009,24 @@ function isVnGift(g) {
   return VN_KEYWORDS.test(n) || VN_ACCENTS.test(n);
 }
 
+function prioritizeVnGifts(arr, predicate = isVnGift) {
+  return arr.map((item, idx) => ({ item, idx }))
+    .sort((a, b) => (predicate(b.item) ? 1 : 0) - (predicate(a.item) ? 1 : 0) || a.idx - b.idx)
+    .map(x => x.item);
+}
+
+function isVnMappingItem(item) {
+  if (!item) return false;
+  const keys = [...(item.matchKeys || []), item.alias || ''];
+  for (const key of keys) {
+    const id = parseInt(key, 10);
+    if (!Number.isFinite(id)) continue;
+    const master = (masterFullList || []).find(g => Number(g.typeid) === id);
+    if (master && isVnGift(master)) return true;
+  }
+  return isVnGift({ name: getGameplayItemName(item) });
+}
+
 // Favorites lưu local
 function loadFavorites() {
   try { return new Set(JSON.parse(localStorage.getItem('giftFavorites') || '[]')); } catch { return new Set(); }
@@ -3037,14 +3056,13 @@ function renderMasterTable() {
       return n.includes(filter) || id.includes(filter);
     });
   }
-  sortMasterArr(arr, sortKey);
+  arr = prioritizeVnGifts(sortMasterArr(arr, sortKey));
   els.dlgMasterCount.textContent = `${arr.length}/${masterFullList.length} quà`;
-  const renderLimit = 500;
-  const display = arr.slice(0, renderLimit);
+  const display = arr;
   els.dlgMasterTableBody.innerHTML = display.map(g => {
     const src = g.localIcon || g.img_url || '';
     const isFav = giftFavorites.has(g.typeid);
-    const vnBadge = g.vn_match
+    const vnBadge = isVnGift(g)
       ? `<span class="vn-badge" title="Quà có trong danh mục khu vực Việt Nam">🇻🇳 VN</span>`
       : '';
     return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
@@ -3055,9 +3073,6 @@ function renderMasterTable() {
       <td><button class="fav-btn ${isFav ? 'on' : ''}" data-fav="${g.typeid}" title="Đánh dấu yêu thích">${isFav ? '⭐' : '☆'}</button></td>
     </tr>`;
   }).join('');
-  if (arr.length > renderLimit) {
-    els.dlgMasterCount.textContent += ` · hiển thị ${renderLimit} đầu — gõ filter để thu hẹp`;
-  }
   // Click row -> add to matchKeys (skip nếu click vào fav button hoặc img)
   els.dlgMasterTableBody.querySelectorAll('tr').forEach(row => {
     row.onclick = (e) => {
@@ -4260,18 +4275,19 @@ function renderSpecialPickerTable() {
   }
   if (vnOnly) arr = arr.filter(g => isVnGift(g));
   if (favOnly) arr = arr.filter(g => giftFavorites.has(g.typeid));
-  arr = sortMasterArr(arr, sortVal);
+  arr = prioritizeVnGifts(sortMasterArr(arr, sortVal));
   const renderLimit = 200;
   if (count) count.textContent = `${arr.length} kết quả`;
   if (body) {
     body.innerHTML = arr.slice(0, renderLimit).map(g => {
       const iconUrl = g.localIcon || g.img_url || '';
       const isFav = giftFavorites.has(g.typeid);
+      const vnBadge = isVnGift(g) ? `<span class="vn-badge" title="Quà có trong danh mục khu vực Việt Nam">🇻🇳 VN</span>` : '';
       return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}" data-icon="${escapeHtml(iconUrl)}">
         <td>${iconUrl ? `<img src="${escapeHtml(iconUrl)}" style="width:32px;height:32px;object-fit:contain" />` : ''}</td>
         <td><span class="id">${g.typeid}</span></td>
       <td><span class="price">${beanIconHtml('small')} ${g.diamonds ?? '?'}</span></td>
-        <td><span class="name">${escapeHtml(g.name)}</span></td>
+        <td><span class="name">${escapeHtml(g.name)} ${vnBadge}</span></td>
         <td><button type="button" class="fav-btn ${isFav ? 'on' : ''}" data-fav="${g.typeid}" title="Yêu thích">${isFav ? '⭐' : '☆'}</button></td>
       </tr>`;
     }).join('');
@@ -4993,7 +5009,7 @@ function updateRankingGridSuggestionUi() {
 }
 
 function rankingGiftItems() {
-  return getAllItems().filter(item => item.type !== 'comment');
+  return prioritizeVnGifts(getAllItems().filter(item => item.type !== 'comment'), isVnMappingItem);
 }
 
 function rankingGiftInfo(itemId) {
@@ -5145,7 +5161,8 @@ function updateRankingButtons(state = rankingPublicState()) {
 function rankingGiftOptions(selectedId = '') {
   return '<option value="">Chọn quà</option>' + rankingGiftItems().map(item => {
     const name = getGameplayItemName(item);
-    return `<option value="${escapeHtml(item.id)}" ${item.id === selectedId ? 'selected' : ''}>${escapeHtml(name)}</option>`;
+    const prefix = isVnMappingItem(item) ? 'VN - ' : '';
+    return `<option value="${escapeHtml(item.id)}" ${item.id === selectedId ? 'selected' : ''}>${escapeHtml(prefix + name)}</option>`;
   }).join('');
 }
 
@@ -5340,7 +5357,8 @@ function rankingHandleGift(ev) {
   if (!cfg.running || !cfg.rows.length || !cfg.activeId) return;
   if (cfg.linkScoreTimer && ['prestart', 'success', 'failed', 'idle'].includes(scoreState.status)) return;
   const activeId = cfg.activeId;
-  const matched = cfg.rows.find(r => r.id === activeId);
+  const hasConfiguredGifts = cfg.rows.some(row => row.giftItemId);
+  const matched = cfg.rows.find(row => rankingGiftMatches(row, ev)) || (!hasConfiguredGifts ? cfg.rows.find(r => r.id === activeId) : null);
   if (!matched) return;
   const points = giftDiamondPointsFromEvent(ev) || giftTotalCountFromEvent(ev) || 1;
   const until = Date.now() + cfg.streakSeconds * 1000;
@@ -5556,15 +5574,15 @@ function pkDuoGiftCatalog() {
     const id = `master:${g.typeid}`;
     if (seen.has(id)) continue;
     seen.add(id);
-    items.push({ id, name: g.gift_name || g.name || `Gift ${g.typeid}`, icon: g.localIcon || g.icon || g.img_url || '', iconId: String(g.typeid || ''), source: 'master' });
+    items.push({ id, name: g.gift_name || g.name || `Gift ${g.typeid}`, icon: g.localIcon || g.icon || g.img_url || '', iconId: String(g.typeid || ''), source: 'master', vn: isVnGift(g) });
   }
   for (const item of rankingGiftItems()) {
     const id = item.id;
     if (seen.has(id)) continue;
     seen.add(id);
-    items.push({ id, name: getGameplayItemName(item), icon: getGameplayItemIcon(item), iconId: getGameplayItemIconId(item), source: 'mapping' });
+    items.push({ id, name: getGameplayItemName(item), icon: getGameplayItemIcon(item), iconId: getGameplayItemIconId(item), source: 'mapping', vn: isVnMappingItem(item) });
   }
-  return items.sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi', { sensitivity: 'base' }));
+  return items.sort((a, b) => (b.vn ? 1 : 0) - (a.vn ? 1 : 0) || String(a.name).localeCompare(String(b.name), 'vi', { sensitivity: 'base' }));
 }
 
 function pkDuoGiftMatches(itemId, ev) {
@@ -5882,16 +5900,18 @@ function openPkDuoGiftPicker(side, idx) {
     const p = normalizePkDuo();
     const picker = document.createElement('div');
     picker.className = 'ctx-menu pkduo-picker-menu';
-    picker.innerHTML = `<input class="pkduo-picker-search" placeholder="Tìm quà trong ${pkDuoGiftCatalog().length} quà..." /><div class="pkduo-picker-list"></div>`;
+    picker.innerHTML = `<input class="pkduo-picker-search" placeholder="Tìm quà trong ${pkDuoGiftCatalog().length} quà..." /><label class="pkduo-picker-tools"><input type="checkbox" data-pk-vn-only /> Chỉ quà VN</label><div class="pkduo-picker-list"></div>`;
     document.body.appendChild(picker);
-    const input = picker.querySelector('input');
+    const input = picker.querySelector('.pkduo-picker-search');
+    const vnOnly = picker.querySelector('[data-pk-vn-only]');
     const list = picker.querySelector('.pkduo-picker-list');
     const render = () => {
       const q = normalizeGameplayGiftKey(input.value);
-      const arr = pkDuoGiftCatalog().filter(g => !q || normalizeGameplayGiftKey(g.name).includes(q) || String(g.iconId || '').includes(q)).slice(0, 250);
-      list.innerHTML = arr.map(g => `<button type="button" data-pk-gift-id="${escapeHtml(g.id)}">${g.icon ? `<img src="${escapeHtml(g.icon)}" />` : '<span>🎁</span>'}<b>${escapeHtml(g.name)}</b><small>${escapeHtml(g.iconId || '')}</small></button>`).join('') || '<div class="score-log-empty">Không tìm thấy quà</div>';
+      const arr = pkDuoGiftCatalog().filter(g => (!vnOnly?.checked || g.vn) && (!q || normalizeGameplayGiftKey(g.name).includes(q) || String(g.iconId || '').includes(q))).slice(0, 250);
+      list.innerHTML = arr.map(g => `<button type="button" data-pk-gift-id="${escapeHtml(g.id)}">${g.icon ? `<img src="${escapeHtml(g.icon)}" />` : '<span>🎁</span>'}<b>${escapeHtml(g.name)} ${g.vn ? '<span class="vn-badge">VN</span>' : ''}</b><small>${escapeHtml(g.iconId || '')}</small></button>`).join('') || '<div class="score-log-empty">Không tìm thấy quà</div>';
     };
     input.oninput = render;
+    if (vnOnly) vnOnly.onchange = render;
     list.onclick = e => {
       const btn = e.target.closest('[data-pk-gift-id]'); if (!btn) return;
       const id = btn.dataset.pkGiftId;
@@ -6211,6 +6231,7 @@ const scoreUserTotals = new Map();
 const SCORE_LOG_MAX = 40;
 
 function scoreEventKey(ev) {
+  if (ev?.event_id) return `event:${ev.event_id}`;
   const total = giftTotalCountFromEvent(ev);
   const points = giftDiamondPointsFromEvent(ev);
   return [ev?.ts || ev?.time || '', ev?.user || '', ev?.gift_id || '', ev?.gift_name || '', total, points, ev?.raw || ''].join('|');

@@ -101,6 +101,7 @@ const MAIN_DEFAULT_SIZE = { width: 1580, height: 960 };
 const MAIN_MIN_SIZE = { width: 1120, height: 720 };
 let client = null;
 let listener = null;
+let parsedEventSeq = 0;
 let overlayManager = null;
 let obsOverlayServer = null;
 let queuePopup = null;
@@ -316,8 +317,9 @@ function enrichGiftEvent(ev) {
   }
   // VN override: nếu typeid có trong vietnam-gifts.json → ưu tiên giá KC khu vực VN.
   // Giữ vm_exchange_rate global trong meta, chỉ override gift_value xuống dòng dưới.
-  if (ev.gift_id && vnGifts.byTypeId && vnGifts.byTypeId.has(ev.gift_id)) {
-    const vn = vnGifts.byTypeId.get(ev.gift_id);
+  const giftTypeId = Number(ev.gift_id);
+  if (Number.isFinite(giftTypeId) && vnGifts.byTypeId && vnGifts.byTypeId.has(giftTypeId)) {
+    const vn = vnGifts.byTypeId.get(giftTypeId);
     ev.vn_match = true;
     if (vn.diamonds != null) ev.gift_value = vn.diamonds;
     if (vn.name) ev.gift_name_vn = vn.name;
@@ -883,7 +885,8 @@ ipcMain.handle('bigo:check-live', async (_e, bigoId) => {
 
 // =================== Gift master IPC ===================
 function decorateGift(g) {
-  const vn = vnGifts.byTypeId && g.typeid ? vnGifts.byTypeId.get(g.typeid) : null;
+  const typeid = Number(g.typeid);
+  const vn = vnGifts.byTypeId && Number.isFinite(typeid) ? vnGifts.byTypeId.get(typeid) : null;
   return {
     ...g,
     diamonds: vn?.diamonds != null ? vn.diamonds : rateToDiamonds(g.vm_exchange_rate),
@@ -1227,6 +1230,10 @@ ipcMain.handle('embed:start', async (_e, opts) => {
   }
   listener = new BigoWebListener({
     onEvent: (ev) => {
+      if (ev && ev.kind === 'parsed') {
+        ev.ts = ev.ts || Date.now();
+        ev.event_id = ev.event_id || `${ev.ts}_${++parsedEventSeq}`;
+      }
       // Enrich gift events in-place using master catalog
       if (ev && ev.kind === 'parsed') enrichGiftEvent(ev);
       if (win && !win.isDestroyed()) win.webContents.send('embed:event', ev);
