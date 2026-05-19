@@ -119,4 +119,51 @@ const ERR_VI = {
 };
 function errVi(code) { return ERR_VI[code] || ('Lỗi kích hoạt: ' + code); }
 
-module.exports = { activate, errVi };
+/** Check 1 lan (action 'verify' - cung dong vai tro heartbeat). */
+async function verifyKey(rawKey) {
+  const key = String(rawKey || '').trim();
+  if (!key) return { ok: false, error: 'empty_key' };
+  if (!cfg.HMAC_SECRET || PUBLIC_KEY_B64.indexOf('DAN_') === 0) {
+    return { ok: false, error: 'not_configured' };
+  }
+  const hwid = getHWID();
+  const r = await apiCall('verify', { key, hwid, device: os.hostname() });
+  if (!r.net) return { ok: false, error: 'no_network', _offline: true };
+  if (!r.body || r.body.ok !== true || !r.body.token) {
+    return { ok: false, error: (r.body && r.body.error) || 'revoked' };
+  }
+  const v = verifyToken(r.body.token, hwid);
+  if (!v) return { ok: false, error: 'bad_token' };
+  if (v.expired) return { ok: false, error: 'key_expired' };
+  return { ok: true, payload: v.payload };
+}
+
+/**
+ * Watcher real-time: moi RECHECK_SECONDS goi server verify.
+ * - Server tu choi ro rang (khoa/thu hoi/het han) -> onRevoked(reason) (de app tu dong).
+ * - Mat mang -> BO QUA (con han offline trong token), khong da oan user.
+ * getKey: () => string (key dang dung, lay luc chay vi co the kich hoat sau).
+ * Tra ve ham stop().
+ */
+function startWatch(opts) {
+  const getKey = opts.getKey;
+  const onRevoked = opts.onRevoked;
+  const sec = Math.max(15, Number(opts.intervalSec || cfg.RECHECK_SECONDS || 60));
+  let busy = false;
+  const timer = setInterval(async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      const key = (typeof getKey === 'function' ? getKey() : getKey) || '';
+      if (!key) return;
+      const r = await verifyKey(key);
+      if (r.ok || r._offline) return;            // con hop le, hoac mat mang -> bo qua
+      onRevoked(r.error || 'revoked');           // server tu choi -> kick
+    } catch (_) { /* khong lam vo app */ }
+    finally { busy = false; }
+  }, sec * 1000);
+  if (timer.unref) timer.unref();
+  return function stop() { clearInterval(timer); };
+}
+
+module.exports = { activate, verifyKey, startWatch, errVi };

@@ -12,4 +12,6 @@ module.exports = {
   PRODUCT: 'hp-bigo-live',
   HMAC_SECRET: local.HMAC_SECRET || process.env.HPKEY_HMAC || '',
   HEARTBEAT_HOURS: 24,
+  // Chu ky check key real-time (giay). Cam key tren admin -> user bi dong app trong <= so nay.
+  RECHECK_SECONDS: 60,
 };

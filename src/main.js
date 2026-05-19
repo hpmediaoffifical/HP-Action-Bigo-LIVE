@@ -726,8 +726,32 @@ ipcMain.handle('license:machine-id', () => {
 
 // Xac thuc qua HP KEY (hpvn.media). Tra ve { ok:true, data:{TRANG_THAI,...} }
 // hoac { ok:false, error } - dung shape renderer dang doc.
+let _hpkeyCurrentKey = '';
+let _hpkeyWatching = false;
 ipcMain.handle('license:verify', async (_e, { key }) => {
-  return require('../hpkey/validate').licenseVerify(key);
+  const res = await require('../hpkey/validate').licenseVerify(key);
+  if (res && res.ok) {
+    _hpkeyCurrentKey = String(key || '').trim();
+    if (!_hpkeyWatching) {
+      _hpkeyWatching = true;
+      // Check key real-time: cam key tren admin -> dong app trong <= RECHECK_SECONDS
+      try {
+        require('../hpkey/core').startWatch({
+          getKey: () => _hpkeyCurrentKey,
+          onRevoked: (reason) => {
+            try {
+              dialog.showErrorBox('Bản quyền bị thu hồi',
+                'KEY của bạn đã bị khóa/thu hồi hoặc hết hạn (' + reason + ').\n' +
+                'Ứng dụng sẽ đóng. Liên hệ HP Media để được hỗ trợ.');
+            } catch (_) {}
+            app.quit();
+            setTimeout(() => { try { app.exit(0); } catch (_) {} }, 1500);
+          },
+        });
+      } catch (e) { console.warn('[hpkey] watch init failed:', e && e.message); }
+    }
+  }
+  return res;
 });
 
 ipcMain.handle('mapping:load', () => mapping);
