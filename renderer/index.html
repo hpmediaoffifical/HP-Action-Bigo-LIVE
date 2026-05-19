@@ -814,12 +814,28 @@
 
       <div class="panel">
         <h2>💾 Xuất / Nhập cấu hình</h2>
+        <div class="form-row">
+          <label>Chế độ xuất
+            <select id="configExportMode">
+              <option value="all">Xuất toàn bộ nhóm</option>
+              <option value="group">Chỉ xuất 1 nhóm</option>
+            </select>
+          </label>
+          <label>Nhóm cần xuất
+            <select id="configExportGroup"></select>
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="checkbox-row"><input type="checkbox" id="configExportSettings" checked /> Cài đặt chung / gameplay / thành viên</label>
+          <label class="checkbox-row"><input type="checkbox" id="configExportOverlays" checked /> Overlay liên quan</label>
+        </div>
         <div class="row">
           <button id="btnConfigExport" class="primary" title="Lưu toàn bộ cài đặt + danh sách quà + nhóm + overlay vào file JSON để chuyển máy khác">💾 Xuất cấu hình</button>
-          <button id="btnConfigImport" class="primary" title="Nhập file JSON đã xuất từ máy khác — sẽ ghi đè cài đặt hiện tại">📥 Nhập cấu hình</button>
+          <button id="btnConfigImport" class="primary" title="Nhập file JSON đã xuất từ máy khác — chỉ thêm hoặc đè mục trùng, không xoá nhóm khác">📥 Nhập cấu hình</button>
         </div>
         <div class="hint small">
-          <b>Xuất</b>: tạo 1 file <code>.json</code> chứa toàn bộ <b>danh sách quà, nhóm, overlay, cài đặt chung, BGM, pre-effect</b> — KHÔNG bao gồm file media (mp3/mp4). Mang file này sang máy khác rồi <b>Nhập</b> là khôi phục mọi thứ.
+          <b>Nhập</b>: chỉ thêm nhóm/overlay mới hoặc đè nhóm/overlay trùng ID/tên, không xoá các nhóm khác đang có trên máy.
+          <b>Xuất</b>: có thể xuất toàn bộ hoặc chỉ 1 nhóm, kèm các cài đặt được tích chọn — KHÔNG bao gồm file media (mp3/mp4).
           Đường dẫn file media là path local nên cần copy file media riêng nếu chuyển máy.
         </div>
       </div>
@@ -1045,6 +1061,9 @@
         </label>
         <label class="checkbox-row" title="Mặc định TẮT. Chỉ tick khi muốn phát pre-effect cho quà này. Toggle global off/on KHÔNG tự bật lại.">
           <input type="checkbox" id="dlgPreFx" /> 🔔 Phát âm thanh trước (chỉ tick riêng quà nào cần)
+        </label>
+        <label class="checkbox-row" title="Phát ngay trên overlay đã chọn, song song với danh sách Hành động. Nên dùng overlay riêng để không xung đột hiệu ứng chính.">
+          <input type="checkbox" id="dlgBackground" /> NỀN
         </label>
       </div>
       <div class="modal-actions">

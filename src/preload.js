@@ -19,8 +19,8 @@ contextBridge.exposeInMainWorld('bigo', {
   pickPreFxFile: () => ipcRenderer.invoke('preFx:pick-file'),
 
   // Config Export / Import
-  configExport: () => ipcRenderer.invoke('config:export'),
-  configImport: () => ipcRenderer.invoke('config:import'),
+  configExport: (opts) => ipcRenderer.invoke('config:export', opts),
+  configImport: (opts) => ipcRenderer.invoke('config:import', opts),
 
   // Gift master catalog
   giftsMasterList: () => ipcRenderer.invoke('gifts:master-list'),
@@ -123,6 +123,6 @@ contextBridge.exposeInMainWorld('bigo', {
   onLog: (cb) => ipcRenderer.on('bigo:log', (_e, msg) => cb(msg)),
   onEmbedEvent: (cb) => ipcRenderer.on('embed:event', (_e, ev) => cb(ev)),
   onOverlayQueueEmpty: (cb) => ipcRenderer.on('overlay:queue-empty', () => cb()),
-  onOverlayEffectEnded: (cb) => ipcRenderer.on('overlay:effect-ended', () => cb()),
+  onOverlayEffectEnded: (cb) => ipcRenderer.on('overlay:effect-ended', (_e, payload) => cb(payload || {})),
   onWarnNoObs: (cb) => ipcRenderer.on('warn:no-obs', (_e, payload) => cb(payload)),
 });

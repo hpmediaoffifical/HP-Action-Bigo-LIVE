@@ -27,6 +27,7 @@
     "files": [
       "src/**",
       "renderer/**",
+      "hpkey/**",
       "config/**",
       "logo-hp.ico",
       "logo-hp.png",
