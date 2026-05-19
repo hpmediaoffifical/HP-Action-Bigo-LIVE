@@ -3642,6 +3642,17 @@ els.btnConnect.onclick = async () => {
   const id = els.embedBigoId.value.trim();
   if (!id) { alert('Nhập BIGO ID'); return; }
 
+  // === VIP allow-list: chỉ cho kết nối các BIGO ID trong danh sách của key ===
+  try {
+    const _lic = JSON.parse(localStorage.getItem('hp_license_info') || '{}');
+    const _role = String(_lic.TINH_NANG || '').toUpperCase();
+    const _ids = Array.isArray(_lic.ALLOW_IDS) ? _lic.ALLOW_IDS : [];
+    if (_role === 'VIP' && _ids.length && _ids.indexOf(id.toLowerCase()) < 0) {
+      alert('BIGO ID này không nằm trong danh sách được phép của key VIP.\nLIÊN HỆ HP MEDIA ĐỂ ĐƯỢC HỖ TRỢ');
+      return;
+    }
+  } catch (e) {}
+
   els.btnConnect.disabled = true;
   els.status.textContent = 'checking...';
   els.status.classList.remove('on');

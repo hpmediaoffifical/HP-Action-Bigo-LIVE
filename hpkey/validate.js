@@ -16,6 +16,7 @@ async function licenseVerify(key) {
     data: {
       TRANG_THAI: 'ACTIVE',
       TINH_NANG: p.r || 'ADMIN',                 // role ADMIN/VIP/CREATOR (thay cho tier)
+      ALLOW_IDS: Array.isArray(p.ids) ? p.ids : [], // VIP: chỉ kết nối các BIGO ID này (rỗng = không giới hạn)
       HAN_SU_DUNG: p.exp ? new Date(p.exp * 1000).toISOString() : '', // '' = vĩnh viễn
       SL_QUA_TOI_DA: '∞',                        // đã bỏ giới hạn quà
       SL_QUA_DA_DUNG: 0,
