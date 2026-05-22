@@ -3163,6 +3163,128 @@ function saveFavorites(set) {
 }
 let giftFavorites = loadFavorites();
 
+// Render config: chunk size khi append progressive. Mỗi chunk render đủ nhanh
+// (~50ms) để main thread không bị freeze quá lâu, và cũng đủ lớn để fill viewport.
+const MASTER_CHUNK_SIZE = 200;
+let masterRenderState = { arr: [], renderedCount: 0, imgObserver: null, scrollHandler: null };
+
+function masterRowHtml(g) {
+  const src = g.localIcon || g.img_url || '';
+  const isFav = giftFavorites.has(g.typeid);
+  const vnBadge = isVnGift(g)
+    ? `<span class="vn-badge" title="Quà có trong danh mục khu vực Việt Nam">🇻🇳 VN</span>`
+    : '';
+  // data-src + class icon-loading: img sẽ được swap thành src khi vào viewport
+  // (IntersectionObserver). Tránh fetch CDN/file đồng loạt cho 2k+ icons.
+  return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
+    <td><img class="icon-loading" data-src="${escapeHtml(src)}" draggable="true" data-typeid="${g.typeid}" title="Kéo ra desktop = ${g.typeid}.png" alt="" /></td>
+    <td><span class="id">${g.typeid}</span></td>
+    <td><span class="price">${beanIconHtml('small')} ${g.diamonds ?? '?'}</span></td>
+    <td><span class="name">${escapeHtml(g.name)} ${vnBadge}</span></td>
+    <td><button type="button" class="fav-btn ${isFav ? 'on' : ''}" data-fav="${g.typeid}" title="Đánh dấu yêu thích">${isFav ? '⭐' : '☆'}</button></td>
+  </tr>`;
+}
+
+function bindMasterRows(rows) {
+  rows.forEach(row => {
+    if (row.classList.contains('master-more-row')) return;
+    row.onclick = (e) => {
+      if (e.target.tagName === 'IMG') return;
+      if (e.target.classList && e.target.classList.contains('fav-btn')) return;
+      const name = row.dataset.name;
+      const typeid = row.dataset.typeid;
+      const multiGift = !!document.getElementById('dlgMultiGift')?.checked;
+      const cur = multiGift ? els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean) : [];
+      if (!cur.includes(typeid)) cur.push(typeid);
+      if (!cur.includes(name)) cur.push(name);
+      els.dlgMatchKeys.value = cur.join(', ');
+      if (!els.dlgAlias.value) els.dlgAlias.value = name;
+    };
+    const favBtn = row.querySelector('.fav-btn');
+    if (favBtn) {
+      favBtn.onclick = (e) => {
+        e.stopPropagation();
+        const id = parseInt(favBtn.dataset.fav, 10);
+        if (giftFavorites.has(id)) giftFavorites.delete(id);
+        else giftFavorites.add(id);
+        saveFavorites(giftFavorites);
+        renderMasterTable();
+      };
+    }
+    const img = row.querySelector('img[draggable]');
+    if (img) {
+      img.ondragstart = (e) => {
+        e.preventDefault();
+        window.bigo.giftsStartDrag(parseInt(img.dataset.typeid, 10));
+      };
+      if (masterRenderState.imgObserver) {
+        masterRenderState.imgObserver.observe(img);
+      } else {
+        // Fallback nếu IntersectionObserver không có
+        const src = img.dataset.src;
+        if (src) { img.src = src; img.classList.remove('icon-loading'); }
+      }
+    }
+  });
+}
+
+function appendMasterChunk() {
+  const { arr, renderedCount } = masterRenderState;
+  if (renderedCount >= arr.length) return;
+  const next = Math.min(renderedCount + MASTER_CHUNK_SIZE, arr.length);
+  const slice = arr.slice(renderedCount, next);
+  const moreRow = els.dlgMasterTableBody.querySelector('.master-more-row');
+  if (moreRow) moreRow.remove();
+  const html = slice.map(masterRowHtml).join('');
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  const newRows = Array.from(tpl.content.querySelectorAll('tr'));
+  els.dlgMasterTableBody.append(tpl.content);
+  bindMasterRows(newRows);
+  masterRenderState.renderedCount = next;
+  if (next < arr.length) {
+    els.dlgMasterTableBody.insertAdjacentHTML('beforeend',
+      `<tr class="master-more-row"><td colspan="5">Đang hiển thị ${next}/${arr.length} quà. Cuộn xuống để xem thêm hoặc gõ tên/mã quà để lọc.</td></tr>`);
+  }
+}
+
+function setupMasterScrollHandler() {
+  const wrap = els.dlgMasterTableBody.closest('.master-table-wrap');
+  if (!wrap) return;
+  if (masterRenderState.scrollHandler) {
+    wrap.removeEventListener('scroll', masterRenderState.scrollHandler);
+  }
+  const handler = () => {
+    if (masterRenderState.renderedCount >= masterRenderState.arr.length) return;
+    const remaining = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight;
+    if (remaining < 300) appendMasterChunk();
+  };
+  wrap.addEventListener('scroll', handler, { passive: true });
+  masterRenderState.scrollHandler = handler;
+}
+
+function ensureMasterImgObserver() {
+  if (masterRenderState.imgObserver) return masterRenderState.imgObserver;
+  if (typeof IntersectionObserver === 'undefined') return null;
+  const wrap = els.dlgMasterTableBody.closest('.master-table-wrap');
+  masterRenderState.imgObserver = new IntersectionObserver((entries, obs) => {
+    for (const ent of entries) {
+      if (!ent.isIntersecting) continue;
+      const img = ent.target;
+      const src = img.dataset.src;
+      if (src) {
+        img.src = src;
+        img.onload = () => img.classList.remove('icon-loading');
+        img.onerror = () => img.classList.remove('icon-loading');
+      } else {
+        img.classList.remove('icon-loading');
+      }
+      obs.unobserve(img);
+    }
+  }, { root: wrap, rootMargin: '120px 0px', threshold: 0.01 });
+  return masterRenderState.imgObserver;
+}
+
 function renderMasterTable() {
   if (!masterFullList) {
     els.dlgMasterCount.textContent = 'đang tải...';
@@ -3185,56 +3307,20 @@ function renderMasterTable() {
   }
   arr = prioritizeVnGifts(sortMasterArr(arr, sortKey));
   els.dlgMasterCount.textContent = `${arr.length}/${masterFullList.length} quà`;
-  const renderLimit = filter || vnOnly || favOnly ? 600 : 180;
-  const display = arr.slice(0, renderLimit);
-  els.dlgMasterTableBody.innerHTML = display.map(g => {
-    const src = g.localIcon || g.img_url || '';
-    const isFav = giftFavorites.has(g.typeid);
-    const vnBadge = isVnGift(g)
-      ? `<span class="vn-badge" title="Quà có trong danh mục khu vực Việt Nam">🇻🇳 VN</span>`
-      : '';
-    return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
-      <td><img src="${escapeHtml(src)}" loading="lazy" draggable="true" data-typeid="${g.typeid}" title="Kéo ra desktop = ${g.typeid}.png" /></td>
-      <td><span class="id">${g.typeid}</span></td>
-      <td><span class="price">${beanIconHtml('small')} ${g.diamonds ?? '?'}</span></td>
-      <td><span class="name">${escapeHtml(g.name)} ${vnBadge}</span></td>
-      <td><button class="fav-btn ${isFav ? 'on' : ''}" data-fav="${g.typeid}" title="Đánh dấu yêu thích">${isFav ? '⭐' : '☆'}</button></td>
-    </tr>`;
-  }).join('');
-  if (arr.length > display.length) {
-    els.dlgMasterTableBody.insertAdjacentHTML('beforeend', `<tr class="master-more-row"><td colspan="5">Đang hiển thị ${display.length}/${arr.length} quà. Gõ tên hoặc mã quà để lọc nhanh hơn.</td></tr>`);
+  // Reset observer: row mới sẽ register vào observer mới để tránh leak
+  if (masterRenderState.imgObserver) {
+    try { masterRenderState.imgObserver.disconnect(); } catch {}
+    masterRenderState.imgObserver = null;
   }
-  // Click row -> add to matchKeys (skip nếu click vào fav button hoặc img)
-  els.dlgMasterTableBody.querySelectorAll('tr[data-typeid]').forEach(row => {
-    row.onclick = (e) => {
-      if (e.target.tagName === 'IMG') return;
-      if (e.target.classList && e.target.classList.contains('fav-btn')) return;
-      const name = row.dataset.name;
-      const typeid = row.dataset.typeid;
-      const multiGift = !!document.getElementById('dlgMultiGift')?.checked;
-      const cur = multiGift ? els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean) : [];
-      if (!cur.includes(typeid)) cur.push(typeid);
-      if (!cur.includes(name)) cur.push(name);
-      els.dlgMatchKeys.value = cur.join(', ');
-      if (!els.dlgAlias.value) els.dlgAlias.value = name;
-    };
-  });
-  els.dlgMasterTableBody.querySelectorAll('.fav-btn').forEach(btn => {
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      const id = parseInt(btn.dataset.fav, 10);
-      if (giftFavorites.has(id)) giftFavorites.delete(id);
-      else giftFavorites.add(id);
-      saveFavorites(giftFavorites);
-      renderMasterTable();
-    };
-  });
-  els.dlgMasterTableBody.querySelectorAll('img[draggable]').forEach(img => {
-    img.ondragstart = (e) => {
-      e.preventDefault();
-      window.bigo.giftsStartDrag(parseInt(img.dataset.typeid, 10));
-    };
-  });
+  ensureMasterImgObserver();
+  // Scroll lên đầu khi filter thay đổi
+  const wrap = els.dlgMasterTableBody.closest('.master-table-wrap');
+  if (wrap) wrap.scrollTop = 0;
+  els.dlgMasterTableBody.innerHTML = '';
+  masterRenderState.arr = arr;
+  masterRenderState.renderedCount = 0;
+  appendMasterChunk();
+  setupMasterScrollHandler();
 }
 
 let masterRenderTimer = null;
@@ -3336,8 +3422,49 @@ async function openGiftDialog(gift = null, groupId = null) {
   els.giftDialog.showModal();
   els.dlgMasterTableBody.innerHTML = '';
   if (els.dlgMasterCount) els.dlgMasterCount.textContent = masterFullList ? 'sẵn sàng' : 'đang tải...';
-  ensureMasterLoaded().then(renderMasterTable).catch(e => appendLog(`[master] ${e.message || e}`));
+  ensureMasterLoaded().then(() => {
+    renderMasterTable();
+    checkIconCacheAndAutoDownload();
+  }).catch(e => appendLog(`[master] ${e.message || e}`));
 }
+
+// Khi user mở dialog: kiểm tra xem có thiếu icon nào không → tự download nền.
+// Hiển thị progress banner sticky ở đầu master-table-wrap. Banner ẩn khi đủ icon.
+let _autoIconDlInFlight = false;
+async function checkIconCacheAndAutoDownload() {
+  const banner = document.getElementById('dlgIconCacheBanner');
+  if (!banner) return;
+  try {
+    const s = await window.bigo.giftsIconsStatus();
+    if (!s || !s.total) { banner.hidden = true; return; }
+    const missing = s.total - s.count;
+    if (missing <= 0) { banner.hidden = true; return; }
+    banner.hidden = false;
+    banner.innerHTML = `📥 Đang tải ${missing}/${s.total} icon quà về máy để giảm lag…
+      <progress max="100" value="${Math.round((s.count / s.total) * 100)}"></progress>
+      <span>${s.count}/${s.total}</span>`;
+    if (!_autoIconDlInFlight) {
+      _autoIconDlInFlight = true;
+      window.bigo.giftsDownloadIcons().finally(() => { _autoIconDlInFlight = false; });
+    }
+  } catch (e) {
+    banner.hidden = true;
+  }
+}
+
+// Listen progress global → cập nhật banner trong giftDialog nếu đang mở
+window.bigo.giftsOnDownloadProgress(p => {
+  const banner = document.getElementById('dlgIconCacheBanner');
+  if (!banner || banner.hidden) return;
+  if (!p || !p.total) return;
+  const pct = Math.round((p.done / p.total) * 100);
+  banner.innerHTML = `📥 Đang tải icon quà về máy: ${p.done}/${p.total}
+    <progress max="100" value="${pct}"></progress>
+    <span>${pct}%</span>`;
+  if (p.done >= p.total) {
+    setTimeout(() => { banner.hidden = true; }, 1200);
+  }
+});
 
 els.dlgGiftSave.onclick = async (e) => {
   if (!els.dlgMatchKeys.value.trim()) { e.preventDefault(); alert('Match keys không được trống'); return; }

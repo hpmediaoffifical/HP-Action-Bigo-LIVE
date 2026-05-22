@@ -992,10 +992,11 @@
         </label>
       </div>
       <div class="form-row" style="margin-bottom:6px">
-        <label style="flex:2"><span id="dlgMasterTotal">Số lượng: đang tải...</span>
-          <input id="dlgMasterFilter" placeholder="gõ tên hoặc mã quà..." />
-        </label>
-        <label>Sắp xếp
+        <div class="field" style="flex:2">
+          <label for="dlgMasterFilter" id="dlgMasterTotal" style="font-size:11px;color:#8a8f9a;margin-bottom:4px;display:block;cursor:text">Số lượng: đang tải...</label>
+          <input type="text" id="dlgMasterFilter" placeholder="🔍 gõ tên hoặc mã quà..." autocomplete="off" />
+        </div>
+        <label style="flex:1">Sắp xếp
           <select id="dlgMasterSort">
             <option value="kc-asc" selected>Đậu thấp → cao</option>
             <option value="kc-desc">Đậu cao → thấp</option>
@@ -1018,6 +1019,7 @@
         </label>
       </div>
       <div class="master-table-wrap">
+        <div id="dlgIconCacheBanner" class="icon-cache-banner" hidden></div>
         <table class="master-table">
           <thead>
             <tr><th style="width:40px">Icon</th><th style="width:80px">Mã</th><th style="width:80px">Đậu</th><th>Tên quà</th><th style="width:32px">⭐</th></tr>

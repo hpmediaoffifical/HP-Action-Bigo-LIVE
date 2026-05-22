@@ -866,7 +866,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .icon-cache-bar progress { flex: 1; height: 12px; }
 
 /* Master gift browser table */
-.master-table-wrap { background: #0f1117; border-radius: 6px; max-height: 320px; overflow-y: auto; margin-top: 6px; border: 1px solid #262a35; }
+.master-table-wrap { background: #0f1117; border-radius: 6px; max-height: 360px; overflow-y: auto; margin-top: 6px; border: 1px solid #262a35; position: relative; }
+.master-table-wrap .icon-cache-banner { position: sticky; top: 0; z-index: 2; padding: 6px 10px; background: linear-gradient(180deg,#1a1d28,#171a23); color: #ffd166; font-size: 11px; border-bottom: 1px solid #2a2f3d; display: flex; gap: 8px; align-items: center; }
+.master-table-wrap .icon-cache-banner progress { flex: 1; height: 6px; }
+.master-table img.icon-loading { background: #232732 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="6" fill="%23323847"/></svg>') no-repeat center; }
+.field input { padding: 7px 10px; background: #0f1117; color: #e6e8ee; border: 1px solid #2a2f3d; border-radius: 6px; font-size: 12px; width: 100%; box-sizing: border-box; }
+.field input:focus { outline: none; border-color: #ff8a3d; }
 .master-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .master-table thead { position: sticky; top: 0; background: #0f1117; z-index: 1; }
 .master-table thead th { padding: 6px 8px; text-align: left; color: #8a8f9a; font-size: 11px; text-transform: uppercase; font-weight: 600; border-bottom: 1px solid #262a35; }
