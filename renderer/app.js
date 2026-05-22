@@ -1568,7 +1568,9 @@ function recordLicenseFailure(message) {
     return;
   }
   localStorage.setItem('hp_license_fail_count', String(count));
-  setLicenseGateMessage(`${message || 'KEY sai hoặc không hợp lệ'} (${count}/5 lần)`, 'err');
+  // Hint: KEY user nhập đã được lưu, sau khi gia hạn / mở khóa chỉ cần KÍCH HOẠT lại
+  const msg = message || 'KEY sai hoặc không hợp lệ';
+  setLicenseGateMessage(`${msg} (${count}/5 lần) — KEY đã được ghi nhớ, sau khi gia hạn/mở khóa bấm KÍCH HOẠT lại.`, 'err');
 }
 
 function waitForLicenseGateUnlock() {
@@ -1601,6 +1603,10 @@ async function submitLicenseGateKey(key, action = 'activate') {
   key = String(key || '').trim();
   if (!key) { setLicenseGateMessage('Vui lòng nhập KEY bản quyền.', 'err'); return false; }
   if (updateLicenseLockoutUi()) return false;
+  // Ghi nhớ KEY ngay khi user submit — dù verify fail (hết hạn/bị khóa) vẫn giữ
+  // để user gia hạn xong KHÔNG phải nhập lại. unlockLicenseGate cũng setItem
+  // (idempotent) khi success.
+  try { localStorage.setItem('hp_license_key', key); } catch {}
   if (btn) btn.disabled = true;
   if (input) input.disabled = true;
   setLicenseGateMessage('Đang kiểm tra KEY và thiết bị...', '');
@@ -1634,6 +1640,12 @@ async function ensureLicenseGate() {
   }
   if (form && !form.dataset.wired) {
     form.dataset.wired = '1';
+    // Ghi nhớ KEY khi user gõ — đề phòng user nhập rồi tắt app trước khi submit
+    if (input) {
+      input.addEventListener('input', () => {
+        try { localStorage.setItem('hp_license_key', input.value.trim()); } catch {}
+      });
+    }
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       submitLicenseGateKey(input?.value || '', 'activate').catch(() => {});
