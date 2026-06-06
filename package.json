@@ -76,8 +76,10 @@
     },
     "publish": [
       {
-        "provider": "generic",
-        "url": "https://github.com/hpmediaoffifical/HP-Action-Bigo-LIVE/releases/latest/download"
+        "provider": "github",
+        "owner": "hpmediaoffifical",
+        "repo": "HP-Action-Bigo-LIVE",
+        "releaseType": "release"
       }
     ]
   },

@@ -6,15 +6,19 @@
 //   4) Tải xong → hỏi "Cài ngay?" → quitAndInstall() → NSIS chạy → app relaunch.
 //   5) App khởi động lại → checkForUpdates() chạy tiếp → không còn version mới thì im lặng.
 //
-// Provider: GitHub Releases (hpmediaoffifical/bigo-action). Cần upload kèm
-// `latest.yml` + file Setup-*.exe khi release (electron-builder --publish always lo việc này).
+// Provider: GitHub Releases. Cần upload kèm `latest.yml` + file Setup-*.exe
+// khi release (electron-builder --publish always lo việc này với provider github).
 //
 // Dev mode (electron .) sẽ KHÔNG check vì app.isPackaged = false — đó là hành vi mong muốn,
 // chỉ build NSIS mới có updater hoạt động thật.
 
 const { app, dialog, BrowserWindow, ipcMain } = require('electron');
 
-const UPDATE_FEED_URL = 'https://github.com/hpmediaoffifical/HP-Action-Bigo-LIVE/releases/latest/download';
+const UPDATE_FEED = {
+  provider: 'github',
+  owner: 'hpmediaoffifical',
+  repo: 'HP-Action-Bigo-LIVE',
+};
 
 let autoUpdater = null;
 let mainWinRef = null;
@@ -73,6 +77,14 @@ function log(msg) {
   }
 }
 
+function formatUpdaterError(err) {
+  const raw = err?.message || String(err || 'Unknown error');
+  if (/latest\.yml/i.test(raw) || /404/i.test(raw)) {
+    return 'Không tìm thấy file cập nhật latest.yml trên GitHub Release. Hãy publish lại bản release bằng npm run release hoặc upload kèm latest.yml và file Setup .exe.';
+  }
+  return raw.split('\n')[0];
+}
+
 function sendStatus(payload) {
   const w = mainWinRef;
   if (w && !w.isDestroyed()) {
@@ -88,7 +100,7 @@ function tryRequireUpdater() {
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = false;
     autoUpdater.allowDowngrade = false;
-    autoUpdater.setFeedURL({ provider: 'generic', url: UPDATE_FEED_URL });
+    autoUpdater.setFeedURL(UPDATE_FEED);
     return autoUpdater;
   } catch (e) {
     log(`Không nạp được electron-updater: ${e.message}. Chạy "npm install" để cài.`);
@@ -98,15 +110,16 @@ function tryRequireUpdater() {
 
 function bindEvents(au) {
   au.on('error', (err) => {
-    log(`Lỗi: ${err?.message || err}`);
-    sendStatus({ state: 'error', message: err?.message || String(err) });
+    const message = formatUpdaterError(err);
+    log(`Lỗi: ${message}`);
+    sendStatus({ state: 'error', message });
     if (isCheckingManually) {
       isCheckingManually = false;
       showAppDialog({
         type: 'error',
         title: 'Kiểm tra cập nhật',
         message: 'Không kiểm tra được cập nhật',
-        detail: err?.message || String(err),
+        detail: message,
         buttons: ['Đóng'],
       }).catch(() => {});
     }
@@ -213,14 +226,15 @@ function startDownload() {
   sendStatus({ state: 'downloading', percent: 0 });
   log('Bắt đầu tải...');
   au.downloadUpdate().catch((e) => {
+    const message = formatUpdaterError(e);
     downloadInProgress = false;
-    log(`Tải lỗi: ${e?.message || e}`);
-    sendStatus({ state: 'error', message: e?.message || String(e) });
+    log(`Tải lỗi: ${message}`);
+    sendStatus({ state: 'error', message });
     showAppDialog({
       type: 'error',
       title: 'Lỗi tải cập nhật',
       message: 'Không tải được bản cập nhật',
-      detail: e?.message || String(e),
+      detail: message,
       buttons: ['Đóng'],
     }).catch(() => {});
   });
@@ -244,7 +258,7 @@ function init(mainWindow) {
   // Delay nhẹ cho main window load xong rồi mới check
   setTimeout(() => {
     log('Auto-check khi khởi động...');
-    au.checkForUpdates().catch((e) => log(`checkForUpdates lỗi: ${e?.message || e}`));
+    au.checkForUpdates().catch((e) => log(`checkForUpdates lỗi: ${formatUpdaterError(e)}`));
   }, 4000);
 }
 
@@ -272,7 +286,7 @@ async function checkManually() {
     return { ok: true };
   } catch (e) {
     isCheckingManually = false;
-    return { ok: false, error: e?.message || String(e) };
+    return { ok: false, error: formatUpdaterError(e) };
   }
 }
 
