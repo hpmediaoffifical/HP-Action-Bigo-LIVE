@@ -17,10 +17,11 @@
       "type": "gift",
       "enabled": false,
       "collapsed": true,
-      "bigoId": "",
+      "bigoId": "npccc",
       "items": [],
       "bgmFile": "file:///G:/MUSIC BG/HİlXg - Reay kill - YouTube.mp3",
-      "bgmFileName": "HİlXg - Reay kill - YouTube.mp3"
+      "bgmFileName": "HİlXg - Reay kill - YouTube.mp3",
+      "memberIds": []
     },
     {
       "id": "g_mox9je2347fw",
@@ -28,7 +29,7 @@
       "type": "gift",
       "enabled": true,
       "collapsed": false,
-      "bigoId": "",
+      "bigoId": "aaaaa",
       "items": [
         {
           "id": "i_moz6mor4q7nf",
@@ -49,23 +50,18 @@
         {
           "id": "i_moxb2tre7cfv",
           "matchKeys": [
-            "1140",
-            "Kiss",
-            "9",
-            "7342",
-            "7758",
-            "Sexy Kiss"
+            "6422",
+            "Mace X GALA"
           ],
           "alias": "HÔN TÔI ĐI",
-          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/04. Chưởng Năng Lượng.webm",
+          "mediaFile": "file:///G:/NPC 2026/NATRA/Webm/06. boom khong no 2 (1).webm",
           "mediaFiles": [
-            "file:///C:/Users/NCPC/Desktop/Krixi/04. Chưởng Năng Lượng.webm",
-            "file:///C:/Users/NCPC/Desktop/Krixi/07. Đóng cửa.webm",
-            "file:///C:/Users/NCPC/Desktop/Krixi/10. Trói Dây Leo 1.webm"
+            "file:///G:/NPC 2026/NATRA/Webm/06. boom khong no 2 (1).webm"
           ],
-          "overlayId": "ov_mowzeyw8m6as",
+          "overlayId": "ov_mp8krs9oy0ph",
           "pauseBgm": false,
-          "preEffect": true,
+          "preEffect": false,
+          "background": true,
           "priority": 0
         },
         {
@@ -121,20 +117,20 @@
             "Duck Box"
           ],
           "alias": "Duck Box",
-          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/dance (5).mp3",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/Do For Love 29s.mp3",
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/Do For Love 29s.mp3"
+          ],
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": true,
           "preEffect": true,
-          "priority": 0,
-          "mediaFiles": [
-            "file:///C:/Users/NCPC/Desktop/Krixi/dance (5).mp3"
-          ]
+          "priority": 0
         },
         {
           "id": "i_moxf76ewyq6n",
           "matchKeys": [
-            "504754",
-            "Galaxy Ring"
+            "503633",
+            "Ashkin DINO"
           ],
           "alias": "Galaxy Ring",
           "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/01. Kim Mộc Thủy Hỏa Thổ.webm",
@@ -169,14 +165,14 @@
             "Red Cap"
           ],
           "alias": "Red Cap",
-          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/dance (2).mp3",
+          "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/Knock Knock 12s.mp3",
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/Knock Knock 12s.mp3"
+          ],
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": true,
           "preEffect": false,
-          "priority": 0,
-          "mediaFiles": [
-            "file:///C:/Users/NCPC/Desktop/Krixi/dance (2).mp3"
-          ]
+          "priority": 0
         },
         {
           "id": "g_mox5xbantd65",
@@ -198,18 +194,18 @@
         {
           "id": "i_moyckldem98z",
           "matchKeys": [
-            "504755",
-            "Interstellar Watch"
+            "504198",
+            "Mauve Wing"
           ],
           "alias": "Interstellar Watch",
           "mediaFile": "file:///C:/Users/NCPC/Desktop/Krixi/04. Chưởng Năng Lượng.webm",
+          "mediaFiles": [
+            "file:///C:/Users/NCPC/Desktop/Krixi/04. Chưởng Năng Lượng.webm"
+          ],
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": true,
           "preEffect": false,
-          "priority": 0,
-          "mediaFiles": [
-            "file:///C:/Users/NCPC/Desktop/Krixi/04. Chưởng Năng Lượng.webm"
-          ]
+          "priority": 0
         },
         {
           "id": "i_moyjykqqw23n",
@@ -290,7 +286,7 @@
       "name": "Ada",
       "type": "gift",
       "enabled": false,
-      "collapsed": true,
+      "collapsed": false,
       "bigoId": "",
       "items": []
     }
@@ -314,6 +310,25 @@
       "autoOpen": false,
       "autoFocus": false,
       "target": "obs"
+    },
+    {
+      "id": "ov_mp8krs9oy0ph",
+      "name": "Webm 2",
+      "bgColor": "#00ff00",
+      "opacity": 1,
+      "bounds": {
+        "x": 1599,
+        "y": 674,
+        "width": 1080,
+        "height": 1920
+      },
+      "alwaysOnTop": false,
+      "clickThrough": false,
+      "target": "obs",
+      "autoHide": false,
+      "lockRatio": false,
+      "autoOpen": false,
+      "autoFocus": false
     }
   ]
 }

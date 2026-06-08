@@ -1,6 +1,6 @@
 {
   "name": "bigo-action",
-  "version": "0.3.6",
+  "version": "0.3.13",
   "description": "Bigo Live gift effect player — nhận quà từ phòng live qua Bigo Open API rồi phát mp3/mp4/webm hiệu ứng",
   "main": "src/main.js",
   "scripts": {
@@ -27,6 +27,7 @@
     "files": [
       "src/**",
       "renderer/**",
+      "hpkey/**",
       "config/**",
       "logo-hp.ico",
       "logo-hp.png",
@@ -36,7 +37,9 @@
       {
         "from": "assets",
         "to": "assets",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
@@ -44,7 +47,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "HP-Action-BIGO-LIVE-Setup-${version}.${ext}"
@@ -71,8 +76,10 @@
     },
     "publish": [
       {
-        "provider": "generic",
-        "url": "https://github.com/hpmediaoffifical/HP-Action-Bigo-LIVE/releases/latest/download"
+        "provider": "github",
+        "owner": "hpmediaoffifical",
+        "repo": "HP-Action-Bigo-LIVE",
+        "releaseType": "release"
       }
     ]
   },

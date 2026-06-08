@@ -215,6 +215,7 @@ function updateConnectStats() {
 
 // =================== Effect Queue State ===================
 const queueItems = []; // { id, ts, user, avatar, gift_id, gift_name, gift_icon, count, diamond, status }
+const backgroundItems = []; // hiệu ứng NỀN: phát song song, chỉ để hiển thị trạng thái.
 const QUEUE_MAX = 5000; // Cho phép hold 5000 items in-memory; render UI giới hạn theo maxListItems.
 let queuePaused = false;
 const missingMediaWarned = new Set();
@@ -385,7 +386,10 @@ function markNextQueueItemPlaying(delayMs = 0) {
 // → advance UI queue: shift entry đang playing, mark new [0] playing.
 // User wants: quà hết hiệu ứng → XOÁ LUÔN khỏi danh sách (không giữ 'done' state).
 if (window.bigo.onOverlayEffectEnded) {
-  window.bigo.onOverlayEffectEnded(() => {
+  window.bigo.onOverlayEffectEnded((payload = {}) => {
+    const handledBackground = onBackgroundEffectEnded(payload.overlayId);
+    const playing = queueItems.find(q => q.status === 'playing');
+    if (payload.overlayId && (!playing || payload.overlayId !== playing.overlayId)) return;
     // Pre-effect ended → decrement ghost counter, không advance app queue.
     // Tránh off-by-one khi gift có pre-effect: overlay chạy N+1 plays nhưng
     // app queueItems chỉ có N entries (cho main effect). Nếu không skip 1 ended
@@ -427,6 +431,27 @@ function getQueueDisplayList() {
   const playing = queueItems.filter(q => q.status === 'playing');
   const queued = queueItems.filter(q => q.status === 'queued');
   return [...playing, ...queued];
+}
+
+function getBackgroundDisplayList() {
+  const playing = backgroundItems.filter(q => q.status === 'playing');
+  const queued = backgroundItems.filter(q => q.status === 'queued');
+  return [...playing, ...queued];
+}
+
+function getCompactBackgroundDisplayList() {
+  const playing = backgroundItems.find(q => q.status === 'playing');
+  const queued = backgroundItems.find(q => q.status === 'queued');
+  return [playing, queued].filter(Boolean).map((q, idx) => ({
+    ...q,
+    displayStep: q.status === 'queued' ? 1 : (q.step || idx + 1),
+  }));
+}
+
+function refreshBackgroundUi() {
+  renderQueue();
+  renderMiniQueue();
+  forwardQueueSnapshot();
 }
 
 function buildQueueGiftKey(giftId, giftName, giftIcon) {
@@ -492,48 +517,55 @@ function renderQueueCards() {
 // Đang phát hiển thị border-left đỏ + badge "▶ ĐANG PHÁT" cạnh tên user.
 function renderQueueRowHtml(q, opts = {}) {
   const isPlaying = q.status === 'playing';
+  const isBackground = !!q.isBackground;
   const avUrl = resolveAvatarForUser(q.user, q.avatar);
-  const avHtml = avUrl ? `<img class="qrow-avatar" src="${escapeHtml(avUrl)}" loading="lazy" />` : '';
+  const avHtml = isBackground ? '<div class="qrow-bg-mark">NỀN</div>' : (avUrl ? `<img class="qrow-avatar" src="${escapeHtml(avUrl)}" loading="lazy" />` : '');
   const giftIconHtml = q.gift_icon
     ? `<img class="qrow-gift-icon" src="${escapeHtml(q.gift_icon)}" loading="lazy" />`
     : '<div class="qrow-gift-icon-empty"></div>';
-  const playingBadge = isPlaying
-    ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>'
-    : '';
+  const playingBadge = isBackground
+    ? `<span class="badge-status bg-status ${isPlaying ? 'playing' : ''}">${isPlaying ? 'NỀN ĐANG PHÁT' : `NỀN CHỜ LẦN ${q.displayStep || q.step || 1}`}</span>`
+    : (isPlaying ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>' : `<span class="badge-status queued">CHỜ LẦN ${q.step || 1}</span>`);
   const cntInline = q.count > 1 || q.total > 1
     ? `<span class="cnt-inline">×${q.count}</span>` : '';
   const beansInline = q.diamond != null
     ? `<span class="beans-inline">${beanIconHtml('small')} x${q.diamond.toLocaleString('en-US')}</span>` : '';
   const effectName = q.effect_name || q.gift_name || 'Hiệu ứng';
   const rowClass = opts.rowClass || 'mini-queue-row';
-  return `<div class="${rowClass} ${q.status}" data-id="${escapeHtml(q.id)}">
+  return `<div class="${rowClass} ${q.status} ${isBackground ? 'background-row' : ''}" data-id="${escapeHtml(q.id)}">
     ${avHtml}
     ${giftIconHtml}
     <div class="qrow-meta">
-      <div class="qrow-user">${escapeHtml(q.user)}${playingBadge}</div>
-      <div class="qrow-effect">tặng <b>${escapeHtml(effectName)}</b>${cntInline}${beansInline}</div>
+      <div class="qrow-user">${isBackground ? 'HIỆU ỨNG NỀN' : escapeHtml(q.user)}${playingBadge}</div>
+      <div class="qrow-effect">${isBackground ? 'đang phát ' : 'tặng '}<b>${escapeHtml(effectName)}</b>${isBackground && q.total > 1 ? `<span class="cnt-inline">${q.displayStep || q.step || 1}/${q.total}</span>` : cntInline}${beansInline}</div>
     </div>
-    <div class="qrow-actions">
+    ${isBackground ? '' : `<div class="qrow-actions">
       <button class="qrow-toggle" data-toggle-qid="${escapeHtml(q.id)}" title="${isPlaying ? 'Tạm dừng hiệu ứng đang phát' : 'Phát hiệu ứng này'}">${isPlaying ? '⏸' : '▶'}</button>
       <button class="qrow-del" data-qid="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
-    </div>
+    </div>`}
   </div>`;
 }
 
 function renderMiniQueue() {
   const el = document.getElementById('miniQueue');
   if (!el) return;
+  const bgList = getCompactBackgroundDisplayList();
+  const bgTotal = backgroundItems.length;
   const list = getQueueDisplayList();
-  if (list.length === 0) {
+  if (bgList.length === 0 && list.length === 0) {
     el.innerHTML = '<div style="color:#555;text-align:center;padding:14px;font-size:11px">Chưa có hiệu ứng</div>';
     return;
   }
   // Render top N theo settings (default 20). Còn lại trong queue chạy hết, chỉ
   // không hiển thị UI (tránh lag). Khi item đầu hết → item dưới được "đẩy lên".
   const maxRows = Math.max(5, Math.min(200, parseInt(appSettings?.maxListItems, 10) || 20));
-  const visible = list.slice(0, maxRows);
-  const hidden = list.length - visible.length;
-  let html = visible.map(q => renderQueueRowHtml(q, { rowClass: 'mini-queue-row' })).join('');
+  const seqPlaying = list.filter(q => q.status === 'playing');
+  const seqQueued = list.filter(q => q.status === 'queued');
+  const visible = seqQueued.slice(0, maxRows);
+  const hidden = seqQueued.length - visible.length;
+  let html = seqPlaying.map(q => renderQueueRowHtml(q, { rowClass: 'mini-queue-row' })).join('');
+  if (bgList.length) html += `<div class="queue-section-title bg-title">HIỆU ỨNG PHÁT NỀN · ${bgTotal} hiệu ứng</div>${bgList.map(q => renderQueueRowHtml(q, { rowClass: 'mini-queue-row' })).join('')}`;
+  if (visible.length) html += `${(seqPlaying.length || bgList.length) ? '<div class="queue-section-title">ĐANG CHỜ PHÁT TIẾP THEO</div>' : ''}${visible.map(q => renderQueueRowHtml(q, { rowClass: 'mini-queue-row' })).join('')}`;
   if (hidden > 0) {
     html += `<div class="mini-queue-more" title="${hidden} hiệu ứng nữa đang chờ phát">+ ${hidden} đang chờ phát…</div>`;
   }
@@ -544,7 +576,7 @@ function renderMiniQueue() {
   el.querySelectorAll('[data-toggle-qid]').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); queueToggleById(btn.dataset.toggleQid); };
   });
-  el.querySelectorAll('.mini-queue-row').forEach(row => wireQueueContextMenu(row));
+  el.querySelectorAll('.mini-queue-row:not(.background-row)').forEach(row => wireQueueContextMenu(row));
 }
 
 async function confirmDeleteOneQueueItem(q) {
@@ -596,6 +628,7 @@ function clearAllQueue() {
   sessionStats.effects = Math.max(0, sessionStats.effects - queueItems.length);
   updateConnectStats();
   queueItems.length = 0;
+  backgroundItems.length = 0;
   syncBgmAfterQueueChange();
   renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats();
   forwardQueueSnapshot();
@@ -605,7 +638,7 @@ function clearAllQueue() {
 // Forward FULL snapshot of queue to popup. Mỗi lần queue thay đổi gọi 1 lần.
 function forwardQueueSnapshot() {
   if (!window.bigo.popupQueueSnapshot) return;
-  const list = getQueueDisplayList();
+  const list = [...getBackgroundDisplayList(), ...getQueueDisplayList()];
   window.bigo.popupQueueSnapshot(list).catch(() => {});
 }
 
@@ -703,21 +736,31 @@ function checkClearGiftTrigger(ev) {
 function pushQueue(ev, matched, playTimes) {
   if (!matched || !hasEffectMedia(matched)) return;
   scoreHandleGift(ev);
+  if (matched.background) {
+    playBackgroundEffect(matched, ev, playTimes);
+    return;
+  }
   // Dùng pushPlayBatch để chia tách thành playTimes entries
   pushPlayBatch(matched, ev, playTimes);
 }
 
 function renderQueue() {
+  const bgList = getCompactBackgroundDisplayList();
+  const bgTotal = backgroundItems.length;
   const list = getQueueDisplayList();
-  if (!list.length) {
+  if (!bgList.length && !list.length) {
     els.effectQueue.innerHTML = '<div style="color:#555;text-align:center;padding:16px">Chưa có hiệu ứng nào trong danh sách</div>';
     updateQueueControlButtons();
     return;
   }
   const maxRows = Math.max(5, Math.min(500, parseInt(appSettings?.maxListItems, 10) || 20));
-  const visible = list.slice(0, maxRows);
-  const hidden = list.length - visible.length;
-  let html = visible.map(q => renderQueueRowHtml(q, { rowClass: 'queue-row' })).join('');
+  const seqPlaying = list.filter(q => q.status === 'playing');
+  const seqQueued = list.filter(q => q.status === 'queued');
+  const visible = seqQueued.slice(0, maxRows);
+  const hidden = seqQueued.length - visible.length;
+  let html = seqPlaying.map(q => renderQueueRowHtml(q, { rowClass: 'queue-row' })).join('');
+  if (bgList.length) html += `<div class="queue-section-title bg-title">HIỆU ỨNG PHÁT NỀN · ${bgTotal} hiệu ứng</div>${bgList.map(q => renderQueueRowHtml(q, { rowClass: 'queue-row' })).join('')}`;
+  if (visible.length) html += `${(seqPlaying.length || bgList.length) ? '<div class="queue-section-title">ĐANG CHỜ PHÁT TIẾP THEO</div>' : ''}${visible.map(q => renderQueueRowHtml(q, { rowClass: 'queue-row' })).join('')}`;
   if (hidden > 0) {
     html += `<div class="mini-queue-more">+ ${hidden} hiệu ứng nữa đang chờ phát…</div>`;
   }
@@ -728,7 +771,7 @@ function renderQueue() {
   els.effectQueue.querySelectorAll('[data-toggle-qid]').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); queueToggleById(btn.dataset.toggleQid); };
   });
-  els.effectQueue.querySelectorAll('.queue-row').forEach(row => wireQueueContextMenu(row));
+  els.effectQueue.querySelectorAll('.queue-row:not(.background-row)').forEach(row => wireQueueContextMenu(row));
   updateQueueControlButtons();
 }
 
@@ -926,7 +969,7 @@ const els = {
   gameplayReview: $('gameplayReview'), gameplayGridEditor: $('gameplayGridEditor'), gameplayItems: $('gameplayItems'), btnGameplayAddCol: $('btnGameplayAddCol'), btnGameplayAddRow: $('btnGameplayAddRow'), btnGameplayDelCol: $('btnGameplayDelCol'), btnGameplayDelRow: $('btnGameplayDelRow'), btnGameplaySave: $('btnGameplaySave'), btnGameplayCopyUrl: $('btnGameplayCopyUrl'),
   scoreHours: $('scoreHours'), scoreMinutes: $('scoreMinutes'), scoreSeconds: $('scoreSeconds'), scoreDelay: $('scoreDelay'), scoreTarget: $('scoreTarget'), scoreMemberGroup: $('scoreMemberGroup'), scoreMember: $('scoreMember'), scoreContent: $('scoreContent'), scoreCreatorName: $('scoreCreatorName'), scoreCreatorAvatar: $('scoreCreatorAvatar'), scoreTimeColor: $('scoreTimeColor'), scoreContentColor: $('scoreContentColor'), scoreOverColor: $('scoreOverColor'), scoreBarColor1: $('scoreBarColor1'), scoreBarColor2: $('scoreBarColor2'), scoreWaveColor: $('scoreWaveColor'), scoreBigGiftThreshold: $('scoreBigGiftThreshold'), scorePrepSeconds: $('scorePrepSeconds'), scoreThemePreset: $('scoreThemePreset'), scoreBarStyle: $('scoreBarStyle'), scoreOverlaySize: $('scoreOverlaySize'), scoreCustomMilestones: $('scoreCustomMilestones'), scoreShowGiftUser: $('scoreShowGiftUser'), scoreShowMissing: $('scoreShowMissing'), scoreShowTopUsers: $('scoreShowTopUsers'), scoreShowSpeed: $('scoreShowSpeed'), scoreCompactMode: $('scoreCompactMode'), scoreHideAvatar: $('scoreHideAvatar'), scoreHideCreator: $('scoreHideCreator'), scoreStartSoundLabel: $('scoreStartSoundLabel'), scoreWarningSoundLabel: $('scoreWarningSoundLabel'), scoreGoalSoundLabel: $('scoreGoalSoundLabel'), scoreSuccessSoundLabel: $('scoreSuccessSoundLabel'), scoreFailSoundLabel: $('scoreFailSoundLabel'), btnScorePickStartSound: $('btnScorePickStartSound'), btnScoreClearStartSound: $('btnScoreClearStartSound'), btnScorePickWarningSound: $('btnScorePickWarningSound'), btnScoreClearWarningSound: $('btnScoreClearWarningSound'), btnScorePickGoalSound: $('btnScorePickGoalSound'), btnScoreClearGoalSound: $('btnScoreClearGoalSound'), btnScorePickSuccessSound: $('btnScorePickSuccessSound'), btnScoreClearSuccessSound: $('btnScoreClearSuccessSound'), btnScorePickFailSound: $('btnScorePickFailSound'), btnScoreClearFailSound: $('btnScoreClearFailSound'), btnScoreStart: $('btnScoreStart'), btnScoreStop: $('btnScoreStop'), btnScoreReset: $('btnScoreReset'), scoreTestPoints: $('scoreTestPoints'), btnScoreTest: $('btnScoreTest'), btnScoreTestBig: $('btnScoreTestBig'), btnScoreTestWarning: $('btnScoreTestWarning'), btnScoreTestSuccess: $('btnScoreTestSuccess'), btnScoreTestFail: $('btnScoreTestFail'), btnScoreCopyUrl: $('btnScoreCopyUrl'), scorePreview: $('scorePreview'), scoreReviewStatus: $('scoreReviewStatus'), scoreReviewStats: $('scoreReviewStats'), scoreGiftLog: $('scoreGiftLog'), scoreUserTotals: $('scoreUserTotals'),
   // Gift dialog extras
-  dlgPauseBgm: $('dlgPauseBgm'), dlgPreFx: $('dlgPreFx'),
+  dlgPauseBgm: $('dlgPauseBgm'), dlgPreFx: $('dlgPreFx'), dlgBackground: $('dlgBackground'),
   effectQueue: $('effectQueue'), btnClearQueue: $('btnClearQueue'),
   btnPopupQueue: $('btnPopupQueue'),
   qStatGifts: $('qStatGifts'), qStatDiamond: $('qStatDiamond'), qStatUsers: $('qStatUsers'),
@@ -1138,16 +1181,83 @@ document.querySelectorAll('.tab').forEach(t => {
 // =================== Config Export / Import ===================
 const btnConfigExport = document.getElementById('btnConfigExport');
 const btnConfigImport = document.getElementById('btnConfigImport');
+function renderConfigExportGroups() {
+  const select = document.getElementById('configExportGroup');
+  const mode = document.getElementById('configExportMode');
+  if (!select) return;
+  const groups = mapping.groups || [];
+  const current = select.value;
+  select.innerHTML = groups.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name || g.id)} (${(g.items || []).length} mục)</option>`).join('');
+  if (groups.some(g => g.id === current)) select.value = current;
+  select.disabled = mode?.value !== 'group';
+}
+
+async function playBackgroundEffect(item, ev, playTimes) {
+  if (!item || !item.overlayId || !hasEffectMedia(item) || !window.bigo.overlayPlay) return;
+  const total = Math.max(1, Math.min(1000, parseInt(playTimes, 10) || 1));
+  const name = item.alias || ev?.gift_name || item.matchKeys?.[0] || '?';
+  const icon = ev?.gift_icon || ev?.gift_icon_url || getGiftIcon(item) || '';
+  const hasPlayingOnOverlay = backgroundItems.some(q => q.overlayId === item.overlayId && q.status === 'playing');
+  for (let i = 0; i < total; i++) {
+    const mediaFile = chooseEffectMedia(item);
+    if (!mediaFile) continue;
+    if (window.bigo.effectsExists) {
+      let exists = true;
+      try { exists = await window.bigo.effectsExists(mediaFile); } catch { exists = false; }
+      if (!exists) { appendLog(`[bg] thiếu file: ${fileDisplayLabel(mediaFile)}`); continue; }
+    }
+    const status = !hasPlayingOnOverlay && !backgroundItems.some(q => q.overlayId === item.overlayId) && i === 0 ? 'playing' : 'queued';
+    backgroundItems.push({
+      id: 'bg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      overlayId: item.overlayId,
+      itemId: item.id || null,
+      gift_name: name,
+      effect_name: effectNameFromMediaFile(mediaFile) || name,
+      gift_icon: icon,
+      mediaFile,
+      status,
+      step: i + 1,
+      total,
+      isBackground: true,
+    });
+    const payload = resolveMediaPayload(mediaFile);
+    window.bigo.overlayPlay({ overlayId: item.overlayId, ...payload }).catch(e => appendLog(`[bg] lỗi phát nền: ${e.message}`));
+  }
+  refreshBackgroundUi();
+  appendLog(`[bg] ${name}: phát nền x${total}`);
+}
+
+function onBackgroundEffectEnded(overlayId) {
+  if (!overlayId) return false;
+  const idx = backgroundItems.findIndex(q => q.overlayId === overlayId && q.status === 'playing');
+  if (idx === -1) return false;
+  backgroundItems.splice(idx, 1);
+  const next = backgroundItems.find(q => q.overlayId === overlayId && q.status === 'queued');
+  if (next) next.status = 'playing';
+  refreshBackgroundUi();
+  return true;
+}
+const configExportMode = document.getElementById('configExportMode');
+if (configExportMode) configExportMode.addEventListener('change', renderConfigExportGroups);
 if (btnConfigExport) {
   btnConfigExport.addEventListener('click', async () => {
     btnConfigExport.disabled = true;
     try {
       // Lưu mapping hiện tại trước khi xuất (bảo đảm export là state mới nhất)
       await persistMapping();
-      const r = await window.bigo.configExport();
+      const opts = {
+        mode: document.getElementById('configExportMode')?.value === 'group' ? 'group' : 'all',
+        groupId: document.getElementById('configExportGroup')?.value || '',
+        include: {
+          mapping: true,
+          settings: !!document.getElementById('configExportSettings')?.checked,
+          overlays: !!document.getElementById('configExportOverlays')?.checked,
+        },
+      };
+      const r = await window.bigo.configExport(opts);
       if (r.canceled) return;
       if (!r.ok) { alert('Xuất thất bại: ' + (r.error || 'unknown')); return; }
-      alert(`✅ Đã xuất cấu hình vào:\n${r.filePath}\n\nMang file này sang máy khác rồi bấm "Nhập cấu hình" để khôi phục.`);
+      alert(`✅ Đã xuất cấu hình vào:\n${r.filePath}\n\nMang file này sang máy khác rồi bấm "Nhập cấu hình" để thêm/đè cấu hình tương ứng.`);
     } finally {
       btnConfigExport.disabled = false;
     }
@@ -1155,14 +1265,14 @@ if (btnConfigExport) {
 }
 if (btnConfigImport) {
   btnConfigImport.addEventListener('click', async () => {
-    if (!confirm('⚠️ Nhập cấu hình sẽ GHI ĐÈ toàn bộ:\n• Danh sách quà\n• Nhóm\n• Overlay\n• Cài đặt chung (BGM, pre-effect, audio device, volume)\n\nNên Xuất cấu hình hiện tại trước để backup. Tiếp tục?')) return;
+    if (!confirm('Nhập cấu hình sẽ THÊM hoặc ĐÈ nhóm/overlay/cài đặt trùng từ file, KHÔNG xoá các nhóm khác đang có trên máy.\n\nNên Xuất cấu hình hiện tại trước để backup. Tiếp tục?')) return;
     btnConfigImport.disabled = true;
     try {
-      const r = await window.bigo.configImport();
+      const r = await window.bigo.configImport({ include: { mapping: true, settings: true, overlays: true } });
       if (r.canceled) return;
       if (!r.ok) { alert('Nhập thất bại: ' + (r.error || 'unknown')); return; }
       const s = r.stats || {};
-      alert(`✅ Đã nhập cấu hình:\n• ${s.groups || 0} nhóm\n• ${s.items || 0} quà\n• ${s.overlays || 0} overlay\n${s.exportedAt ? '\nFile xuất từ: ' + s.exportedAt : ''}\n\nApp sẽ reload để áp dụng.`);
+      alert(`✅ Đã nhập cấu hình:\n• Đã đọc: ${s.importedGroups || 0} nhóm, ${s.importedOverlays || 0} overlay\n• Hiện có: ${s.groups || 0} nhóm, ${s.items || 0} quà, ${s.overlays || 0} overlay\n${s.exportedAt ? '\nFile xuất từ: ' + s.exportedAt : ''}\n\nApp sẽ reload để áp dụng.`);
       // Reload để re-fetch mapping + settings từ disk và re-render UI
       location.reload();
     } finally {
@@ -1458,7 +1568,9 @@ function recordLicenseFailure(message) {
     return;
   }
   localStorage.setItem('hp_license_fail_count', String(count));
-  setLicenseGateMessage(`${message || 'KEY sai hoặc không hợp lệ'} (${count}/5 lần)`, 'err');
+  // Hint: KEY user nhập đã được lưu, sau khi gia hạn / mở khóa chỉ cần KÍCH HOẠT lại
+  const msg = message || 'KEY sai hoặc không hợp lệ';
+  setLicenseGateMessage(`${msg} (${count}/5 lần) — KEY đã được ghi nhớ, sau khi gia hạn/mở khóa bấm KÍCH HOẠT lại.`, 'err');
 }
 
 function waitForLicenseGateUnlock() {
@@ -1491,6 +1603,10 @@ async function submitLicenseGateKey(key, action = 'activate') {
   key = String(key || '').trim();
   if (!key) { setLicenseGateMessage('Vui lòng nhập KEY bản quyền.', 'err'); return false; }
   if (updateLicenseLockoutUi()) return false;
+  // Ghi nhớ KEY ngay khi user submit — dù verify fail (hết hạn/bị khóa) vẫn giữ
+  // để user gia hạn xong KHÔNG phải nhập lại. unlockLicenseGate cũng setItem
+  // (idempotent) khi success.
+  try { localStorage.setItem('hp_license_key', key); } catch {}
   if (btn) btn.disabled = true;
   if (input) input.disabled = true;
   setLicenseGateMessage('Đang kiểm tra KEY và thiết bị...', '');
@@ -1524,6 +1640,12 @@ async function ensureLicenseGate() {
   }
   if (form && !form.dataset.wired) {
     form.dataset.wired = '1';
+    // Ghi nhớ KEY khi user gõ — đề phòng user nhập rồi tắt app trước khi submit
+    if (input) {
+      input.addEventListener('input', () => {
+        try { localStorage.setItem('hp_license_key', input.value.trim()); } catch {}
+      });
+    }
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       submitLicenseGateKey(input?.value || '', 'activate').catch(() => {});
@@ -1774,6 +1896,7 @@ async function init() {
   renderMiniQueue();
   renderQueueCards();
   renderSettingsGroupsList();
+  renderConfigExportGroups();
   renderGameplayUi();
   renderRankingMemberSelectors();
   renderRankingEditor();
@@ -2008,6 +2131,7 @@ async function autoSaveOpenGiftFields() {
   found.item.priority = els.dlgPriority ? Math.max(0, Math.min(100, parseInt(els.dlgPriority.value, 10) || 0)) : 0;
   found.item.pauseBgm = els.dlgPauseBgm ? els.dlgPauseBgm.checked : false;
   found.item.preEffect = els.dlgPreFx ? els.dlgPreFx.checked : false;
+  found.item.background = els.dlgBackground ? els.dlgBackground.checked : false;
   await persistMapping();
   renderGiftTable();
 }
@@ -2811,7 +2935,7 @@ function renderGroupCard(grp, overlayMap) {
   const isCommon = !!grp.isCommon;
     const enabled = isCommon ? true : grp.enabled !== false;
     const collapsed = !!grp.collapsed;
-  const itemsHtml = (grp.items || []).map(item => {
+  const renderGroupItem = (item) => {
     const iconUrl = getGiftIcon(item);
     const iconCell = iconUrl
       ? `<img src="${escapeHtml(iconUrl)}" class="grow-icon" loading="lazy" />`
@@ -2821,6 +2945,7 @@ function renderGroupCard(grp, overlayMap) {
     const priorityBadge = item.priority > 0 ? `<span class="gift-state-badge prio-badge" title="Ưu tiên: chèn vào hàng ${item.priority} trong queue">⚡#${item.priority}</span>` : '';
     const pauseBgmBadge = item.pauseBgm ? '<span class="gift-state-badge pause-bgm-badge" title="Tạm dừng nhạc nền khi hiệu ứng này phát">🔇</span>' : '';
     const preEffectBadge = item.preEffect ? '<span class="gift-state-badge pre-effect-badge" title="Phát âm thanh/video trước hiệu ứng">🔔</span>' : '';
+    const backgroundBadge = item.background ? '<span class="gift-state-badge bg-badge" title="Nền: phát song song ngoài danh sách Hành động">NỀN</span>' : '';
     const targetBadge = item.overlayId ? `<span class="gift-state-badge target-badge" title="Đích phát: ${overlayTarget === 'obs' ? 'OBS localhost' : overlayTarget === 'both' ? 'Cửa sổ + OBS localhost' : 'Cửa sổ máy tính'}">${overlayTarget === 'obs' ? '🔗' : overlayTarget === 'both' ? '🖥🔗' : '🖥'}</span>` : '';
     const mediaFiles = normalizeMediaFiles(item);
     const missingBadge = !mediaFiles.length ? '<span class="gift-state-badge missing-badge" title="Chưa chọn file hiệu ứng">⚠️</span>' : '';
@@ -2830,12 +2955,12 @@ function renderGroupCard(grp, overlayMap) {
     const mediaTypeIcon = mediaFiles.length > 1 ? '🎲' : mediaIconFor(mediaFiles[0] || '');
     const fileDisplay = mediaFiles.length > 1 ? `${mediaFiles.length} hiệu ứng ngẫu nhiên` : displayEffectName(mediaFiles[0] || '');
     const actionBadges = mediaFiles.length
-      ? `${priorityBadge}${pauseBgmBadge}${preEffectBadge}${randomBadge}${targetBadge}${specialBadge}`
+      ? `${priorityBadge}${pauseBgmBadge}${preEffectBadge}${backgroundBadge}${randomBadge}${targetBadge}${specialBadge}`
       : `${missingBadge}${targetBadge}${specialBadge}`;
     const fileLine = mediaFiles.length
-      ? `<div class="grow-sub"><code><span class="media-kind-icon">${escapeHtml(mediaTypeIcon)}</span>${escapeHtml(fileDisplay)}</code></div>`
+      ? `<div class="grow-sub"><code><span class="media-kind-icon">${escapeHtml(mediaTypeIcon)}</span>${escapeHtml(fileDisplay)}</code>${item.background ? '<span class="bg-sub-note">Phát song song trên overlay riêng, không vào Hành động</span>' : ''}</div>`
       : `<div class="grow-sub"><span style="color:#ff6b6b">— chưa có file hiệu ứng —</span></div>`;
-    return `<div class="group-item" data-iid="${item.id}" data-gid="${grp.id}">
+    return `<div class="group-item ${item.background ? 'background-item' : ''}" data-iid="${item.id}" data-gid="${grp.id}">
       ${iconCell}
       <div class="grow-meta">
         <div class="grow-name"><b>${escapeHtml(displayName)}</b></div>
@@ -2849,7 +2974,19 @@ function renderGroupCard(grp, overlayMap) {
         <button class="tiny danger" data-act="del-item" data-iid="${item.id}">🗑</button>
       </div>
     </div>`;
-  }).join('') || '<div style="color:#555;padding:8px;font-size:11px">Nhóm trống</div>';
+  };
+  const allItems = grp.items || [];
+  const backgroundItems = allItems.filter(item => item.background);
+  const normalItems = allItems.filter(item => !item.background);
+  const backgroundHtml = backgroundItems.length
+      ? `<div class="group-section-label bg-section-label">NỀN · ${backgroundItems.length} hiệu ứng phát song song</div>${backgroundItems.map(renderGroupItem).join('')}`
+    : '';
+  const normalHtml = normalItems.length
+    ? `${backgroundItems.length ? '<div class="group-section-label">HÀNH ĐỘNG TUẦN TỰ</div>' : ''}${normalItems.map(renderGroupItem).join('')}`
+    : '';
+  const itemsHtml = backgroundHtml || normalHtml
+    ? `${backgroundHtml}${normalHtml}`
+    : '<div style="color:#555;padding:8px;font-size:11px">Nhóm trống</div>';
 
   // NHÓM CHUNG: không có toggle bật/tắt + không xoá được + tên cố định
   const toggleHtml = isCommon
@@ -2887,7 +3024,7 @@ async function groupAction(act, gid, value, itemId) {
       // Khi BẬT nhóm: đưa tên nhóm vào search + auto-fill BIGO ID + apply BGM theo nhóm
       if (value && grp.name) {
         if (els.embedGroupSearch) els.embedGroupSearch.value = grp.name;
-        if (grp.bigoId && els.embedBigoId && !els.embedBigoId.value.trim()) {
+        if (grp.bigoId && els.embedBigoId) {
           els.embedBigoId.value = grp.bigoId;
         }
       }
@@ -2946,11 +3083,11 @@ async function groupAction(act, gid, value, itemId) {
       // Pre-effect: phát ÂM THANH/VIDEO trước (1 lần) nếu cả gift + setting cùng bật
       maybeDispatchPreEffect(found.item);
       // Manual play cũng counter 🎵 effects để user thấy stats hoạt động khi test
-      sessionStats.effects += playTimes;
+      if (!found.item.background) sessionStats.effects += playTimes;
       updateConnectStats();
-      // Chia tách thành playTimes entries (đếm lùi giảm dần)
       addGameplayScoreForItem(found.item, playTimes);
-      pushPlayBatch(found.item, null, playTimes);
+      if (found.item.background) playBackgroundEffect(found.item, null, playTimes);
+      else pushPlayBatch(found.item, null, playTimes);
     } else if (act === 'edit-item') {
       openGiftDialog(found.item, found.group.id);
     } else if (act === 'del-item') {
@@ -3038,6 +3175,128 @@ function saveFavorites(set) {
 }
 let giftFavorites = loadFavorites();
 
+// Render config: chunk size khi append progressive. Mỗi chunk render đủ nhanh
+// (~50ms) để main thread không bị freeze quá lâu, và cũng đủ lớn để fill viewport.
+const MASTER_CHUNK_SIZE = 200;
+let masterRenderState = { arr: [], renderedCount: 0, imgObserver: null, scrollHandler: null };
+
+function masterRowHtml(g) {
+  const src = g.localIcon || g.img_url || '';
+  const isFav = giftFavorites.has(g.typeid);
+  const vnBadge = isVnGift(g)
+    ? `<span class="vn-badge" title="Quà có trong danh mục khu vực Việt Nam">🇻🇳 VN</span>`
+    : '';
+  // data-src + class icon-loading: img sẽ được swap thành src khi vào viewport
+  // (IntersectionObserver). Tránh fetch CDN/file đồng loạt cho 2k+ icons.
+  return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
+    <td><img class="icon-loading" data-src="${escapeHtml(src)}" draggable="true" data-typeid="${g.typeid}" title="Kéo ra desktop = ${g.typeid}.png" alt="" /></td>
+    <td><span class="id">${g.typeid}</span></td>
+    <td><span class="price">${beanIconHtml('small')} ${g.diamonds ?? '?'}</span></td>
+    <td><span class="name">${escapeHtml(g.name)} ${vnBadge}</span></td>
+    <td><button type="button" class="fav-btn ${isFav ? 'on' : ''}" data-fav="${g.typeid}" title="Đánh dấu yêu thích">${isFav ? '⭐' : '☆'}</button></td>
+  </tr>`;
+}
+
+function bindMasterRows(rows) {
+  rows.forEach(row => {
+    if (row.classList.contains('master-more-row')) return;
+    row.onclick = (e) => {
+      if (e.target.tagName === 'IMG') return;
+      if (e.target.classList && e.target.classList.contains('fav-btn')) return;
+      const name = row.dataset.name;
+      const typeid = row.dataset.typeid;
+      const multiGift = !!document.getElementById('dlgMultiGift')?.checked;
+      const cur = multiGift ? els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean) : [];
+      if (!cur.includes(typeid)) cur.push(typeid);
+      if (!cur.includes(name)) cur.push(name);
+      els.dlgMatchKeys.value = cur.join(', ');
+      if (!els.dlgAlias.value) els.dlgAlias.value = name;
+    };
+    const favBtn = row.querySelector('.fav-btn');
+    if (favBtn) {
+      favBtn.onclick = (e) => {
+        e.stopPropagation();
+        const id = parseInt(favBtn.dataset.fav, 10);
+        if (giftFavorites.has(id)) giftFavorites.delete(id);
+        else giftFavorites.add(id);
+        saveFavorites(giftFavorites);
+        renderMasterTable();
+      };
+    }
+    const img = row.querySelector('img[draggable]');
+    if (img) {
+      img.ondragstart = (e) => {
+        e.preventDefault();
+        window.bigo.giftsStartDrag(parseInt(img.dataset.typeid, 10));
+      };
+      if (masterRenderState.imgObserver) {
+        masterRenderState.imgObserver.observe(img);
+      } else {
+        // Fallback nếu IntersectionObserver không có
+        const src = img.dataset.src;
+        if (src) { img.src = src; img.classList.remove('icon-loading'); }
+      }
+    }
+  });
+}
+
+function appendMasterChunk() {
+  const { arr, renderedCount } = masterRenderState;
+  if (renderedCount >= arr.length) return;
+  const next = Math.min(renderedCount + MASTER_CHUNK_SIZE, arr.length);
+  const slice = arr.slice(renderedCount, next);
+  const moreRow = els.dlgMasterTableBody.querySelector('.master-more-row');
+  if (moreRow) moreRow.remove();
+  const html = slice.map(masterRowHtml).join('');
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  const newRows = Array.from(tpl.content.querySelectorAll('tr'));
+  els.dlgMasterTableBody.append(tpl.content);
+  bindMasterRows(newRows);
+  masterRenderState.renderedCount = next;
+  if (next < arr.length) {
+    els.dlgMasterTableBody.insertAdjacentHTML('beforeend',
+      `<tr class="master-more-row"><td colspan="5">Đang hiển thị ${next}/${arr.length} quà. Cuộn xuống để xem thêm hoặc gõ tên/mã quà để lọc.</td></tr>`);
+  }
+}
+
+function setupMasterScrollHandler() {
+  const wrap = els.dlgMasterTableBody.closest('.master-table-wrap');
+  if (!wrap) return;
+  if (masterRenderState.scrollHandler) {
+    wrap.removeEventListener('scroll', masterRenderState.scrollHandler);
+  }
+  const handler = () => {
+    if (masterRenderState.renderedCount >= masterRenderState.arr.length) return;
+    const remaining = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight;
+    if (remaining < 300) appendMasterChunk();
+  };
+  wrap.addEventListener('scroll', handler, { passive: true });
+  masterRenderState.scrollHandler = handler;
+}
+
+function ensureMasterImgObserver() {
+  if (masterRenderState.imgObserver) return masterRenderState.imgObserver;
+  if (typeof IntersectionObserver === 'undefined') return null;
+  const wrap = els.dlgMasterTableBody.closest('.master-table-wrap');
+  masterRenderState.imgObserver = new IntersectionObserver((entries, obs) => {
+    for (const ent of entries) {
+      if (!ent.isIntersecting) continue;
+      const img = ent.target;
+      const src = img.dataset.src;
+      if (src) {
+        img.src = src;
+        img.onload = () => img.classList.remove('icon-loading');
+        img.onerror = () => img.classList.remove('icon-loading');
+      } else {
+        img.classList.remove('icon-loading');
+      }
+      obs.unobserve(img);
+    }
+  }, { root: wrap, rootMargin: '120px 0px', threshold: 0.01 });
+  return masterRenderState.imgObserver;
+}
+
 function renderMasterTable() {
   if (!masterFullList) {
     els.dlgMasterCount.textContent = 'đang tải...';
@@ -3060,52 +3319,20 @@ function renderMasterTable() {
   }
   arr = prioritizeVnGifts(sortMasterArr(arr, sortKey));
   els.dlgMasterCount.textContent = `${arr.length}/${masterFullList.length} quà`;
-  const display = arr;
-  els.dlgMasterTableBody.innerHTML = display.map(g => {
-    const src = g.localIcon || g.img_url || '';
-    const isFav = giftFavorites.has(g.typeid);
-    const vnBadge = isVnGift(g)
-      ? `<span class="vn-badge" title="Quà có trong danh mục khu vực Việt Nam">🇻🇳 VN</span>`
-      : '';
-    return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
-      <td><img src="${escapeHtml(src)}" loading="lazy" draggable="true" data-typeid="${g.typeid}" title="Kéo ra desktop = ${g.typeid}.png" /></td>
-      <td><span class="id">${g.typeid}</span></td>
-      <td><span class="price">${beanIconHtml('small')} ${g.diamonds ?? '?'}</span></td>
-      <td><span class="name">${escapeHtml(g.name)} ${vnBadge}</span></td>
-      <td><button class="fav-btn ${isFav ? 'on' : ''}" data-fav="${g.typeid}" title="Đánh dấu yêu thích">${isFav ? '⭐' : '☆'}</button></td>
-    </tr>`;
-  }).join('');
-  // Click row -> add to matchKeys (skip nếu click vào fav button hoặc img)
-  els.dlgMasterTableBody.querySelectorAll('tr').forEach(row => {
-    row.onclick = (e) => {
-      if (e.target.tagName === 'IMG') return;
-      if (e.target.classList && e.target.classList.contains('fav-btn')) return;
-      const name = row.dataset.name;
-      const typeid = row.dataset.typeid;
-      const multiGift = !!document.getElementById('dlgMultiGift')?.checked;
-      const cur = multiGift ? els.dlgMatchKeys.value.split(',').map(s => s.trim()).filter(Boolean) : [];
-      if (!cur.includes(typeid)) cur.push(typeid);
-      if (!cur.includes(name)) cur.push(name);
-      els.dlgMatchKeys.value = cur.join(', ');
-      if (!els.dlgAlias.value) els.dlgAlias.value = name;
-    };
-  });
-  els.dlgMasterTableBody.querySelectorAll('.fav-btn').forEach(btn => {
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      const id = parseInt(btn.dataset.fav, 10);
-      if (giftFavorites.has(id)) giftFavorites.delete(id);
-      else giftFavorites.add(id);
-      saveFavorites(giftFavorites);
-      renderMasterTable();
-    };
-  });
-  els.dlgMasterTableBody.querySelectorAll('img[draggable]').forEach(img => {
-    img.ondragstart = (e) => {
-      e.preventDefault();
-      window.bigo.giftsStartDrag(parseInt(img.dataset.typeid, 10));
-    };
-  });
+  // Reset observer: row mới sẽ register vào observer mới để tránh leak
+  if (masterRenderState.imgObserver) {
+    try { masterRenderState.imgObserver.disconnect(); } catch {}
+    masterRenderState.imgObserver = null;
+  }
+  ensureMasterImgObserver();
+  // Scroll lên đầu khi filter thay đổi
+  const wrap = els.dlgMasterTableBody.closest('.master-table-wrap');
+  if (wrap) wrap.scrollTop = 0;
+  els.dlgMasterTableBody.innerHTML = '';
+  masterRenderState.arr = arr;
+  masterRenderState.renderedCount = 0;
+  appendMasterChunk();
+  setupMasterScrollHandler();
 }
 
 let masterRenderTimer = null;
@@ -3132,6 +3359,7 @@ if (els.dlgPriority) els.dlgPriority.addEventListener('change', () => autoSaveOp
 if (els.dlgPriority) els.dlgPriority.addEventListener('input', () => autoSaveOpenGiftFields());
 if (els.dlgPauseBgm) els.dlgPauseBgm.addEventListener('change', () => autoSaveOpenGiftFields());
 if (els.dlgPreFx) els.dlgPreFx.addEventListener('change', () => autoSaveOpenGiftFields());
+if (els.dlgBackground) els.dlgBackground.addEventListener('change', () => autoSaveOpenGiftFields());
 if (els.dlgMediaList) {
   els.dlgMediaList.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-media-act]');
@@ -3201,11 +3429,54 @@ async function openGiftDialog(gift = null, groupId = null) {
   if (els.dlgPauseBgm) els.dlgPauseBgm.checked = !!gift?.pauseBgm;
   // preEffect opt-in: chỉ tick khi user đã explicit set true. undefined/false → unchecked.
   if (els.dlgPreFx) els.dlgPreFx.checked = gift?.preEffect === true;
+  if (els.dlgBackground) els.dlgBackground.checked = gift?.background === true;
   els.giftDialog.dataset.editingId = gift?.id || '';
   els.giftDialog.showModal();
-  await ensureMasterLoaded();
-  renderMasterTable();
+  els.dlgMasterTableBody.innerHTML = '';
+  if (els.dlgMasterCount) els.dlgMasterCount.textContent = masterFullList ? 'sẵn sàng' : 'đang tải...';
+  ensureMasterLoaded().then(() => {
+    renderMasterTable();
+    checkIconCacheAndAutoDownload();
+  }).catch(e => appendLog(`[master] ${e.message || e}`));
 }
+
+// Khi user mở dialog: kiểm tra xem có thiếu icon nào không → tự download nền.
+// Hiển thị progress banner sticky ở đầu master-table-wrap. Banner ẩn khi đủ icon.
+let _autoIconDlInFlight = false;
+async function checkIconCacheAndAutoDownload() {
+  const banner = document.getElementById('dlgIconCacheBanner');
+  if (!banner) return;
+  try {
+    const s = await window.bigo.giftsIconsStatus();
+    if (!s || !s.total) { banner.hidden = true; return; }
+    const missing = s.total - s.count;
+    if (missing <= 0) { banner.hidden = true; return; }
+    banner.hidden = false;
+    banner.innerHTML = `📥 Đang tải ${missing}/${s.total} icon quà về máy để giảm lag…
+      <progress max="100" value="${Math.round((s.count / s.total) * 100)}"></progress>
+      <span>${s.count}/${s.total}</span>`;
+    if (!_autoIconDlInFlight) {
+      _autoIconDlInFlight = true;
+      window.bigo.giftsDownloadIcons().finally(() => { _autoIconDlInFlight = false; });
+    }
+  } catch (e) {
+    banner.hidden = true;
+  }
+}
+
+// Listen progress global → cập nhật banner trong giftDialog nếu đang mở
+window.bigo.giftsOnDownloadProgress(p => {
+  const banner = document.getElementById('dlgIconCacheBanner');
+  if (!banner || banner.hidden) return;
+  if (!p || !p.total) return;
+  const pct = Math.round((p.done / p.total) * 100);
+  banner.innerHTML = `📥 Đang tải icon quà về máy: ${p.done}/${p.total}
+    <progress max="100" value="${pct}"></progress>
+    <span>${pct}%</span>`;
+  if (p.done >= p.total) {
+    setTimeout(() => { banner.hidden = true; }, 1200);
+  }
+});
 
 els.dlgGiftSave.onclick = async (e) => {
   if (!els.dlgMatchKeys.value.trim()) { e.preventDefault(); alert('Match keys không được trống'); return; }
@@ -3221,6 +3492,7 @@ els.dlgGiftSave.onclick = async (e) => {
     overlayId: els.dlgOverlay.value,
     pauseBgm: els.dlgPauseBgm ? els.dlgPauseBgm.checked : false,
     preEffect: els.dlgPreFx ? els.dlgPreFx.checked : false,
+    background: els.dlgBackground ? els.dlgBackground.checked : false,
     priority: els.dlgPriority ? Math.max(0, Math.min(100, parseInt(els.dlgPriority.value, 10) || 0)) : 0,
   };
   // Diagnostic log để user verify priority được save đúng
@@ -3508,6 +3780,17 @@ els.btnConnect.onclick = async () => {
   }
   const id = els.embedBigoId.value.trim();
   if (!id) { alert('Nhập BIGO ID'); return; }
+
+  // === VIP allow-list: chỉ cho kết nối các BIGO ID trong danh sách của key ===
+  try {
+    const _lic = JSON.parse(localStorage.getItem('hp_license_info') || '{}');
+    const _role = String(_lic.TINH_NANG || '').toUpperCase();
+    const _ids = Array.isArray(_lic.ALLOW_IDS) ? _lic.ALLOW_IDS : [];
+    if (_role === 'VIP' && _ids.length && _ids.indexOf(id.toLowerCase()) < 0) {
+      alert('BIGO ID này không nằm trong danh sách được phép của key VIP.\nLIÊN HỆ HP MEDIA ĐỂ ĐƯỢC HỖ TRỢ');
+      return;
+    }
+  } catch (e) {}
 
   els.btnConnect.disabled = true;
   els.status.textContent = 'checking...';
@@ -3958,7 +4241,7 @@ function renderParsed(ev) {
       sessionStats.giftCount += (ev.gift_count || 1) * (ev.combo || 1);
       sessionStats.diamond += giftDiamondPointsFromEvent(ev);
       if (ev.user) sessionStats.users.add(ev.user);
-      if (matched && hasEffectMedia(matched)) {
+      if (matched && hasEffectMedia(matched) && !matched.background) {
         sessionStats.effects += playTimes;
       }
       updateConnectStats();
@@ -6954,6 +7237,7 @@ function renderSettingsGroupsList() {
       ${g.isCommon ? '' : `<button class="tiny danger" data-glsact="del" data-gid="${g.id}" title="Xoá (items về NHÓM CHUNG)">🗑</button>`}
     </div>
   `).join('');
+  renderConfigExportGroups();
 }
 
 // =================== GLOBAL CLICK DELEGATION ===================

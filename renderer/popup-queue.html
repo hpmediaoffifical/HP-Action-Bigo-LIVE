@@ -29,6 +29,15 @@
       background: linear-gradient(90deg, rgba(254,44,85,0.22), rgba(254,44,85,0.04));
       border-left-color: #fe2c55;
     }
+    #popQueue .queue-row.background-row {
+      background: linear-gradient(90deg, rgba(105,104,250,0.24), rgba(65,199,255,0.06));
+      border-left-color: #6968fa;
+    }
+    .pop-section-title { margin: 8px 2px 6px; color:#8a8f9a; font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+    .pop-section-title.bg-title { color:#8ad6ff; }
+    #popQueue .qrow-bg-mark { width:36px; height:24px; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; background:linear-gradient(135deg,#6968fa,#41c7ff); color:#fff; font-size:10px; font-weight:900; }
+    #popQueue .badge-status.bg-status { background:#243b63; color:#8ad6ff; padding:2px 7px; border-radius:999px; font-weight:900; }
+    #popQueue .badge-status.bg-status.playing { background:#1e8a4f; color:#fff; }
     #popQueue .qrow-gift-icon, #popQueue .qrow-gift-icon-empty {
       width: var(--queue-icon, 40px) !important;
       height: var(--queue-icon, 40px) !important;
@@ -130,6 +139,7 @@
     function getQueueGroups() {
       const groups = new Map();
       for (const q of snapshot) {
+        if (q.isBackground) continue;
         const key = buildQueueGiftKey(q);
         let g = groups.get(key);
         if (!g) {
@@ -191,35 +201,47 @@
 
     function renderRow(q, idx) {
       const isPlaying = q.status === 'playing';
-      const giftIcon = q.gift_icon
+      const isBackground = !!q.isBackground;
+      const giftIcon = isBackground
+        ? '<div class="qrow-bg-mark">NỀN</div>'
+        : (q.gift_icon
         ? `<img class="qrow-gift-icon" src="${escapeHtml(q.gift_icon)}" />`
-        : `<div class="qrow-gift-icon-empty"></div>`;
-      const playingBadge = isPlaying
-        ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>'
-        : '';
+        : `<div class="qrow-gift-icon-empty"></div>`);
+      const playingBadge = isBackground
+        ? `<span class="badge-status bg-status ${isPlaying ? 'playing' : ''}">${isPlaying ? 'NỀN ĐANG PHÁT' : `NỀN CHỜ LẦN ${q.displayStep || q.step || 1}`}</span>`
+        : (isPlaying ? '<span class="badge-status playing">▶ ĐANG PHÁT</span>' : `<span class="badge-status queued">CHỜ LẦN ${q.step || 1}</span>`);
       const cntInline = `<span class="cnt-inline">SL ×${q.count || 1}</span>`;
       const beansInline = q.diamond != null
         ? `<span class="beans-inline"><span class="bean-icon small"></span> x${Number(q.diamond).toLocaleString('en-US')}</span>` : '';
       const effectName = q.effect_name || q.gift_name || 'Hiệu ứng';
-      return `<div class="queue-row ${q.status}" data-id="${escapeHtml(q.id)}">
+      return `<div class="queue-row ${q.status} ${isBackground ? 'background-row' : ''}" data-id="${escapeHtml(q.id)}">
         ${giftIcon}
         <div class="qrow-meta">
-          <div class="qrow-user">${escapeHtml(q.user)}${playingBadge}</div>
+          <div class="qrow-user">${isBackground ? 'HIỆU ỨNG NỀN' : escapeHtml(q.user)}${playingBadge}</div>
           <div class="qrow-effect" title="${escapeHtml(effectName)}">
-            <b>${escapeHtml(effectName)}</b>${cntInline}${beansInline}
+            <b>${escapeHtml(effectName)}</b>${isBackground && q.total > 1 ? `<span class="cnt-inline">${q.displayStep || q.step || 1}/${q.total}</span>` : cntInline}${beansInline}
           </div>
         </div>
-        <div class="qrow-actions">
+        ${isBackground ? '' : `<div class="qrow-actions">
           <button class="qrow-toggle" data-toggle="${escapeHtml(q.id)}" title="${isPlaying ? 'Tạm dừng' : 'Phát'}">${isPlaying ? '⏸' : '▶'}</button>
           <button class="qrow-del" data-del="${escapeHtml(q.id)}" title="Xoá hàng này">✕</button>
-        </div>
+        </div>`}
       </div>`;
     }
 
     function renderAll() {
       const q = document.getElementById('popQueue');
+      const bgAll = snapshot.filter(it => it.isBackground);
+      const bgPlaying = bgAll.find(it => it.status === 'playing');
+      const bgQueued = bgAll.find(it => it.status === 'queued');
+      const bg = [bgPlaying, bgQueued].filter(Boolean).map(it => ({ ...it, displayStep: it.status === 'queued' ? 1 : (it.step || 1) }));
+      const normal = snapshot.filter(it => !it.isBackground);
+      const normalPlaying = normal.filter(it => it.status === 'playing');
+      const normalQueued = normal.filter(it => it.status === 'queued');
       let playingCount = 0;
-      const html = snapshot.map((it, i) => {
+      let html = normalPlaying.map((it, i) => renderRow(it, i)).join('');
+      if (bg.length) html += `<div class="pop-section-title bg-title">HIỆU ỨNG PHÁT NỀN · ${bgAll.length} hiệu ứng</div>${bg.map((it, i) => renderRow(it, i)).join('')}`;
+      if (normalQueued.length) html += `${(normalPlaying.length || bg.length) ? '<div class="pop-section-title">ĐANG CHỜ PHÁT TIẾP THEO</div>' : ''}` + normalQueued.map((it, i) => {
         if (it.status === 'playing') { playingCount++; return renderRow(it, 0); }
         return renderRow(it, i - playingCount + 1);
       }).join('');
@@ -242,6 +264,7 @@
       q.querySelectorAll('.queue-row').forEach(row => {
         row.oncontextmenu = (e) => {
           e.preventDefault();
+          if (row.classList.contains('background-row')) return;
           const id = row.dataset.id;
           if (!id) return;
           showCtxMenu(e.clientX, e.clientY, [
@@ -295,7 +318,7 @@
       document.getElementById('popQGifts').textContent = stats.gifts;
       document.getElementById('popQDiamond').textContent = stats.diamond;
       document.getElementById('popQUsers').textContent = stats.users.size;
-      const playing = snapshot.some(q => q.status === 'playing');
+      const playing = snapshot.some(q => !q.isBackground && q.status === 'playing');
       const btn = document.getElementById('popQToggle');
       if (btn) {
         btn.textContent = playing ? '⏸ Dừng' : '▶ Phát';
@@ -309,6 +332,7 @@
       // Recompute stats từ snapshot
       stats.gifts = 0; stats.diamond = 0; stats.users.clear();
       for (const q of snapshot) {
+        if (q.isBackground) continue;
         stats.gifts += q.count || 0;
         stats.diamond += q.diamond || 0;
         if (q.user) stats.users.add(q.user);
@@ -324,6 +348,7 @@
       // Recompute stats
       stats.gifts = 0; stats.diamond = 0; stats.users.clear();
       for (const q of snapshot) {
+        if (q.isBackground) continue;
         stats.gifts += q.count || 0;
         stats.diamond += q.diamond || 0;
         if (q.user) stats.users.add(q.user);

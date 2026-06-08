@@ -216,6 +216,77 @@ function migrateMapping(raw) {
   return defaultMapping();
 }
 
+function clonePlain(obj) {
+  return obj == null ? obj : JSON.parse(JSON.stringify(obj));
+}
+
+function normalizeExportInclude(include) {
+  return {
+    mapping: include?.mapping !== false,
+    settings: !!include?.settings,
+    overlays: include?.overlays !== false,
+  };
+}
+
+function pickSettingsForExport(settings, include) {
+  if (!include?.settings) return null;
+  return clonePlain(settings || {});
+}
+
+function mergeSettings(current, incoming) {
+  if (!incoming || typeof incoming !== 'object') return current || {};
+  return { ...(current || {}), ...clonePlain(incoming) };
+}
+
+function mergeMapping(current, incoming) {
+  const dst = migrateMapping(clonePlain(current || defaultMapping()));
+  const src = migrateMapping(clonePlain(incoming || {}));
+  ensureCommonGroup(dst);
+  if (!Array.isArray(dst.groups)) dst.groups = [];
+  if (!Array.isArray(dst.overlays)) dst.overlays = [];
+
+  const overlayIdMap = new Map();
+  for (const srcOv of (src.overlays || [])) {
+    if (!srcOv || !srcOv.id) continue;
+    const sameId = dst.overlays.find(o => o.id === srcOv.id);
+    const sameName = sameId ? null : dst.overlays.find(o => String(o.name || '').trim().toLowerCase() === String(srcOv.name || '').trim().toLowerCase());
+    const target = sameId || sameName;
+    if (target) {
+      const oldId = srcOv.id;
+      Object.assign(target, clonePlain(srcOv), { id: target.id });
+      overlayIdMap.set(oldId, target.id);
+    } else {
+      dst.overlays.push(clonePlain(srcOv));
+      overlayIdMap.set(srcOv.id, srcOv.id);
+    }
+  }
+
+  const remapGroup = (group) => {
+    const next = clonePlain(group);
+    next.items = (next.items || []).map(item => ({
+      ...item,
+      overlayId: item.overlayId && overlayIdMap.has(item.overlayId) ? overlayIdMap.get(item.overlayId) : item.overlayId,
+    }));
+    return next;
+  };
+
+  for (const srcGroup of (src.groups || [])) {
+    if (!srcGroup || !srcGroup.id) continue;
+    const incomingGroup = remapGroup(srcGroup);
+    const sameId = dst.groups.find(g => g.id === incomingGroup.id);
+    const sameName = sameId ? null : dst.groups.find(g => String(g.name || '').trim().toLowerCase() === String(incomingGroup.name || '').trim().toLowerCase());
+    const target = sameId || sameName;
+    if (target) {
+      Object.assign(target, incomingGroup, { id: target.id, isCommon: target.isCommon || incomingGroup.isCommon });
+    } else {
+      dst.groups.push(incomingGroup);
+    }
+  }
+
+  ensureCommonGroup(dst);
+  return dst;
+}
+
 function mediaBasename(mediaFile) {
   let s = String(mediaFile || '').trim();
   if (!s) return '';
@@ -550,7 +621,7 @@ app.whenReady().then(async () => {
       const cfg = mapping?.overlays?.find(o => o.id === overlayId);
       const target = cfg?.target || 'native';
       if (target === 'obs' && win && !win.isDestroyed()) {
-        try { win.webContents.send('overlay:effect-ended'); } catch {}
+        try { win.webContents.send('overlay:effect-ended', { overlayId }); } catch {}
       }
     },
     onQueueEmpty: ({ overlayId }) => {
@@ -631,8 +702,9 @@ ipcMain.handle('updater:download', () => {
 });
 ipcMain.handle('updater:state', () => autoUpdater.getState());
 
-// =================== License (Google Apps Script) ===================
-const LICENSE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwOuL0jR7HL9oMwNkebX1JRKI8lf5-RafKZsqsIQmuHpuME5fGlsXsuqDv_r3VhP_Anuw/exec';
+// =================== License (HP KEY - hpvn.media) ===================
+// Backend cu (Google Apps Script) da thay bang HP KEY. Cau hinh: hpkey/config.js
+// + hpkey/public-key.js. Giu nguyen IPC interface => renderer khong phai sua.
 
 // Generate machine ID — hash hardware để bind 1 key vào 1 máy.
 ipcMain.handle('license:machine-id', () => {
@@ -652,35 +724,34 @@ ipcMain.handle('license:machine-id', () => {
   return crypto.createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 32);
 });
 
-// Call Apps Script endpoint với key + machineId + action.
-// Response expect: { ok, data: { status, tinh_nang, han_su_dung, sl_qua_toi_da, ... } }
-ipcMain.handle('license:verify', async (_e, { key, machineId, action }) => {
-  if (!key) return { ok: false, error: 'Thiếu mã key' };
-  try {
-    const params = new URLSearchParams({
-      action: action || 'verify',
-      key: String(key).trim(),
-      machineId: String(machineId || ''),
-    });
-    const url = `${LICENSE_ENDPOINT}?${params.toString()}`;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 15000);
-    let res;
-    try {
-      res = await fetch(url, { method: 'GET', redirect: 'follow', signal: ctrl.signal });
-    } finally { clearTimeout(timer); }
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}`, status: res.status };
-    const text = await res.text();
-    let json = null;
-    try { json = JSON.parse(text); } catch {}
-    if (!json) {
-      // Apps Script trả HTML khi script lỗi hoặc deploy cấu hình sai
-      return { ok: false, error: 'Phản hồi không phải JSON. Có thể script chưa deploy đúng hoặc cần access "Anyone".', raw: text.slice(0, 300) };
+// Xac thuc qua HP KEY (hpvn.media). Tra ve { ok:true, data:{TRANG_THAI,...} }
+// hoac { ok:false, error } - dung shape renderer dang doc.
+let _hpkeyCurrentKey = '';
+let _hpkeyWatching = false;
+ipcMain.handle('license:verify', async (_e, { key }) => {
+  const res = await require('../hpkey/validate').licenseVerify(key);
+  if (res && res.ok) {
+    _hpkeyCurrentKey = String(key || '').trim();
+    if (!_hpkeyWatching) {
+      _hpkeyWatching = true;
+      // Check key real-time: cam key tren admin -> dong app trong <= RECHECK_SECONDS
+      try {
+        require('../hpkey/core').startWatch({
+          getKey: () => _hpkeyCurrentKey,
+          onRevoked: (reason) => {
+            try {
+              dialog.showErrorBox('Bản quyền bị thu hồi',
+                'KEY của bạn đã bị khóa/thu hồi hoặc hết hạn (' + reason + ').\n' +
+                'Ứng dụng sẽ đóng. Liên hệ HP Media để được hỗ trợ.');
+            } catch (_) {}
+            app.quit();
+            setTimeout(() => { try { app.exit(0); } catch (_) {} }, 1500);
+          },
+        });
+      } catch (e) { console.warn('[hpkey] watch init failed:', e && e.message); }
     }
-    return { ok: true, data: json };
-  } catch (e) {
-    return { ok: false, error: e.message || String(e) };
   }
+  return res;
 });
 
 ipcMain.handle('mapping:load', () => mapping);
@@ -804,12 +875,29 @@ ipcMain.handle('effects:open-folder', async () => {
 
 // =================== Config Export / Import ===================
 // Xuất bundle settings + mapping ra 1 JSON file để chuyển sang máy khác.
-ipcMain.handle('config:export', async () => {
+ipcMain.handle('config:export', async (_e, opts = {}) => {
   if (!win) return { ok: false };
+  const include = normalizeExportInclude(opts.include || {});
+  const exportMode = opts.mode === 'group' ? 'group' : 'all';
+  const sourceMapping = mapping || loadMapping();
+  let exportMapping = null;
+  if (include.mapping) {
+    const groups = exportMode === 'group'
+      ? (sourceMapping.groups || []).filter(g => g.id === opts.groupId)
+      : (sourceMapping.groups || []);
+    if (exportMode === 'group' && groups.length === 0) return { ok: false, error: 'Chưa chọn nhóm để xuất' };
+    const overlayIds = new Set();
+    for (const g of groups) for (const item of (g.items || [])) if (item.overlayId) overlayIds.add(item.overlayId);
+    exportMapping = {
+      version: 3,
+      groups: clonePlain(groups),
+      overlays: include.overlays ? clonePlain((sourceMapping.overlays || []).filter(o => exportMode === 'all' || overlayIds.has(o.id))) : [],
+    };
+  }
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const res = await dialog.showSaveDialog(win, {
     title: 'Xuất cài đặt BIGO Action',
-    defaultPath: `bigo-action-config-${ts}.json`,
+    defaultPath: exportMode === 'group' ? `bigo-action-group-${ts}.json` : `bigo-action-config-${ts}.json`,
     filters: [{ name: 'JSON', extensions: ['json'] }, { name: 'All', extensions: ['*'] }],
   });
   if (res.canceled || !res.filePath) return { ok: false, canceled: true };
@@ -820,8 +908,10 @@ ipcMain.handle('config:export', async () => {
     type: 'bigo-action-config',
     appVersion,
     exportedAt: new Date().toISOString(),
-    settings: loadJson(CONFIG_PATH, {}),
-    mapping: mapping || loadMapping(),
+    exportMode,
+    include,
+    settings: pickSettingsForExport(loadJson(CONFIG_PATH, {}), include),
+    mapping: exportMapping,
   };
   try {
     fs.writeFileSync(res.filePath, JSON.stringify(bundle, null, 2), 'utf8');
@@ -831,8 +921,8 @@ ipcMain.handle('config:export', async () => {
   }
 });
 
-// Nhập bundle - thay thế settings + mapping. Yêu cầu xác nhận từ renderer trước.
-ipcMain.handle('config:import', async () => {
+// Nhập bundle - merge settings + mapping, không xoá nhóm/overlay khác trên máy hiện tại.
+ipcMain.handle('config:import', async (_e, opts = {}) => {
   if (!win) return { ok: false };
   const res = await dialog.showOpenDialog(win, {
     title: 'Chọn file cấu hình BIGO Action (.json)',
@@ -850,16 +940,22 @@ ipcMain.handle('config:import', async () => {
   if (!bundle || bundle.type !== 'bigo-action-config') {
     return { ok: false, error: 'File không phải bundle BIGO Action' };
   }
-  if (!bundle.mapping || !Array.isArray(bundle.mapping.groups) || !Array.isArray(bundle.mapping.overlays)) {
+  if (bundle.mapping && (!Array.isArray(bundle.mapping.groups) || !Array.isArray(bundle.mapping.overlays))) {
     return { ok: false, error: 'Bundle mapping không hợp lệ (thiếu groups hoặc overlays)' };
   }
-  // Apply
+  const include = normalizeExportInclude({ ...(bundle.include || {}), ...(opts.include || {}) });
+  const before = mapping || loadMapping();
   try {
-    if (bundle.settings && typeof bundle.settings === 'object') {
-      saveJson(CONFIG_PATH, bundle.settings);
+    if (include.settings && bundle.settings && typeof bundle.settings === 'object') {
+      saveJson(CONFIG_PATH, mergeSettings(loadJson(CONFIG_PATH, {}), bundle.settings));
     }
-    ensureCommonGroup(bundle.mapping);
-    mapping = bundle.mapping;
+    if (include.mapping && bundle.mapping) {
+      const incoming = clonePlain(bundle.mapping);
+      if (!include.overlays) incoming.overlays = [];
+      mapping = mergeMapping(before, incoming);
+    } else {
+      mapping = before;
+    }
     saveJson(MAPPING_PATH, mapping);
     // Sync OverlayWindow.cfg references
     if (overlayManager && Array.isArray(mapping.overlays)) {
@@ -874,6 +970,8 @@ ipcMain.handle('config:import', async () => {
         groups: mapping.groups.length,
         overlays: mapping.overlays.length,
         items: mapping.groups.reduce((s, g) => s + (g.items?.length || 0), 0),
+        importedGroups: bundle.mapping?.groups?.length || 0,
+        importedOverlays: include.overlays ? (bundle.mapping?.overlays?.length || 0) : 0,
         exportedAt: bundle.exportedAt || null,
         appVersion: bundle.appVersion || null,
       },
@@ -1047,7 +1145,6 @@ function ensureQueuePopup() {
     x: saved.x, y: saved.y,
     title: '📋 HÀNH ĐỘNG — HP Action - BIGO LIVE',
     icon: APP_ICON || undefined,
-    parent: win,
     webPreferences: { nodeIntegration: true, contextIsolation: false },
   });
   queuePopup.setMenuBarVisibility(false);
@@ -1153,7 +1250,6 @@ function ensureChatsPopup() {
     x: saved.x, y: saved.y,
     title: '💬 TƯƠNG TÁC — HP Action - BIGO LIVE',
     icon: APP_ICON || undefined,
-    parent: win,
     webPreferences: { nodeIntegration: true, contextIsolation: false },
   });
   chatsPopup.setMenuBarVisibility(false);
@@ -1203,7 +1299,6 @@ function ensureGiftsPopup() {
     x: saved.x, y: saved.y,
     title: '🎁 ĐÃ NHẬN — HP Action - BIGO LIVE',
     icon: APP_ICON || undefined,
-    parent: win,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -1372,9 +1467,15 @@ ipcMain.handle('overlay:delete', (_e, overlayId) => {
 });
 // overlay:effect-ended — fire mỗi khi 1 video/audio kết thúc trong overlay window.
 // Forward về renderer chính để advance UI queue (chính xác theo playback thực tế).
-ipcMain.on('overlay:effect-ended', (_e) => {
+ipcMain.on('overlay:effect-ended', (e) => {
+  let overlayId = null;
+  try {
+    for (const [id, ov] of overlayManager.overlays.entries()) {
+      if (ov.win && !ov.win.isDestroyed() && ov.win.webContents === e.sender) { overlayId = id; break; }
+    }
+  } catch {}
   if (win && !win.isDestroyed()) {
-    try { win.webContents.send('overlay:effect-ended'); } catch {}
+    try { win.webContents.send('overlay:effect-ended', { overlayId }); } catch {}
   }
 });
 
@@ -1458,7 +1559,7 @@ ipcMain.handle('overlay:play', (_e, { overlayId, file, fileUrl: rawUrl }) => {
       try { win.webContents.send('bigo:log', `[obs-overlay] ${cfg.name || overlayId}: chưa có OBS Browser Source kết nối, bỏ qua 1 hiệu ứng`); } catch {}
       // Toast cảnh báo dễ thấy hơn log panel. Renderer tự throttle để không spam.
       try { win.webContents.send('warn:no-obs', { overlayId, overlayName: cfg.name || overlayId }); } catch {}
-      setTimeout(() => { try { win.webContents.send('overlay:effect-ended'); } catch {} }, 50);
+      setTimeout(() => { try { win.webContents.send('overlay:effect-ended', { overlayId }); } catch {} }, 50);
     }
   } else if (target === 'both') {
     overlayManager.play(cfg, fileUrl(fullPath));
