@@ -30,7 +30,7 @@ Polling `/broom/pull_data` mỗi 2s, ping mỗi 30s. Doc: <https://github.com/yo
 ## Cài đặt
 
 ```powershell
-cd "$env:USERPROFILE\Desktop\BIGO Action"
+cd "F:\PHAT TRIEN GAME\BIGO Action"
 npm install
 npm start
 ```

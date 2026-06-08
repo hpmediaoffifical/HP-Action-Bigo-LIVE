@@ -3,7 +3,8 @@ import openpyxl, json, sys, time, io, os
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 SRC = r'C:\Users\NCPC\Downloads\Qùa NPC_14052026.xlsx'
-DST = r'C:\Users\NCPC\Desktop\BIGO Action\config\vietnam-gifts.json'
+# DST tự tính theo vị trí script (portable, không phụ thuộc Desktop/ổ đĩa)
+DST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'vietnam-gifts.json')
 
 wb = openpyxl.load_workbook(SRC, data_only=True)
 
