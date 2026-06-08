@@ -6,22 +6,19 @@
 //   4) Tải xong → hỏi "Cài ngay?" → quitAndInstall() → NSIS chạy → app relaunch.
 //   5) App khởi động lại → checkForUpdates() chạy tiếp → không còn version mới thì im lặng.
 //
-// Provider: generic (server riêng hpvn.media, HTTPS) — giữ source + installer private.
-// Sau khi build, upload `latest.yml` + `Setup-*.exe` + `.blockmap` lên
-// https://hpvn.media/updates/hp-bigo-live/ (electron-updater tự verify sha512).
+// Provider: GitHub Releases (repo public). `npm run release` tự upload kèm
+// `latest.yml` + file Setup-*.exe + .blockmap (electron-builder --publish always lo).
+// Repo public nên end-user tải được không cần token; electron-updater verify sha512.
 //
 // Dev mode (electron .) sẽ KHÔNG check vì app.isPackaged = false — đó là hành vi mong muốn,
 // chỉ build NSIS mới có updater hoạt động thật.
 
 const { app, dialog, BrowserWindow, ipcMain } = require('electron');
 
-// Update feed: host file cập nhật trên server riêng hpvn.media (HTTPS).
-// Giữ source code + installer riêng tư (repo GitHub vẫn private). electron-updater
-// tải latest.yml + Setup .exe từ URL này và tự verify sha512 -> chống sửa đổi file.
-// Mỗi lần release: upload 3 file (latest.yml, Setup-*.exe, .blockmap) lên thư mục dưới.
 const UPDATE_FEED = {
-  provider: 'generic',
-  url: 'https://hpvn.media/updates/hp-bigo-live/',
+  provider: 'github',
+  owner: 'hpmediaoffifical',
+  repo: 'HP-Action-Bigo-LIVE',
 };
 
 let autoUpdater = null;
@@ -84,7 +81,7 @@ function log(msg) {
 function formatUpdaterError(err) {
   const raw = err?.message || String(err || 'Unknown error');
   if (/latest\.yml/i.test(raw) || /404/i.test(raw)) {
-    return 'Không tìm thấy file cập nhật trên server (hpvn.media/updates/hp-bigo-live). Hãy build rồi upload kèm latest.yml + file Setup .exe + .blockmap lên thư mục đó.';
+    return 'Không tìm thấy file cập nhật latest.yml trên GitHub Release. Hãy publish lại bản release bằng npm run release (kèm latest.yml + file Setup .exe).';
   }
   return raw.split('\n')[0];
 }
