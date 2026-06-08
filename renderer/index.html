@@ -205,6 +205,38 @@
           <b>Match keys</b>: tên quà mà Bigo render trong chat (vd <code>お面</code>, <code>Rose</code>) — cách nhau bằng dấu phẩy. Có thể nhập nhiều cái cho 1 hiệu ứng.
         </div>
       </div>
+
+      <!-- Quét quà mới của BIGO → sao chép vào Google Sheet -->
+      <div class="panel">
+        <div class="panel-head">
+          <h2>🔎 Quét quà mới của BIGO</h2>
+          <div>
+            <button id="btnScanNewGifts" class="primary" title="Tải danh sách quà mới nhất từ BIGO rồi lọc ra quà chưa có trong Sheet">🔄 Quét quà mới</button>
+          </div>
+        </div>
+        <div class="hint small">
+          Dò quà BIGO <b>chưa có</b> trong Google Sheet (so với danh sách đã lưu), rồi sao chép để dán vào Sheet — đúng 5 cột: <code>ID QUÀ · TÊN QUÀ · ẢNH QUÀ · ĐƠN GIÁ KC · KHU VỰC</code>.
+        </div>
+        <div id="scanNewStatus" class="scan-new-status">Bấm “Quét quà mới” để bắt đầu.</div>
+        <div class="scan-new-actions" id="scanNewActions" style="display:none">
+          <button id="btnCopyNewGifts" class="primary" title="Sao chép dạng TSV — dán thẳng vào Google Sheet">📋 Sao chép cho Google Sheet</button>
+          <button id="btnMarkGiftsAdded" class="tiny" title="Đánh dấu các quà này đã thêm vào Sheet — lần quét sau không hiện lại">✅ Đã thêm vào Sheet</button>
+        </div>
+        <div class="table-wrap" id="scanNewTableWrap" style="display:none">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:54px">Ảnh</th>
+                <th style="width:90px">ID QUÀ</th>
+                <th>TÊN QUÀ</th>
+                <th style="width:110px">ĐƠN GIÁ KC</th>
+                <th style="width:84px">KHU VỰC</th>
+              </tr>
+            </thead>
+            <tbody id="scanNewTableBody"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <!-- =================== TAB: GAMEPLAY OVERLAY =================== -->

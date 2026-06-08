@@ -43,7 +43,7 @@ function bootstrapUserDirs() {
   try { fs.mkdirSync(CONFIG_DIR, { recursive: true }); } catch {}
   try { fs.mkdirSync(GIFT_ICONS_DIR, { recursive: true }); } catch {}
   if (app.isPackaged) {
-    for (const f of ['gift-mapping.json', 'gift-master.json', 'vietnam-gifts.json']) {
+    for (const f of ['gift-mapping.json', 'gift-master.json', 'vietnam-gifts.json', 'sheet-known-gift-ids.json']) {
       const dst = path.join(CONFIG_DIR, f);
       const src = path.join(SHIPPED_CONFIG_DIR, f);
       if (!fs.existsSync(dst) && fs.existsSync(src)) {
@@ -1064,6 +1064,67 @@ ipcMain.handle('gifts:lookup', (_e, query) => {
     if (n.includes(q)) out.push(decorateGift(g));
   }
   return out;
+});
+
+// =================== Quét quà mới cho Google Sheet ===================
+// Dò quà BIGO chưa có trong Sheet (so với snapshot ID đã lưu) rồi xuất TSV để dán.
+const SHEET_KNOWN_IDS_PATH = path.join(CONFIG_DIR, 'sheet-known-gift-ids.json');
+function loadKnownGiftIds() {
+  const data = loadJson(SHEET_KNOWN_IDS_PATH, null);
+  const arr = (data && Array.isArray(data.ids)) ? data.ids : [];
+  return new Set(arr.map(Number).filter(Number.isFinite));
+}
+function saveKnownGiftIds(set) {
+  const ids = [...set].filter(Number.isFinite).sort((a, b) => a - b);
+  saveJson(SHEET_KNOWN_IDS_PATH, {
+    note: 'ID quà đã có trong Google Sheet (baseline để dò quà mới).',
+    updatedAt: Date.now(),
+    ids,
+  });
+  return ids.length;
+}
+// ĐƠN GIÁ KC: ưu tiên giá khu vực VN nếu có, ngược lại vm_exchange_rate / 100.
+function giftPriceKC(g) {
+  const id = Number(g.typeid);
+  if (vnGifts.byTypeId && vnGifts.byTypeId.has(id)) {
+    const vn = vnGifts.byTypeId.get(id);
+    if (vn && vn.diamonds != null) return vn.diamonds;
+  }
+  return rateToDiamonds(g.vm_exchange_rate);
+}
+
+// Quét quà mới: fetch master mới nhất rồi lọc ra ID chưa có trong snapshot.
+ipcMain.handle('gifts:scan-new', async () => {
+  const r = await ensureGiftMaster(true);
+  if (!r.ok) return { ok: false, error: r.error || 'Không tải được danh sách quà BIGO — kiểm tra mạng.' };
+  const known = loadKnownGiftIds();
+  const fresh = [];
+  for (const g of (giftMaster.gifts || [])) {
+    const id = Number(g.typeid);
+    if (!Number.isFinite(id) || known.has(id)) continue;
+    fresh.push({ id, name: g.name || '', img_url: g.img_url || '', priceKC: giftPriceKC(g), region: 'VN' });
+  }
+  fresh.sort((a, b) => a.id - b.id);
+  return {
+    ok: true,
+    total: (giftMaster.gifts || []).length,
+    knownCount: known.size,
+    newCount: fresh.length,
+    gifts: fresh,
+    fallback: !!r.fallback,
+  };
+});
+
+// Đánh dấu đã thêm vào Sheet: merge ID vào snapshot để lần sau không hiện lại.
+ipcMain.handle('gifts:known-add', (_e, ids) => {
+  const known = loadKnownGiftIds();
+  let added = 0;
+  for (const x of (Array.isArray(ids) ? ids : [])) {
+    const id = Number(x);
+    if (Number.isFinite(id) && !known.has(id)) { known.add(id); added++; }
+  }
+  const knownCount = saveKnownGiftIds(known);
+  return { ok: true, added, knownCount };
 });
 
 // =================== Gift Icons (download + drag) ===================
