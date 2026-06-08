@@ -979,6 +979,9 @@ const els = {
   // Gifts tab
   giftTableBody: $('giftTableBody'), btnAddGift: $('btnAddGift'), btnTestGift: $('btnTestGift'),
   iconCacheStatus: $('iconCacheStatus'), btnDownloadIcons: $('btnDownloadIcons'), iconProgress: $('iconProgress'),
+  btnScanNewGifts: $('btnScanNewGifts'), scanNewStatus: $('scanNewStatus'), scanNewActions: $('scanNewActions'),
+  btnCopyNewGifts: $('btnCopyNewGifts'), btnMarkGiftsAdded: $('btnMarkGiftsAdded'),
+  scanNewTableWrap: $('scanNewTableWrap'), scanNewTableBody: $('scanNewTableBody'),
   // Overlays tab
   overlayTableBody: $('overlayTableBody'), btnAddOverlay: $('btnAddOverlay'),
   // Gift modal
@@ -1987,6 +1990,82 @@ els.btnDownloadIcons.onclick = async () => {
   const r = await window.bigo.giftsDownloadIcons();
   els.btnDownloadIcons.disabled = false;
   els.iconCacheStatus.textContent = `Hoàn tất: ${r.ok} mới · ${r.skip} bỏ qua · ${r.fail} lỗi · tổng ${r.total}`;
+};
+
+// =================== Quét quà mới của BIGO → Google Sheet ===================
+let _scanNewGifts = [];
+function renderScanNewTable(gifts) {
+  _scanNewGifts = gifts || [];
+  const has = _scanNewGifts.length > 0;
+  els.scanNewActions.style.display = has ? 'flex' : 'none';
+  els.scanNewTableWrap.style.display = has ? 'block' : 'none';
+  if (!has) { els.scanNewTableBody.innerHTML = ''; return; }
+  els.scanNewTableBody.innerHTML = _scanNewGifts.map(g => `
+    <tr>
+      <td>${g.img_url ? `<img class="scan-new-icon" src="${escapeHtml(g.img_url)}" loading="lazy" />` : ''}</td>
+      <td>${g.id}</td>
+      <td>${escapeHtml(g.name)}</td>
+      <td>${g.priceKC ?? ''}</td>
+      <td>${escapeHtml(g.region || '')}</td>
+    </tr>`).join('');
+}
+
+els.btnScanNewGifts.onclick = async () => {
+  els.btnScanNewGifts.disabled = true;
+  els.scanNewStatus.textContent = '⏳ Đang tải danh sách quà mới nhất từ BIGO...';
+  els.scanNewStatus.style.color = '';
+  try {
+    const r = await window.bigo.giftsScanNew();
+    if (!r || !r.ok) {
+      els.scanNewStatus.textContent = `✗ Lỗi: ${(r && r.error) || 'không quét được'}`;
+      els.scanNewStatus.style.color = '#ff6b6b';
+      renderScanNewTable([]);
+      return;
+    }
+    renderScanNewTable(r.gifts);
+    if (r.newCount > 0) {
+      els.scanNewStatus.innerHTML = `✅ Tìm thấy <b>${r.newCount}</b> quà mới (tổng BIGO ${r.total} · đã có trong Sheet ${r.knownCount}). Bấm <b>Sao chép</b> rồi dán vào Google Sheet.`;
+      els.scanNewStatus.style.color = '';
+    } else {
+      els.scanNewStatus.textContent = `👍 Không có quà mới — Sheet đã đủ ${r.knownCount} quà (tổng BIGO ${r.total}).`;
+      els.scanNewStatus.style.color = '#7ad17a';
+    }
+    if (r.fallback) els.scanNewStatus.innerHTML += ' <span style="color:#e0a030">(dùng cache offline — có thể chưa mới nhất)</span>';
+  } catch (e) {
+    els.scanNewStatus.textContent = `✗ Lỗi: ${e?.message || e}`;
+    els.scanNewStatus.style.color = '#ff6b6b';
+  } finally {
+    els.btnScanNewGifts.disabled = false;
+  }
+};
+
+els.btnCopyNewGifts.onclick = async () => {
+  if (!_scanNewGifts.length) return;
+  // TSV đúng thứ tự cột Sheet: ID QUÀ · TÊN QUÀ · ẢNH QUÀ · ĐƠN GIÁ KC · KHU VỰC
+  const tsv = _scanNewGifts
+    .map(g => [g.id, g.name, g.img_url, (g.priceKC ?? ''), g.region].join('\t'))
+    .join('\n');
+  try {
+    await navigator.clipboard.writeText(tsv);
+    els.btnCopyNewGifts.textContent = `✓ Đã sao chép ${_scanNewGifts.length} dòng`;
+    setTimeout(() => { els.btnCopyNewGifts.textContent = '📋 Sao chép cho Google Sheet'; }, 2500);
+  } catch (e) {
+    alert('Không sao chép được: ' + (e?.message || e));
+  }
+};
+
+els.btnMarkGiftsAdded.onclick = async () => {
+  if (!_scanNewGifts.length) return;
+  if (!confirm(`Đánh dấu ${_scanNewGifts.length} quà này ĐÃ thêm vào Google Sheet?\nLần quét sau sẽ không hiện lại các quà này.`)) return;
+  const ids = _scanNewGifts.map(g => g.id);
+  const r = await window.bigo.giftsKnownAdd(ids);
+  if (r && r.ok) {
+    renderScanNewTable([]);
+    els.scanNewStatus.textContent = `✅ Đã đánh dấu ${r.added} quà. Tổng đã có trong Sheet: ${r.knownCount}.`;
+    els.scanNewStatus.style.color = '#7ad17a';
+  } else {
+    alert('Không lưu được. Thử lại.');
+  }
 };
 
 // Display label cho file URL: "📁 filename.mp4" để phân biệt với file legacy trong assets/effects.

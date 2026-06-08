@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('bigo', {
   // Gift master catalog
   giftsMasterList: () => ipcRenderer.invoke('gifts:master-list'),
   giftsMasterRefresh: () => ipcRenderer.invoke('gifts:master-refresh'),
+  giftsScanNew: () => ipcRenderer.invoke('gifts:scan-new'),
+  giftsKnownAdd: (ids) => ipcRenderer.invoke('gifts:known-add', ids),
   giftsLookup: (q) => ipcRenderer.invoke('gifts:lookup', q),
 
   // VN gifts (override giá KC theo khu vực Việt Nam)
