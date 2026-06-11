@@ -4026,10 +4026,14 @@ els.btnConnect.onclick = async () => {
   startLiveViewerRefresh(id);
   // Auto-play BGM khi kết nối thành công (theo nhóm active hoặc Cài đặt chung)
   applyActiveBgm();
-  // Kết nối LIVE có thể làm Chromium định tuyến lại audio → áp lại sink để
-  // chắc chắn nhạc nền vẫn ra đúng thiết bị (soundcard rời / cable ảo).
   await applyBgmSinkId();
   playBgmIfHas();
+  // Luồng audio của room phát TRỄ vài giây sau connect và mới là thứ làm reset
+  // thiết bị phát → ghim lại sink nhiều lần trong ~14s để bắt đúng thời điểm đó.
+  // (Xem reassertBgmSink.) Không gây hại nếu sink vẫn đang đúng.
+  for (const ms of [2000, 5000, 9000, 14000]) {
+    setTimeout(() => reassertBgmSink(`connect+${ms}ms`), ms);
+  }
 };
 
 els.btnPopupGifts.onclick = () => window.bigo.popupOpenGifts();
@@ -4601,7 +4605,30 @@ async function refreshAudioDevices() {
 
 async function applyBgmSinkId() {
   if (!els.bgmAudio || !els.bgmAudio.setSinkId) return;
-  try { await els.bgmAudio.setSinkId(appSettings.bgm.deviceId || 'default'); } catch (e) { console.warn('setSinkId:', e.message); }
+  const target = appSettings.bgm.deviceId || 'default';
+  try {
+    await els.bgmAudio.setSinkId(target);
+  } catch (e) {
+    console.warn('setSinkId:', e.message);
+    appendLog(`[bgm-sink] setSinkId LỖI: ${e.message} (deviceId=${target.slice(0, 8)})`);
+  }
+}
+
+// Ghim LẠI thiết bị phát BGM + đảm bảo đang phát.
+// Lý do: khi kết nối ID LIVE, luồng audio của room (phát TRỄ vài giây sau khi
+// trang load) làm Chromium reset/định tuyến lại thiết bị audio. Stream BGM đang
+// ghim vào thiết bị NON-DEFAULT (soundcard rời / cable ảo) bị mất tiếng dù
+// audio element vẫn "playing"; thiết bị "default" thì luôn tự khôi phục nên
+// không bị. Gọi lại setSinkId(cùng deviceId) buộc Chromium tạo lại sink → có
+// tiếng trở lại. Cần gọi ĐÚNG LÚC luồng LIVE phát (không chỉ ngay khi connect).
+async function reassertBgmSink(reason) {
+  const a = els.bgmAudio;
+  if (!a) return;
+  try {
+    appendLog(`[bgm-sink] ghim lại (${reason}) | sink=${(a.sinkId || '').slice(0, 8)} paused=${a.paused} t=${(a.currentTime || 0).toFixed(1)} vol=${a.volume} muted=${a.muted} err=${a.error ? a.error.code : 0}`);
+  } catch {}
+  await applyBgmSinkId();
+  if (a.src && a.paused) { try { await a.play(); } catch {} }
 }
 
 async function initAppSettings(s) {
@@ -7577,6 +7604,12 @@ if (els.bgmAudio) {
   els.bgmAudio.addEventListener('play', updateBgmSidebarIcon);
   els.bgmAudio.addEventListener('pause', updateBgmSidebarIcon);
   els.bgmAudio.addEventListener('loadedmetadata', updateBgmSidebarIcon);
+}
+
+// Khi danh sách/topology thiết bị audio đổi (Chromium reset thiết bị lúc luồng
+// LIVE phát) → ghim lại sink để BGM không bị mất tiếng trên soundcard rời.
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', () => reassertBgmSink('devicechange'));
 }
 
 // Sidebar BGM toggle button
