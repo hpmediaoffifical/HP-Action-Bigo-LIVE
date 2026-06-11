@@ -215,9 +215,13 @@
           </div>
         </div>
         <div class="hint small">
-          Dò quà BIGO <b>chưa có</b> trong Google Sheet (so với danh sách đã lưu), rồi sao chép để dán vào Sheet — đúng 5 cột: <code>ID QUÀ · TÊN QUÀ · ẢNH QUÀ · ĐƠN GIÁ KC · KHU VỰC</code>.
+          Dò quà BIGO <b>chưa có</b> trong Google Sheet (so với danh sách đã lưu), rồi sao chép để dán vào Sheet — đúng 5 cột: <code>ID QUÀ · TÊN QUÀ · ẢNH QUÀ · ĐƠN GIÁ KC · KHU VỰC/NOTE</code>.
+          <br>Cột <b>KHU VỰC/NOTE</b> ghi chú tự do, gộp được nhiều giá trị (vd <code>VN, NPC</code>). Sau khi gõ note trong Sheet, copy cột <b>ID QUÀ</b> + cột <b>KHU VỰC/NOTE</b> rồi bấm <b>Nạp NOTE từ Sheet</b> để hiện badge trong danh sách quà.
         </div>
         <div id="scanNewStatus" class="scan-new-status">Bấm “Quét quà mới” để bắt đầu.</div>
+        <div class="scan-new-actions">
+          <button id="btnImportNotes" class="tiny" title="Đọc clipboard: copy cột ID QUÀ + KHU VỰC/NOTE trong Google Sheet rồi bấm để nạp note (vd NPC) và hiện badge trong danh sách">🏷️ Nạp NOTE từ Sheet</button>
+        </div>
         <div class="scan-new-actions" id="scanNewActions" style="display:none">
           <button id="btnCopyNewGifts" class="primary" title="Sao chép dạng TSV — dán thẳng vào Google Sheet">📋 Sao chép cho Google Sheet</button>
           <button id="btnMarkGiftsAdded" class="tiny" title="Đánh dấu các quà này đã thêm vào Sheet — lần quét sau không hiện lại">✅ Đã thêm vào Sheet</button>
@@ -230,7 +234,7 @@
                 <th style="width:90px">ID QUÀ</th>
                 <th>TÊN QUÀ</th>
                 <th style="width:110px">ĐƠN GIÁ KC</th>
-                <th style="width:84px">KHU VỰC</th>
+                <th style="width:96px">KHU VỰC/NOTE</th>
               </tr>
             </thead>
             <tbody id="scanNewTableBody"></tbody>

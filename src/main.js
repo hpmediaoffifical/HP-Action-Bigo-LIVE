@@ -35,6 +35,8 @@ const VN_GIFTS_PATH = path.join(CONFIG_DIR, 'vietnam-gifts.json');
 const SHIPPED_VN_GIFTS_PATH = app.isPackaged
   ? path.join(process.resourcesPath, 'app.asar.unpacked', 'config', 'vietnam-gifts.json')
   : path.join(ROOT, 'config', 'vietnam-gifts.json');
+// Ghi chú/NOTE cho từng quà (vd "NPC", "VN, NPC") — map theo ID quà. User nạp từ cột E của Google Sheet.
+const GIFT_NOTES_PATH = path.join(CONFIG_DIR, 'gift-notes.json');
 const EFFECTS_DIR = path.join(SHIPPED_ASSETS_DIR, 'effects');
 const GIFT_ICONS_DIR = path.join(USER_ASSETS_DIR, 'gift-icons');
 const GIFT_MASTER_TTL = 24 * 3600 * 1000; // 24h
@@ -43,7 +45,7 @@ function bootstrapUserDirs() {
   try { fs.mkdirSync(CONFIG_DIR, { recursive: true }); } catch {}
   try { fs.mkdirSync(GIFT_ICONS_DIR, { recursive: true }); } catch {}
   if (app.isPackaged) {
-    for (const f of ['gift-mapping.json', 'gift-master.json', 'vietnam-gifts.json', 'sheet-known-gift-ids.json']) {
+    for (const f of ['gift-mapping.json', 'gift-master.json', 'vietnam-gifts.json', 'sheet-known-gift-ids.json', 'gift-notes.json']) {
       const dst = path.join(CONFIG_DIR, f);
       const src = path.join(SHIPPED_CONFIG_DIR, f);
       if (!fs.existsSync(dst) && fs.existsSync(src)) {
@@ -77,6 +79,34 @@ function loadVnGifts() {
     source: raw.source || 'vietnam-gifts.json',
     fetchedAt: raw.fetchedAt || 0,
   };
+}
+
+// =================== Gift NOTES (cột E "KHU VỰC/NOTE": NPC, sự kiện, …) ===================
+// File: config/gift-notes.json → { notes: { "<typeid>": "VN, NPC", … } }. User nạp từ Google Sheet.
+// Note là chuỗi tự do, có thể gộp nhiều giá trị ngăn cách bằng dấu phẩy. App tách thành tags để hiện badge.
+let giftNotes = new Map(); // typeid(Number) → noteString
+function parseNoteTags(noteStr) {
+  if (!noteStr) return [];
+  return String(noteStr).split(/[,\/;|]+/).map(s => s.trim()).filter(Boolean);
+}
+function loadGiftNotes() {
+  const raw = loadJson(GIFT_NOTES_PATH, null);
+  const obj = raw && raw.notes && typeof raw.notes === 'object' ? raw.notes : {};
+  const m = new Map();
+  for (const [k, v] of Object.entries(obj)) {
+    const id = Number(k);
+    const note = v == null ? '' : String(v).trim();
+    if (Number.isFinite(id) && note) m.set(id, note);
+  }
+  giftNotes = m;
+  return m;
+}
+function saveGiftNotes(obj) {
+  saveJson(GIFT_NOTES_PATH, {
+    note: 'Ghi chú/NOTE cho từng quà (vd "NPC", "VN, NPC") — map theo ID quà → chuỗi note. Hiện badge trong danh sách.',
+    updatedAt: Date.now(),
+    notes: obj,
+  });
 }
 
 // App icon — Windows ưu tiên .ico, fallback .png. Khi packaged đọc từ resources.
@@ -599,6 +629,7 @@ app.on('second-instance', () => {
 app.whenReady().then(async () => {
   mapping = loadMapping();
   loadVnGifts();
+  loadGiftNotes();
   overlayManager = new OverlayManager({
     onBoundsChanged: (overlayId, b) => {
       const ov = mapping.overlays.find(o => o.id === overlayId);
@@ -1024,6 +1055,10 @@ ipcMain.handle('bigo:check-live', async (_e, bigoId) => {
 function decorateGift(g) {
   const typeid = Number(g.typeid);
   const vn = vnGifts.byTypeId && Number.isFinite(typeid) ? vnGifts.byTypeId.get(typeid) : null;
+  // Tags hiển thị badge: gộp note thủ công (gift-notes.json) + tự thêm "VN" nếu quà có trong danh mục VN.
+  const noteStr = giftNotes.has(typeid) ? giftNotes.get(typeid) : '';
+  const tags = parseNoteTags(noteStr);
+  if (vn && !tags.some(t => t.toUpperCase() === 'VN')) tags.unshift('VN');
   return {
     ...g,
     diamonds: vn?.diamonds != null ? vn.diamonds : rateToDiamonds(g.vm_exchange_rate),
@@ -1032,6 +1067,8 @@ function decorateGift(g) {
     vn_match: !!vn,
     vn_name: vn?.name || null,
     vn_diamonds: vn?.diamonds ?? null,
+    note: noteStr,
+    tags,
   };
 }
 
@@ -1102,7 +1139,7 @@ ipcMain.handle('gifts:scan-new', async () => {
   for (const g of (giftMaster.gifts || [])) {
     const id = Number(g.typeid);
     if (!Number.isFinite(id) || known.has(id)) continue;
-    fresh.push({ id, name: g.name || '', img_url: g.img_url || '', priceKC: giftPriceKC(g), region: 'VN' });
+    fresh.push({ id, name: g.name || '', img_url: g.img_url || '', priceKC: giftPriceKC(g), region: giftNotes.get(id) || 'VN' });
   }
   fresh.sort((a, b) => a.id - b.id);
   return {
@@ -1125,6 +1162,30 @@ ipcMain.handle('gifts:known-add', (_e, ids) => {
   }
   const knownCount = saveKnownGiftIds(known);
   return { ok: true, added, knownCount };
+});
+
+// Nạp NOTE từ Google Sheet: merge { id → note } vào gift-notes.json. Note rỗng = xoá note của quà đó.
+// entries: [{ id, note }] — renderer parse từ clipboard (cột ID QUÀ + cột KHU VỰC/NOTE).
+ipcMain.handle('gifts:notes-import', (_e, entries) => {
+  const raw = loadJson(GIFT_NOTES_PATH, null);
+  const map = raw && raw.notes && typeof raw.notes === 'object' ? { ...raw.notes } : {};
+  let updated = 0, cleared = 0;
+  for (const ent of (Array.isArray(entries) ? entries : [])) {
+    const id = Number(ent && ent.id);
+    if (!Number.isFinite(id)) continue;
+    const note = String((ent && ent.note) ?? '').trim();
+    const key = String(id);
+    if (note) {
+      if (map[key] !== note) updated++;
+      map[key] = note;
+    } else if (map[key] != null) {
+      delete map[key];
+      cleared++;
+    }
+  }
+  saveGiftNotes(map);
+  loadGiftNotes();
+  return { ok: true, updated, cleared, total: Object.keys(map).length };
 });
 
 // =================== Gift Icons (download + drag) ===================

@@ -980,7 +980,7 @@ const els = {
   giftTableBody: $('giftTableBody'), btnAddGift: $('btnAddGift'), btnTestGift: $('btnTestGift'),
   iconCacheStatus: $('iconCacheStatus'), btnDownloadIcons: $('btnDownloadIcons'), iconProgress: $('iconProgress'),
   btnScanNewGifts: $('btnScanNewGifts'), scanNewStatus: $('scanNewStatus'), scanNewActions: $('scanNewActions'),
-  btnCopyNewGifts: $('btnCopyNewGifts'), btnMarkGiftsAdded: $('btnMarkGiftsAdded'),
+  btnCopyNewGifts: $('btnCopyNewGifts'), btnMarkGiftsAdded: $('btnMarkGiftsAdded'), btnImportNotes: $('btnImportNotes'),
   scanNewTableWrap: $('scanNewTableWrap'), scanNewTableBody: $('scanNewTableBody'),
   // Overlays tab
   overlayTableBody: $('overlayTableBody'), btnAddOverlay: $('btnAddOverlay'),
@@ -2068,6 +2068,53 @@ els.btnMarkGiftsAdded.onclick = async () => {
   }
 };
 
+// Nạp NOTE từ Google Sheet: user copy cột ID QUÀ + cột KHU VỰC/NOTE (hoặc cả 5 cột) rồi bấm nút.
+// Parse từng dòng: ô đầu = ID, ô cuối = note (gộp được "VN, NPC"). Lưu vào gift-notes.json → hiện badge.
+function parsePastedNotes(text) {
+  // Lọc ID trùng: mỗi ID chỉ lấy 1 lần (giữ note đầu tiên không rỗng).
+  const byId = new Map(); // id → note, giữ thứ tự xuất hiện
+  for (const line of String(text || '').split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const cells = line.split('\t').map(c => c.trim());
+    const id = parseInt(cells[0], 10);
+    if (!Number.isFinite(id)) continue; // bỏ dòng tiêu đề
+    // Note = ô cuối cùng (khi copy 2 cột ID+NOTE → cells[1]; khi copy đủ 5 cột → cells[4]).
+    let note = cells.length >= 2 ? cells[cells.length - 1] : '';
+    // Bỏ trường hợp ô cuối là URL ảnh hoặc trùng ID (copy thiếu cột note).
+    if (/^https?:\/\//i.test(note) || note === cells[0]) note = '';
+    if (byId.has(id)) {
+      // ID trùng: chỉ điền thêm nếu lần trước rỗng mà lần này có note (không mất thông tin).
+      if (!byId.get(id) && note) byId.set(id, note);
+    } else {
+      byId.set(id, note);
+    }
+  }
+  return [...byId].map(([id, note]) => ({ id, note }));
+}
+
+if (els.btnImportNotes) els.btnImportNotes.onclick = async () => {
+  let text = '';
+  try { text = await navigator.clipboard.readText(); }
+  catch { alert('Không đọc được clipboard. Hãy copy 2 cột "ID QUÀ" và "KHU VỰC/NOTE" trong Google Sheet rồi bấm lại.'); return; }
+  const entries = parsePastedNotes(text);
+  if (!entries.length) {
+    els.scanNewStatus.textContent = '✗ Clipboard trống hoặc sai định dạng. Copy cột ID QUÀ + KHU VỰC/NOTE từ Sheet rồi bấm lại.';
+    els.scanNewStatus.style.color = '#ff6b6b';
+    return;
+  }
+  const r = await window.bigo.giftsNotesImport(entries);
+  if (r && r.ok) {
+    // Reload master để badge cập nhật ngay trong danh sách quà.
+    masterFullList = await window.bigo.giftsMasterList();
+    try { renderGiftTable(); } catch {}
+    try { renderMasterTable(); } catch {}
+    els.scanNewStatus.innerHTML = `✅ Đã nạp NOTE: <b>${r.updated}</b> cập nhật${r.cleared ? ` · ${r.cleared} xoá` : ''} (tổng ${r.total} quà có note). Badge đã hiện trong danh sách.`;
+    els.scanNewStatus.style.color = '#7ad17a';
+  } else {
+    alert('Không lưu được NOTE. Thử lại.');
+  }
+};
+
 // Display label cho file URL: "📁 filename.mp4" để phân biệt với file legacy trong assets/effects.
 // Với basename thuần (legacy) thì hiển thị raw.
 function fileDisplayLabel(value) {
@@ -2293,6 +2340,18 @@ function renderGroupsInto(container, opts) {
     } else {
       el.onclick = () => groupAction(act, el.dataset.gid, undefined, el.dataset.iid);
     }
+  });
+  // Chip mã ID quà: bấm để sao chép, không lan ra click của dòng
+  container.querySelectorAll('[data-copy-id]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.copyId;
+      if (!id || !navigator.clipboard) return;
+      navigator.clipboard.writeText(id).then(() => {
+        el.textContent = `✓ ${id}`;
+        setTimeout(() => { el.textContent = `#${id}`; }, 1000);
+      }).catch(() => {});
+    };
   });
   // Drag-drop reorder items trong group
   wireDragDrop(container);
@@ -3020,6 +3079,11 @@ function renderGroupCard(grp, overlayMap) {
       ? `<img src="${escapeHtml(iconUrl)}" class="grow-icon" loading="lazy" />`
       : '<div class="grow-icon-empty"></div>';
     const displayName = item.alias || (item.matchKeys || [])[0] || '?';
+    // Mã ID quà BIGO = matchKey dạng số (vd "5877"). Hiện mờ cạnh tên để nhận biết quà, không ảnh hưởng logic phát.
+    const giftId = (item.matchKeys || []).map(k => String(k).trim()).find(k => /^\d+$/.test(k)) || '';
+    const idBadge = giftId
+      ? `<span class="grow-id" title="Mã ID quà BIGO (bấm để sao chép)" data-copy-id="${escapeHtml(giftId)}">#${escapeHtml(giftId)}</span>`
+      : '';
     const overlayTarget = overlayMap.get(item.overlayId)?.target || 'native';
     const priorityBadge = item.priority > 0 ? `<span class="gift-state-badge prio-badge" title="Ưu tiên: chèn vào hàng ${item.priority} trong queue">⚡#${item.priority}</span>` : '';
     const pauseBgmBadge = item.pauseBgm ? '<span class="gift-state-badge pause-bgm-badge" title="Tạm dừng nhạc nền khi hiệu ứng này phát">🔇</span>' : '';
@@ -3042,7 +3106,7 @@ function renderGroupCard(grp, overlayMap) {
     return `<div class="group-item ${item.background ? 'background-item' : ''}" data-iid="${item.id}" data-gid="${grp.id}">
       ${iconCell}
       <div class="grow-meta">
-        <div class="grow-name"><b>${escapeHtml(displayName)}</b></div>
+        <div class="grow-name"><b>${escapeHtml(displayName)}</b>${idBadge}</div>
         ${fileLine}
       </div>
       <div class="grow-actions">
@@ -3233,6 +3297,48 @@ function prioritizeVnGifts(arr, predicate = isVnGift) {
     .map(x => x.item);
 }
 
+// ===== Badge NOTE (cột E "KHU VỰC/NOTE": VN, NPC, …) =====
+// Tách note "VN, NPC" → ['VN','NPC']. Gộp với detect VN (vn_match) làm fallback cho record cũ.
+function noteToTags(noteStr) {
+  if (!noteStr) return [];
+  return String(noteStr).split(/[,\/;|]+/).map(s => s.trim()).filter(Boolean);
+}
+function giftTags(g) {
+  if (!g) return [];
+  const tags = Array.isArray(g.tags) ? g.tags.slice() : noteToTags(g.note);
+  // Fallback: record cũ chưa có tags nhưng vẫn là quà VN → vẫn hiện badge VN.
+  if (!tags.some(t => t.toUpperCase() === 'VN') && isVnGift(g)) tags.unshift('VN');
+  const seen = new Set(), out = [];
+  for (const t of tags) { const k = t.toUpperCase(); if (!seen.has(k)) { seen.add(k); out.push(t); } }
+  return out;
+}
+function tagBadgeClass(tag) {
+  const u = tag.toUpperCase();
+  if (u === 'VN') return 'vn-badge';
+  if (u === 'NPC') return 'npc-badge';
+  return 'note-badge';
+}
+// Quà "được gắn thông tin ở cột E" = có ít nhất 1 tag/note (VN, NPC, …).
+function hasGiftNote(g) { return giftTags(g).length > 0; }
+// Ưu tiên quà có note (VN/NPC/cột E) lên đầu; cả 2 nhóm giữ nguyên thứ tự sort hiện tại
+// (mặc định Đậu thấp → cao). arr truyền vào đã được sortMasterArr() sắp sẵn theo dropdown.
+function prioritizeNotedGifts(arr) {
+  const noted = [], rest = [];
+  for (const g of arr) (hasGiftNote(g) ? noted : rest).push(g);
+  return [...noted, ...rest];
+}
+
+function giftBadgesHtml(g, { small = false } = {}) {
+  return giftTags(g).map(t => {
+    const u = t.toUpperCase();
+    const label = u === 'VN' ? 'VN' : escapeHtml(t);
+    const title = u === 'VN' ? 'Quà có trong danh mục khu vực Việt Nam'
+      : u === 'NPC' ? 'Quà của NPC' : `Ghi chú: ${escapeHtml(t)}`;
+    const cls = tagBadgeClass(t) + (small ? ' badge-sm' : '');
+    return `<span class="${cls}" title="${title}">${label}</span>`;
+  }).join(' ');
+}
+
 function isVnMappingItem(item) {
   if (!item) return false;
   const keys = [...(item.matchKeys || []), item.alias || ''];
@@ -3262,9 +3368,7 @@ let masterRenderState = { arr: [], renderedCount: 0, imgObserver: null, scrollHa
 function masterRowHtml(g) {
   const src = g.localIcon || g.img_url || '';
   const isFav = giftFavorites.has(g.typeid);
-  const vnBadge = isVnGift(g)
-    ? `<span class="vn-badge" title="Quà có trong danh mục khu vực Việt Nam">🇻🇳 VN</span>`
-    : '';
+  const vnBadge = giftBadgesHtml(g);
   // data-src + class icon-loading: img sẽ được swap thành src khi vào viewport
   // (IntersectionObserver). Tránh fetch CDN/file đồng loạt cho 2k+ icons.
   return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}">
@@ -3396,7 +3500,7 @@ function renderMasterTable() {
       return n.includes(filter) || id.includes(filter);
     });
   }
-  arr = prioritizeVnGifts(sortMasterArr(arr, sortKey));
+  arr = prioritizeNotedGifts(sortMasterArr(arr, sortKey));
   els.dlgMasterCount.textContent = `${arr.length}/${masterFullList.length} quà`;
   // Reset observer: row mới sẽ register vào observer mới để tránh leak
   if (masterRenderState.imgObserver) {
@@ -4698,14 +4802,14 @@ function renderSpecialPickerTable() {
   }
   if (vnOnly) arr = arr.filter(g => isVnGift(g));
   if (favOnly) arr = arr.filter(g => giftFavorites.has(g.typeid));
-  arr = prioritizeVnGifts(sortMasterArr(arr, sortVal));
+  arr = prioritizeNotedGifts(sortMasterArr(arr, sortVal));
   const renderLimit = 200;
   if (count) count.textContent = `${arr.length} kết quả`;
   if (body) {
     body.innerHTML = arr.slice(0, renderLimit).map(g => {
       const iconUrl = g.localIcon || g.img_url || '';
       const isFav = giftFavorites.has(g.typeid);
-      const vnBadge = isVnGift(g) ? `<span class="vn-badge" title="Quà có trong danh mục khu vực Việt Nam">🇻🇳 VN</span>` : '';
+      const vnBadge = giftBadgesHtml(g);
       return `<tr data-typeid="${g.typeid}" data-name="${escapeHtml(g.name)}" data-icon="${escapeHtml(iconUrl)}">
         <td>${iconUrl ? `<img src="${escapeHtml(iconUrl)}" style="width:32px;height:32px;object-fit:contain" />` : ''}</td>
         <td><span class="id">${g.typeid}</span></td>

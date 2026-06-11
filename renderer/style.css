@@ -210,6 +210,43 @@
   box-shadow: 0 2px 6px rgba(218, 37, 29, 0.32);
   vertical-align: 1px;
 }
+/* Badge NPC — phân biệt rõ với VN (tím/teal) */
+.npc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #7c3aed, #2dd4bf);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.32);
+  vertical-align: 1px;
+}
+/* Badge note chung — cho các ghi chú khác VN/NPC */
+.note-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  margin-left: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  border-radius: 6px;
+  background: #3a4150;
+  color: #e6e9ef;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  vertical-align: 1px;
+}
+/* Phiên bản nhỏ dùng trong picker */
+.vn-badge.badge-sm, .npc-badge.badge-sm, .note-badge.badge-sm {
+  padding: 0 5px;
+  font-size: 9px;
+  margin-left: 4px;
+}
 :root {
   --bigo-bean-icon: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAArlBMVEUAAADvogDjkgDpnADqnwD/xQDikgDikQDikwDjkgDjkwD8ugD5tgD4tAD4tAD2sQDikgD2sQDomgDikgDyrgDyrQDupQDpnAD6uADzrADhkgDikgD3swDikgD0rgDzrADjkgDkkgD4swDlkgD/vwDhkQD////+vgDvpgD/6KPtogDnmwD/1Vr/1FL/ySX5twD1sAD/8cf/4Yf/xRnklwD/9t7/9t3/23L/wxD7uQCbM/aIAAAAJHRSTlMAFpgdCwT53311SPXl29PKuquMaEI4JfTr49fLu6aQe2xUTTHDAjF8AAAA7klEQVQoz6XS2ZLCIBAFUEI0xn0bnX3vBmKMxmUW///HVFqhg755n1J16uZSFOLmTIa9bv8tuka1Ptjo7uTSHsmKYgMv9QCltrZSSmX/D3G1eG9toY75WbSnHFszhmoF7YjhR06Tv6Rz6LDd5pY254QZwNDjGJdUzc6o7/wmGqCs6bcAHYcRoj7p5m9d2I8vp09U5ek5TBF3AWp34Bgx14H6I0nEWYDvDuMEw9kRuwc8dDXfTIXP4KD50qMZM4waeCyfWBtsCZbYKuamLEuzxaQmKvqMLFJUUx95a1w+telrQja4/gw/Uymb3+LW7AE5TzPk9VvkZAAAAABJRU5ErkJggg==");
 }
@@ -1091,6 +1128,23 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .group-item .grow-meta { min-width: 0; }
 .group-item .grow-name { color: #c9d6ff; font-size: 13px; word-break: break-word; display: flex; align-items: center; gap: 6px; }
 .group-item .grow-name b { color: #ffe07a; }
+/* Mã ID quà BIGO — chip mờ cạnh tên, bấm để sao chép. Không chiếm chỗ, không ảnh hưởng layout. */
+.group-item .grow-id {
+  flex: 0 0 auto;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #7f8794;
+  background: #0f1117;
+  border: 1px solid #2a2f3a;
+  padding: 0 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  user-select: none;
+  line-height: 16px;
+  transition: color .12s, border-color .12s;
+}
+.group-item .grow-id:hover { color: #cfe0ff; border-color: #3d6fb0; }
 .group-item .grow-sub { color: #8a8f9a; font-size: 11px; margin-top: 2px; word-break: break-all; }
 .group-item .grow-sub code { background: #0f1117; padding: 1px 6px; border-radius: 4px; color: #cfd4df; }
 .group-item .media-kind-icon { display: inline-block; margin-right: 5px; font-size: 12px; vertical-align: -1px; }
