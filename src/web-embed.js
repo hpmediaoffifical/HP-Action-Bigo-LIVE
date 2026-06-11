@@ -53,6 +53,13 @@ class BigoWebListener {
       },
     });
     this.win.setMenuBarVisibility(false);
+    // Cửa sổ này chỉ DOM-scrape chat/quà — KHÔNG cần audio của luồng LIVE.
+    // Để nó phát audio sẽ làm audio service của Chromium định tuyến lại và
+    // khiến nhạc nền (đang setSinkId ra soundcard rời) bị mất tiếng.
+    try { this.win.webContents.setAudioMuted(true); } catch {}
+    this.win.webContents.on('did-finish-load', () => {
+      try { this.win.webContents.setAudioMuted(true); } catch {}
+    });
     this.win.on('closed', () => { this.win = null; });
     // UA Chrome 131 (2025) — bigo có thể serve UI khác cho UA cũ.
     const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';

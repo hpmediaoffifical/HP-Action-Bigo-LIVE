@@ -3922,6 +3922,9 @@ els.btnConnect.onclick = async () => {
   startLiveViewerRefresh(id);
   // Auto-play BGM khi kết nối thành công (theo nhóm active hoặc Cài đặt chung)
   applyActiveBgm();
+  // Kết nối LIVE có thể làm Chromium định tuyến lại audio → áp lại sink để
+  // chắc chắn nhạc nền vẫn ra đúng thiết bị (soundcard rời / cable ảo).
+  await applyBgmSinkId();
   playBgmIfHas();
 };
 
