@@ -922,9 +922,9 @@ function runSpecialFeatureAction(key, ev, cfg, sourceGroup = null) {
 function checkGroupSpecialEffectsTriggers(ev) {
   const all = appSettings?.groupSpecialEffects || {};
   let triggered = false;
-  for (const group of (mapping.groups || []).filter(g => g.type !== 'comment' && (g.isCommon || g.enabled !== false))) {
+  for (const group of (mapping.groups || []).filter(g => isGroupSpecialActive(g))) {
     const groupCfg = all[group.id];
-    if (!groupCfg || groupCfg.enabled === false) continue;
+    if (!groupCfg) continue;
     const features = groupCfg.features || {};
     for (const [key, cfg] of Object.entries(features)) {
       if (!cfg?.enabled) continue;
@@ -1042,39 +1042,7 @@ async function runSpecialTest(key) {
 // Trả về true nếu gift này match ít nhất 1 trigger (caller có thể dùng để skip
 // duplicate flow nếu cần).
 function checkSpecialEffectsTriggers(ev) {
-  const se = appSettings?.specialEffects;
-  let triggered = checkGroupSpecialEffectsTriggers(ev);
-  if (!se) return triggered;
-  if (matchSpecialGift(ev, se.clearQueue)) {
-    appendLog(`[se:clearQueue] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → xoá DSHT`);
-    clearAllQueue();
-    triggered = true;
-  }
-  if (matchSpecialGift(ev, se.shuffleQueue)) {
-    appendLog(`[se:shuffleQueue] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → xáo trộn HÀNH ĐỘNG`);
-    queueShuffleQueued();
-    triggered = true;
-  }
-  if (matchSpecialGift(ev, se.removeGift)) {
-    triggerRemoveGiftSpecial(ev, se.removeGift);
-    triggered = true;
-  }
-  if (matchSpecialGift(ev, se.blindBag)) {
-    triggerBlindBagSpecial(ev, se.blindBag);
-    triggered = true;
-  }
-  // 4 speed triggers: audio/video × up/down
-  for (const key of ['speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo']) {
-    if (matchSpecialGift(ev, se[key])) {
-      const dur = parseInt(se[key].duration, 10) || 10;
-      const axis = SPEED_AXIS[key];
-      appendLog(`[se:${key}] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → ${axis} ×${se[key].factor} trong ${dur}s`);
-      triggerSpeedEffect(key);
-      triggered = true;
-      break; // chỉ 1 speed trigger 1 lúc (lock semantics)
-    }
-  }
-  return triggered;
+  return checkGroupSpecialEffectsTriggers(ev);
 }
 
 // Backward compat shim
@@ -2236,10 +2204,14 @@ async function init() {
   await initAppSettings(s);
 
   mapping = await window.bigo.mappingLoad();
+  if (migrateLegacySpecialEffectsToCommonGroup()) {
+    await saveAppSettings({ groupSpecialEffects: appSettings.groupSpecialEffects || {} });
+  }
   await reloadEffects();
   await validateConfiguredMediaFiles();
   renderGiftTable();
   renderOverlayTable();
+  renderGroupSpecialEffectsUi();
   // Re-apply heart goal UI sau khi mapping load (vì lần đầu chạy trong initAppSettings,
   // mapping chưa có → overlay dropdown trống "(chưa có overlay)").
   applyHeartGoalUi();
@@ -3541,6 +3513,7 @@ async function groupAction(act, gid, value, itemId) {
       applyActiveBgm();
       if (value) playBgmIfHas();
       renderGiftTable();
+      renderGroupSpecialEffectsUi();
     }
     return;
   }
@@ -5666,6 +5639,8 @@ const SE_GROUP_FEATURES = [
   ['speedDownVideo', '🎬⏪ Giảm tốc video'],
 ];
 
+const SE_GROUP_KEYS = SE_GROUP_FEATURES.map(([key]) => key);
+
 function defaultGroupSpecialFeature(key) {
   const base = appSettings.specialEffects?.[key] || {};
   const next = { enabled: true, typeid: null, giftName: '', iconUrl: '' };
@@ -5685,11 +5660,42 @@ function defaultGroupSpecialFeature(key) {
 function getGroupSpecialConfig(groupId, create = true) {
   if (!appSettings.groupSpecialEffects || typeof appSettings.groupSpecialEffects !== 'object') appSettings.groupSpecialEffects = {};
   if (!appSettings.groupSpecialEffects[groupId] && create) {
-    appSettings.groupSpecialEffects[groupId] = { enabled: true, collapsed: true, features: {} };
+    appSettings.groupSpecialEffects[groupId] = { collapsed: true, features: {} };
   }
   const cfg = appSettings.groupSpecialEffects[groupId];
   if (cfg && !cfg.features) cfg.features = {};
   return cfg || null;
+}
+
+function isGroupSpecialActive(group) {
+  return !!group && group.type !== 'comment' && (group.isCommon || group.enabled !== false);
+}
+
+function isGroupSpecialVisible(group) {
+  return !!group && group.type !== 'comment';
+}
+
+function hasMeaningfulLegacySpecialConfig(key, cfg) {
+  if (!cfg) return false;
+  if (cfg.enabled || cfg.typeid || cfg.giftName || cfg.iconUrl) return true;
+  if (key === 'removeGift') {
+    return !!(cfg.targetTypeid || cfg.targetGiftName || cfg.targetIconUrl || (parseInt(cfg.removeCount, 10) || 1) !== 1);
+  }
+  return false;
+}
+
+function migrateLegacySpecialEffectsToCommonGroup() {
+  const common = getCommonGroup();
+  const commonCfg = getGroupSpecialConfig(common.id);
+  let changed = false;
+  for (const key of SE_GROUP_KEYS) {
+    if (commonCfg.features[key]) continue;
+    const legacy = appSettings.specialEffects?.[key];
+    if (!hasMeaningfulLegacySpecialConfig(key, legacy)) continue;
+    commonCfg.features[key] = { ...defaultGroupSpecialFeature(key), ...legacy };
+    changed = true;
+  }
+  return changed;
 }
 
 async function persistGroupSpecialEffects() {
@@ -5699,12 +5705,14 @@ async function persistGroupSpecialEffects() {
 function renderGroupSpecialEffectsUi() {
   const list = document.getElementById('seGroupSpecialList');
   if (!list) return;
-  const groups = (mapping.groups || []).filter(g => g.type !== 'comment');
+  getCommonGroup();
+  const groups = (mapping.groups || []).filter(g => isGroupSpecialVisible(g));
   if (!groups.length) {
     list.innerHTML = '<div class="se-feature-empty">Chưa có nhóm quà. Tạo nhóm ở Cài đặt chung → 📂 Quản lý nhóm quà.</div>';
     return;
   }
   list.innerHTML = groups.map(group => {
+    const active = isGroupSpecialActive(group);
     const cfg = getGroupSpecialConfig(group.id, false) || { enabled: true, collapsed: true, features: {} };
     const features = cfg.features || {};
     const featureKeys = Object.keys(features);
@@ -5720,12 +5728,19 @@ function renderGroupSpecialEffectsUi() {
         ${featureKeys.length ? featureKeys.map(key => renderGroupSpecialFeature(group, key, features[key])).join('') : '<div class="se-feature-empty">Chưa thêm tính năng nào cho nhóm này.</div>'}
       </div>
     </div>`;
-    return `<div class="se-group-card ${cfg.enabled === false ? 'off' : ''}" data-seg-gid="${escapeHtml(group.id)}">
+    const stateLabel = group.isCommon ? 'luôn hoạt động' : (active ? 'đang bật theo DANH SÁCH TRÒ CHƠI' : 'đang tắt theo DANH SÁCH TRÒ CHƠI');
+    const toggleHtml = group.isCommon
+      ? '<span class="se-group-state on">Bật</span>'
+      : `<label class="switch se-group-switch" title="Bật/tắt nhóm trong DANH SÁCH TRÒ CHƠI">
+          <input type="checkbox" data-seg-group-enabled="${escapeHtml(group.id)}" ${active ? 'checked' : ''} />
+          <span class="slider"></span>
+        </label>`;
+    return `<div class="se-group-card ${active ? 'on' : 'off'}" data-seg-gid="${escapeHtml(group.id)}">
       <div class="se-group-head">
         <button type="button" class="tiny" data-seg-collapse="${escapeHtml(group.id)}">${cfg.collapsed ? '▶' : '▼'}</button>
         <span class="se-group-title">${escapeHtml(group.name || group.id)}</span>
-        <span class="se-group-meta">${featureKeys.length} tính năng · ${(group.items || []).length} quà</span>
-        <label class="checkbox-row"><input type="checkbox" data-seg-enabled="${escapeHtml(group.id)}" ${cfg.enabled !== false ? 'checked' : ''}> Bật nhóm</label>
+        <span class="se-group-meta">${featureKeys.length} tính năng · ${(group.items || []).length} quà · ${stateLabel}</span>
+        ${toggleHtml}
       </div>
       ${body}
     </div>`;
@@ -5982,24 +5997,21 @@ if (seGroupSpecialList) {
   });
 
   seGroupSpecialList.addEventListener('change', async (e) => {
-    const groupEnabled = e.target.closest('[data-seg-enabled]');
+    const groupEnabled = e.target.closest('[data-seg-group-enabled]');
     const featureEnabled = e.target.closest('[data-seg-feature-enabled]');
     const factor = e.target.closest('[data-seg-factor]');
     const duration = e.target.closest('[data-seg-duration]');
     const removeCount = e.target.closest('[data-seg-remove-count]');
-    if (groupEnabled) {
-      const cfg = getGroupSpecialConfig(groupEnabled.dataset.segEnabled);
-      cfg.enabled = groupEnabled.checked;
-      await persistGroupSpecialEffects();
-      renderGroupSpecialEffectsUi();
-      return;
-    }
     const applyFeatureValue = async (token, key, value) => {
       const [groupId, featureKey] = token.split(':');
       const cfg = getGroupSpecialConfig(groupId);
       cfg.features[featureKey] = { ...(cfg.features[featureKey] || defaultGroupSpecialFeature(featureKey)), [key]: value };
       await persistGroupSpecialEffects();
     };
+    if (groupEnabled) {
+      await groupAction('toggle-group', groupEnabled.dataset.segGroupEnabled, groupEnabled.checked);
+      return;
+    }
     if (featureEnabled) {
       const [groupId, featureKey] = featureEnabled.dataset.segFeatureEnabled.split(':');
       const cfg = getGroupSpecialConfig(groupId);

@@ -1471,7 +1471,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   background: #171a22;
   overflow: hidden;
 }
-.se-group-card.off { opacity: .62; }
+.se-group-card.off { opacity: .72; border-color: #3a2a2a; }
+.se-group-card.off .se-group-head { background: linear-gradient(90deg, rgba(231,76,60,.12), rgba(255,255,255,.02)); }
 .se-group-head {
   display: flex;
   align-items: center;
@@ -1481,6 +1482,20 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .se-group-title { color: #fff; font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .se-group-meta { color: #8a8f9a; font-size: 11px; margin-left: auto; white-space: nowrap; }
+.se-group-switch { margin-left: 2px; }
+.se-group-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #1e8a4f;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
 .se-group-body { padding: 10px; display: grid; gap: 8px; }
 .se-feature-add { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .se-feature-add select { min-width: 220px; }
