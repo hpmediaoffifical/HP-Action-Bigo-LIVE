@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeImage, dialog, shell, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeImage, dialog, shell, clipboard, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -495,10 +495,21 @@ function getSavedBounds(key, fallback) {
 }
 function getInitialMainBounds() {
   const saved = getSavedBounds('main', MAIN_DEFAULT_SIZE) || MAIN_DEFAULT_SIZE;
+  const width0 = Math.max(saved.width || MAIN_DEFAULT_SIZE.width, MAIN_MIN_SIZE.width);
+  const height0 = Math.max(saved.height || MAIN_DEFAULT_SIZE.height, MAIN_MIN_SIZE.height);
+  const display = screen.getDisplayMatching({ x: saved.x || 0, y: saved.y || 0, width: width0, height: height0 });
+  const area = display?.workArea || screen.getPrimaryDisplay().workArea;
+  const width = Math.min(width0, area.width);
+  const height = Math.min(height0, area.height);
+  const maxX = area.x + Math.max(0, area.width - width);
+  const maxY = area.y + Math.max(0, area.height - height);
+  const hasPos = Number.isFinite(saved.x) && Number.isFinite(saved.y);
   return {
     ...saved,
-    width: Math.min(Math.max(saved.width || MAIN_DEFAULT_SIZE.width, MAIN_MIN_SIZE.width), MAIN_MAX_INITIAL_SIZE.width),
-    height: Math.min(Math.max(saved.height || MAIN_DEFAULT_SIZE.height, MAIN_MIN_SIZE.height), MAIN_MAX_INITIAL_SIZE.height),
+    width,
+    height,
+    x: hasPos ? Math.min(Math.max(saved.x, area.x), maxX) : saved.x,
+    y: hasPos ? Math.min(Math.max(saved.y, area.y), maxY) : saved.y,
   };
 }
 function trackWindowBounds(window, key) {

@@ -27,7 +27,6 @@
   <div class="app-layout">
     <aside class="sidebar">
       <button class="tab sidebar-tab active" data-tab="embed" title="TƯƠNG TÁC" aria-label="TƯƠNG TÁC">💬</button>
-      <button class="tab sidebar-tab" data-tab="queue" title="DANH SÁCH HIỆU ỨNG" aria-label="DANH SÁCH HIỆU ỨNG">🎬</button>
       <button class="tab sidebar-tab" data-tab="gifts" title="BẢNG QUÀ" aria-label="BẢNG QUÀ">🎁</button>
       <button class="tab sidebar-tab" data-tab="gameplay" title="GROUP DANCE" aria-label="GROUP DANCE">👯</button>
       <button class="tab sidebar-tab" data-tab="ranking" title="BẢNG XẾP HẠNG" aria-label="BẢNG XẾP HẠNG">👑</button>
@@ -139,6 +138,7 @@
                 <input type="checkbox" id="chatTranslateOn"> 🌐 Dịch sang
               </label>
               <select id="chatTranslateTo" style="font-size:11px">
+                <option value="auto-vi">Tự nhận diện → Tiếng Việt</option>
                 <option value="vi">Tiếng Việt</option>
                 <option value="en">English</option>
                 <option value="zh-CN">中文</option>
@@ -682,6 +682,17 @@
           Gắn quà tặng làm trigger cho action đặc biệt. User trong LIVE tặng đúng quà này → app tự thực hiện.
         </div>
 
+        <div class="se-group-manager">
+          <div class="se-group-manager-head">
+            <div>
+              <h3>🧩 Đặc biệt theo nhóm quà</h3>
+              <div class="hint small">Mỗi nhóm lấy từ <b>📂 Quản lý nhóm quà</b>. Chọn tính năng cần dùng từ dropdown để thêm, không cần show toàn bộ.</div>
+            </div>
+            <button type="button" class="tiny" id="btnRefreshGroupSpecial">↻ Làm mới nhóm</button>
+          </div>
+          <div id="seGroupSpecialList" class="se-group-list"></div>
+        </div>
+
         <div class="se-row">
           <div class="se-row-head">
             <span class="se-icon">🧹</span>
@@ -690,9 +701,64 @@
           </div>
           <div class="se-row-body">
             <span id="seClearQueueLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny primary se-test" data-se-key="clearQueue">▶ Test</button>
             <button type="button" class="tiny se-pick" data-se-key="clearQueue" title="Chọn quà từ master">🎁 Chọn</button>
             <button type="button" class="tiny danger se-unpick" data-se-key="clearQueue" title="Bỏ trigger">🗑</button>
           </div>
+        </div>
+
+        <div class="se-row">
+          <div class="se-row-head">
+            <span class="se-icon">🎲</span>
+            <b class="se-title">Xáo trộn danh sách HÀNH ĐỘNG</b>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seShuffleQueueEnabled" /> Bật</label>
+          </div>
+          <div class="se-row-body">
+            <span id="seShuffleQueueLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny primary se-test" data-se-key="shuffleQueue">▶ Test</button>
+            <button type="button" class="tiny se-pick" data-se-key="shuffleQueue" title="Chọn quà trigger xáo trộn">🎁 Chọn</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="shuffleQueue" title="Bỏ trigger">🗑</button>
+          </div>
+          <div class="hint small" style="margin-top:6px">Viewer tặng đúng quà này → app trộn ngẫu nhiên các hiệu ứng đang chờ trong 📋 HÀNH ĐỘNG, hiệu ứng đang phát vẫn giữ nguyên.</div>
+        </div>
+
+        <div class="se-row">
+          <div class="se-row-head">
+            <span class="se-icon">🎯</span>
+            <b class="se-title">Tặng quà A xoá quà B</b>
+            <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">SL xoá <input type="number" id="seRemoveGiftCount" min="1" max="1000" value="1" style="width:70px" /></label>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seRemoveGiftEnabled" /> Bật</label>
+          </div>
+          <div class="se-row-body">
+            <span>A:</span>
+            <span id="seRemoveGiftTriggerLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny primary se-test" data-se-key="removeGift">▶ Test A</button>
+            <button type="button" class="tiny se-pick" data-se-key="removeGiftTrigger" title="Chọn quà A">🎁 Chọn A</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="removeGiftTrigger" title="Bỏ quà A">🗑</button>
+          </div>
+          <div class="se-row-body" style="margin-top:6px">
+            <span>B:</span>
+            <span id="seRemoveGiftTargetLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny" id="btnSeRemoveGiftAddTargetTest" title="Thêm 1 quà B vào HÀNH ĐỘNG để test xoá">➕ B test</button>
+            <button type="button" class="tiny se-pick" data-se-key="removeGiftTarget" title="Chọn quà B bị xoá">🎁 Chọn B</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="removeGiftTarget" title="Bỏ quà B">🗑</button>
+          </div>
+          <div class="hint small" style="margin-top:6px">Ví dụ quà A 100 đậu, quà B 5 đậu: nhập SL xoá 20 để xoá tối đa 20 hành động quà B. Nếu queue còn ít hơn thì xoá hết về 0, không báo âm.</div>
+        </div>
+
+        <div class="se-row">
+          <div class="se-row-head">
+            <span class="se-icon">🎁</span>
+            <b class="se-title">Túi mù ngẫu nhiên</b>
+            <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seBlindBagEnabled" /> Bật</label>
+          </div>
+          <div class="se-row-body">
+            <span id="seBlindBagLabel" class="se-gift-label">— chưa chọn —</span>
+            <button type="button" class="tiny primary se-test" data-se-key="blindBag">▶ Test</button>
+            <button type="button" class="tiny se-pick" data-se-key="blindBag" title="Chọn icon/quà kích hoạt túi mù">🎁 Chọn ICON</button>
+            <button type="button" class="tiny danger se-unpick" data-se-key="blindBag" title="Bỏ trigger túi mù">🗑</button>
+          </div>
+          <div class="hint small" style="margin-top:6px">Khi viewer tặng đúng icon này, app bốc ngẫu nhiên 1 hiệu ứng đã cấu hình hoặc 1 tính năng đặc biệt và đưa vào 📋 HÀNH ĐỘNG.</div>
         </div>
 
         <!-- 🎵 NHẠC (audio mp3/wav) — 2 hàng -->

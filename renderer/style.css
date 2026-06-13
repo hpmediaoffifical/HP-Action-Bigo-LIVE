@@ -593,14 +593,19 @@ main { padding: 10px 14px; }
 .tab-panel.active { display: block; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-/* Embed tab: layout 3fr left + 2fr right (60:40 ratio per user request) */
-.embed-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, 430px); gap: 10px; align-items: start; }
+/* Embed tab: layout left + resizable right column */
+.embed-layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
 .embed-center { min-width: 0; }
 /* Right panel: 3 sections, mỗi section resizable + collapsible */
 .embed-right {
   display: flex; flex-direction: column;
   gap: 8px;
   position: sticky; top: 10px;
+  width: var(--embed-right-width, 430px);
+  min-width: 330px;
+  max-width: 70vw;
+  resize: horizontal;
+  overflow: auto;
 }
 .embed-right .right-panel-section {
   margin-bottom: 0;
@@ -1444,6 +1449,58 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   white-space: nowrap;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
+.se-group-manager {
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px;
+  padding: 10px;
+  margin: 10px 0 14px;
+  background: rgba(10,12,18,.35);
+}
+.se-group-manager-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.se-group-manager h3 { margin: 0 0 4px; color: #ffd166; font-size: 13px; }
+.se-group-list { display: grid; gap: 8px; }
+.se-group-card {
+  border: 1px solid #2b3140;
+  border-radius: 10px;
+  background: #171a22;
+  overflow: hidden;
+}
+.se-group-card.off { opacity: .62; }
+.se-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: linear-gradient(90deg, rgba(255,138,61,.12), rgba(255,255,255,.02));
+}
+.se-group-title { color: #fff; font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.se-group-meta { color: #8a8f9a; font-size: 11px; margin-left: auto; white-space: nowrap; }
+.se-group-body { padding: 10px; display: grid; gap: 8px; }
+.se-feature-add { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.se-feature-add select { min-width: 220px; }
+.se-feature-list { display: grid; gap: 8px; }
+.se-feature-card {
+  border: 1px solid #293041;
+  border-radius: 9px;
+  padding: 8px;
+  background: #1f2330;
+}
+.se-feature-card-head, .se-feature-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.se-feature-card-head { margin-bottom: 6px; }
+.se-feature-title { color: #ffd166; font-weight: 800; }
+.se-feature-spacer { flex: 1; }
+.se-feature-empty { color: #666; font-size: 12px; padding: 6px 2px; }
 .prio-badge {
   background: linear-gradient(135deg, #fe2c55, #ff8a3d);
   color: #fff;

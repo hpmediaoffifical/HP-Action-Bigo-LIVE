@@ -333,6 +333,11 @@ function insertBatchByQueuePriority(batch, priority) {
 }
 
 async function playQueueItem(q) {
+  if (q?.specialAction) {
+    executeQueuedSpecialAction(q);
+    setTimeout(() => completeQueueItemById(q.id), 250);
+    return;
+  }
   if (!q || !q.overlayId || !q.mediaFile || !window.bigo.overlayPlay) return;
   if (q.pauseBgm) pauseBgmForEffect();
   if (window.bigo.effectsExists) {
@@ -702,16 +707,360 @@ function matchSpecialGift(ev, cfg) {
   return false;
 }
 
+function specialGiftLabelHtml(cfg, fields = { id: 'typeid', name: 'giftName', icon: 'iconUrl' }) {
+  const name = cfg?.[fields.name] || '';
+  if (!name) return '— chưa chọn —';
+  const id = cfg?.[fields.id];
+  const icon = cfg?.[fields.icon] || '';
+  const idText = id ? ` (id ${id})` : '';
+  const iconHtml = icon ? `<img src="${escapeHtml(icon)}" style="width:18px;height:18px;vertical-align:middle;margin-right:6px;border-radius:3px" />` : '';
+  return `${iconHtml}<b>${escapeHtml(name)}</b>${idText}`;
+}
+
+function queueItemMatchesSpecialTarget(q, cfg) {
+  if (!q || !cfg) return false;
+  if (cfg.targetTypeid && q.gift_id != null && Number(q.gift_id) === Number(cfg.targetTypeid)) return true;
+  const targetName = normalizeGameplayGiftKey(cfg.targetGiftName || '');
+  if (targetName) {
+    const qNames = [q.gift_name, q.effect_name].map(normalizeGameplayGiftKey).filter(Boolean);
+    if (qNames.includes(targetName)) return true;
+  }
+  const targetIcon = normalizeGameplayIconUrl(cfg.targetIconUrl || '');
+  const qIcon = normalizeGameplayIconUrl(q.gift_icon || '');
+  return !!targetIcon && !!qIcon && targetIcon === qIcon;
+}
+
+function removeQueueGiftBySpecialTarget(cfg, maxRemove) {
+  const limit = Math.max(0, Math.min(10000, parseInt(maxRemove, 10) || 0));
+  if (!limit || !cfg?.targetGiftName) return 0;
+  const ids = [];
+  for (const q of queueItems.filter(x => x.status === 'queued')) {
+    if (ids.length >= limit) break;
+    if (queueItemMatchesSpecialTarget(q, cfg)) ids.push(q.id);
+  }
+  for (const q of queueItems.filter(x => x.status === 'playing')) {
+    if (ids.length >= limit) break;
+    if (queueItemMatchesSpecialTarget(q, cfg)) ids.push(q.id);
+  }
+  if (!ids.length) return 0;
+  const idSet = new Set(ids);
+  let stoppedPlaying = false;
+  for (let i = queueItems.length - 1; i >= 0; i--) {
+    const q = queueItems[i];
+    if (!idSet.has(q.id)) continue;
+    if (q.status === 'playing') {
+      stoppedPlaying = true;
+      if (q.overlayId && window.bigo.overlayStopEffect) window.bigo.overlayStopEffect(q.overlayId).catch(() => {});
+    }
+    queueItems.splice(i, 1);
+  }
+  sessionStats.effects = Math.max(0, sessionStats.effects - ids.length);
+  if (stoppedPlaying && queueItems.length > 0 && !queueItems.some(q => q.status === 'playing')) markNextQueueItemPlaying(550);
+  syncBgmAfterQueueChange();
+  updateConnectStats();
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
+  return ids.length;
+}
+
+function triggerRemoveGiftSpecial(ev, cfg) {
+  const perGift = Math.max(1, Math.min(1000, parseInt(cfg?.removeCount, 10) || 1));
+  const giftCount = Math.max(1, giftTotalCountFromEvent(ev) || 1);
+  const target = perGift * giftCount;
+  const removed = removeQueueGiftBySpecialTarget(cfg, target);
+  appendLog(`[se:removeGift] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → xoá ${removed}/${target} "${cfg.targetGiftName || 'quà B'}"`);
+  return removed > 0;
+}
+
+function firstNumericMatchKey(item) {
+  return (item?.matchKeys || []).map(k => String(k).trim()).find(k => /^\d+$/.test(k)) || null;
+}
+
+const BLIND_BAG_ACTION_TITLES = {
+  shuffleQueue: 'Xáo trộn HÀNH ĐỘNG',
+  clearQueue: 'Xoá danh sách hiệu ứng',
+  speedUpAudio: 'Tăng tốc nhạc',
+  speedDownAudio: 'Giảm tốc nhạc',
+  speedUpVideo: 'Tăng tốc video',
+  speedDownVideo: 'Giảm tốc video',
+};
+
+function getBlindBagCandidates(sourceGroup = null, triggerCfg = appSettings?.specialEffects?.blindBag || {}) {
+  const candidates = [];
+  const sourceItems = sourceGroup
+    ? (sourceGroup.items || []).map(item => ({ ...item, _group: sourceGroup }))
+    : getEnabledGiftItems();
+  for (const item of sourceItems) {
+    if (!hasEffectMedia(item) || !item.overlayId) continue;
+    if (triggerCfg.typeid && firstNumericMatchKey(item) && Number(firstNumericMatchKey(item)) === Number(triggerCfg.typeid)) continue;
+    if (triggerCfg.giftName && getGameplayMatchKeys(item).some(k => normalizeGameplayGiftKey(k) === normalizeGameplayGiftKey(triggerCfg.giftName))) continue;
+    candidates.push({ kind: 'item', item });
+  }
+  const canShuffle = queueItems.filter(q => q.status === 'queued').length >= 2;
+  if (canShuffle) candidates.push({ kind: 'action', action: 'shuffleQueue', title: BLIND_BAG_ACTION_TITLES.shuffleQueue });
+  const sourceFeatures = sourceGroup
+    ? (getGroupSpecialConfig(sourceGroup.id, false)?.features || {})
+    : (appSettings?.specialEffects || {});
+  for (const key of ['clearQueue','shuffleQueue','removeGift','speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo']) {
+    const seCfg = sourceFeatures[key];
+    if (key === 'shuffleQueue' && !canShuffle) continue;
+    if (key === 'removeGift' && !seCfg?.targetGiftName) continue;
+    if (seCfg?.enabled) candidates.push({ kind: 'action', action: key, cfg: seCfg, title: BLIND_BAG_ACTION_TITLES[key] || key });
+  }
+  return candidates;
+}
+
+function buildEventForItem(item, sourceEv) {
+  return {
+    user: sourceEv?.user || 'Túi mù',
+    user_avatar_url: sourceEv?.user_avatar_url || '',
+    gift_name: getGameplayItemName(item),
+    gift_id: firstNumericMatchKey(item),
+    gift_icon: getGameplayItemIcon(item),
+    total_count: 1,
+    gift_count: 1,
+    combo: 1,
+  };
+}
+
+function pushSpecialActionQueue(action, sourceEv, triggerCfg = appSettings?.specialEffects?.blindBag || {}, sourceGroup = null) {
+  const q = {
+    id: 'q_special_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+    ts: Date.now(),
+    user: sourceEv?.user || 'Túi mù',
+    avatar: resolveAvatarForUser(sourceEv?.user, sourceEv?.user_avatar_url),
+    gift_name: triggerCfg.giftName || 'Túi mù',
+    gift_id: triggerCfg.typeid || null,
+    gift_icon: triggerCfg.iconUrl || sourceEv?.gift_icon || sourceEv?.gift_icon_url || '',
+    effect_name: action.title || BLIND_BAG_ACTION_TITLES[action.action] || action.action,
+    count: 1, step: 1, total: 1,
+    diamond: null,
+    specialAction: action.action,
+    specialActionCfg: action.cfg || null,
+    specialActionGroupId: sourceGroup?.id || null,
+    status: 'queued',
+    playTimes: 1,
+  };
+  const shouldAutoStart = !queuePaused && !queueItems.some(x => x.status === 'playing');
+  queueItems.push(q);
+  while (queueItems.length > QUEUE_MAX) queueItems.shift();
+  sessionStats.effects += 1;
+  updateConnectStats();
+  if (shouldAutoStart) {
+    q.status = 'playing';
+    q.playStartedAt = Date.now();
+    playQueueItem(q);
+  }
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
+}
+
+function completeQueueItemById(id) {
+  const idx = queueItems.findIndex(q => q.id === id);
+  if (idx === -1) return;
+  queueItems.splice(idx, 1);
+  sessionStats.effects = Math.max(0, sessionStats.effects - 1);
+  if (!queuePaused && queueItems.length > 0 && !queueItems.some(q => q.status === 'playing')) markNextQueueItemPlaying();
+  syncBgmAfterQueueChange();
+  updateConnectStats();
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
+}
+
+function executeQueuedSpecialAction(q) {
+  const action = q?.specialAction;
+  if (q?.specialActionCfg) {
+    runSpecialFeatureAction(action, fakeGiftEventFromSpecialCfg(q.specialActionCfg, 'HP MEDIA'), q.specialActionCfg, findGroupById(q.specialActionGroupId));
+  } else if (action === 'shuffleQueue') queueShuffleQueued();
+  else if (action === 'clearQueue') clearAllQueue();
+  else if (['speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].includes(action)) triggerSpeedEffect(action);
+  appendLog(`[se:blindBag] chạy ngẫu nhiên: ${q?.effect_name || action}`);
+}
+
+function triggerBlindBagSpecial(ev, cfg, sourceGroup = null) {
+  const candidates = getBlindBagCandidates(sourceGroup, cfg);
+  if (!candidates.length) {
+    appendLog('[se:blindBag] chưa có hiệu ứng/tính năng để bốc ngẫu nhiên');
+    return false;
+  }
+  const choice = candidates[Math.floor(Math.random() * candidates.length)];
+  if (choice.kind === 'item') {
+    const item = choice.item;
+    const fakeEv = buildEventForItem(item, ev);
+    maybeDispatchPreEffect(item);
+    if (!item.background) {
+      sessionStats.effects += 1;
+      updateConnectStats();
+    }
+    if (item.background) playBackgroundEffect(item, fakeEv, 1);
+    else pushPlayBatch(item, fakeEv, 1);
+    appendLog(`[se:blindBag] ${cfg.giftName || ev.gift_name || 'Túi mù'} → ${getGameplayItemName(item)}`);
+    return true;
+  }
+  pushSpecialActionQueue(choice, ev, cfg, sourceGroup);
+  appendLog(`[se:blindBag] ${cfg.giftName || ev.gift_name || 'Túi mù'} → ${choice.title}`);
+  return true;
+}
+
+function runSpecialFeatureAction(key, ev, cfg, sourceGroup = null) {
+  if (key === 'clearQueue') {
+    clearAllQueue();
+    appendLog(`[se:${key}] ${ev.user || '?'} → xoá HÀNH ĐỘNG`);
+    return true;
+  }
+  if (key === 'shuffleQueue') {
+    queueShuffleQueued();
+    appendLog(`[se:${key}] ${ev.user || '?'} → xáo trộn HÀNH ĐỘNG`);
+    return true;
+  }
+  if (key === 'removeGift') return triggerRemoveGiftSpecial(ev, cfg);
+  if (key === 'blindBag') return triggerBlindBagSpecial(ev, cfg, sourceGroup);
+  if (['speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].includes(key)) {
+    triggerSpeedEffect(key, cfg);
+    return true;
+  }
+  return false;
+}
+
+function checkGroupSpecialEffectsTriggers(ev) {
+  const all = appSettings?.groupSpecialEffects || {};
+  let triggered = false;
+  for (const group of (mapping.groups || []).filter(g => g.type !== 'comment' && (g.isCommon || g.enabled !== false))) {
+    const groupCfg = all[group.id];
+    if (!groupCfg || groupCfg.enabled === false) continue;
+    const features = groupCfg.features || {};
+    for (const [key, cfg] of Object.entries(features)) {
+      if (!cfg?.enabled) continue;
+      if (!matchSpecialGift(ev, cfg)) continue;
+      runSpecialFeatureAction(key, ev, cfg, group);
+      triggered = true;
+    }
+  }
+  return triggered;
+}
+
+function fakeGiftEventFromSpecialCfg(cfg, fallbackName = 'HP MEDIA') {
+  return {
+    type: 'gift',
+    user: 'HP MEDIA',
+    user_avatar_url: '',
+    gift_name: cfg?.giftName || fallbackName,
+    gift_id: cfg?.typeid || null,
+    gift_icon: cfg?.iconUrl || '',
+    gift_count: 1,
+    total_count: 1,
+    combo: 1,
+    total_diamond: 0,
+  };
+}
+
+function findSpecialTargetItem(cfg) {
+  if (!cfg?.targetGiftName && !cfg?.targetTypeid && !cfg?.targetIconUrl) return null;
+  const ev = {
+    gift_id: cfg.targetTypeid || null,
+    gift_name: cfg.targetGiftName || '',
+    gift_icon: cfg.targetIconUrl || '',
+  };
+  return getEnabledGiftItems().find(item => itemMatchesGameplayGift(item, ev)) || null;
+}
+
+function addRemoveGiftTargetTestItem() {
+  const cfg = appSettings?.specialEffects?.removeGift || {};
+  if (!cfg.targetGiftName) {
+    alert('Chưa chọn quà B để test');
+    return;
+  }
+  const item = findSpecialTargetItem(cfg);
+  if (!item) {
+    alert('Quà B chưa có trong danh sách hiệu ứng. Hãy thêm quà B vào nhóm trước, rồi bấm B test.');
+    return;
+  }
+  if (item.background) {
+    alert('Quà B đang là hiệu ứng NỀN nên không nằm trong HÀNH ĐỘNG để xoá. Hãy chọn quà B dạng HÀNH ĐỘNG tuần tự.');
+    return;
+  }
+  if (!hasEffectMedia(item) || !item.overlayId) {
+    alert('Quà B chưa có file hiệu ứng hoặc overlay, không thể đưa vào HÀNH ĐỘNG để test.');
+    return;
+  }
+  const fakeEv = {
+    type: 'gift',
+    user: 'HP MEDIA',
+    user_avatar_url: '',
+    gift_name: cfg.targetGiftName,
+    gift_id: cfg.targetTypeid || firstNumericMatchKey(item),
+    gift_icon: cfg.targetIconUrl || getGameplayItemIcon(item),
+    gift_count: 1,
+    total_count: 1,
+    combo: 1,
+    total_diamond: 0,
+  };
+  sessionStats.effects += 1;
+  updateConnectStats();
+  pushPlayBatch(item, fakeEv, 1);
+  appendLog(`[se:removeGift] HP MEDIA thêm quà B "${cfg.targetGiftName}" vào HÀNH ĐỘNG`);
+}
+
+async function runSpecialTest(key) {
+  const se = appSettings?.specialEffects || {};
+  if (key === 'clearQueue') {
+    const ok = await appConfirm({
+      title: 'Test xoá HÀNH ĐỘNG?',
+      message: 'Chạy thử tính năng xoá toàn bộ danh sách HÀNH ĐỘNG.',
+      detail: 'Nếu đang có hiệu ứng trong queue, thao tác test sẽ xoá thật queue hiện tại.',
+      okText: 'Test xoá',
+      cancelText: 'Huỷ',
+      danger: true,
+    });
+    if (!ok) return;
+    clearAllQueue();
+    appendLog('[se:clearQueue] HP MEDIA xoá HÀNH ĐỘNG');
+    return;
+  }
+  if (key === 'removeGift') {
+    const cfg = se.removeGift || {};
+    if (!cfg.giftName) { alert('Chưa chọn quà A'); return; }
+    if (!cfg.targetGiftName) { alert('Chưa chọn quà B'); return; }
+    triggerRemoveGiftSpecial(fakeGiftEventFromSpecialCfg(cfg, 'HP MEDIA'), cfg);
+    return;
+  }
+  if (key === 'shuffleQueue') {
+    queueShuffleQueued();
+    appendLog('[se:shuffleQueue] HP MEDIA xáo trộn HÀNH ĐỘNG');
+    return;
+  }
+  if (key === 'blindBag') {
+    const cfg = se.blindBag || {};
+    if (!cfg.giftName) { alert('Chưa chọn ICON túi mù'); return; }
+    triggerBlindBagSpecial(fakeGiftEventFromSpecialCfg(cfg, 'Túi mù HP MEDIA'), cfg);
+    return;
+  }
+  if (['speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].includes(key)) {
+    triggerSpeedEffect(key);
+    appendLog(`[se:${key}] HP MEDIA chạy thử không qua LIVE`);
+  }
+}
+
 // Check & trigger TẤT CẢ special effects khi 1 gift event đến từ live.
 // Trả về true nếu gift này match ít nhất 1 trigger (caller có thể dùng để skip
 // duplicate flow nếu cần).
 function checkSpecialEffectsTriggers(ev) {
   const se = appSettings?.specialEffects;
-  if (!se) return false;
-  let triggered = false;
+  let triggered = checkGroupSpecialEffectsTriggers(ev);
+  if (!se) return triggered;
   if (matchSpecialGift(ev, se.clearQueue)) {
     appendLog(`[se:clearQueue] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → xoá DSHT`);
     clearAllQueue();
+    triggered = true;
+  }
+  if (matchSpecialGift(ev, se.shuffleQueue)) {
+    appendLog(`[se:shuffleQueue] ${ev.user || '?'} tặng "${ev.gift_name || '?'}" → xáo trộn HÀNH ĐỘNG`);
+    queueShuffleQueued();
+    triggered = true;
+  }
+  if (matchSpecialGift(ev, se.removeGift)) {
+    triggerRemoveGiftSpecial(ev, se.removeGift);
+    triggered = true;
+  }
+  if (matchSpecialGift(ev, se.blindBag)) {
+    triggerBlindBagSpecial(ev, se.blindBag);
     triggered = true;
   }
   // 4 speed triggers: audio/video × up/down
@@ -1177,6 +1526,7 @@ document.querySelectorAll('.tab').forEach(t => {
     }
     if (t.dataset.tab === 'special') {
       try { applyHeartGoalUi(); } catch (e) { console.warn(e); }
+      try { renderGroupSpecialEffectsUi(); } catch (e) { console.warn(e); }
     }
   };
 });
@@ -1930,6 +2280,19 @@ async function init() {
 }
 
 function initRightPanelControls() {
+  const right = document.querySelector('.embed-right');
+  if (right) {
+    const savedWidth = parseInt(localStorage.getItem('rps_w_right') || '', 10);
+    if (savedWidth >= 330) right.style.width = savedWidth + 'px';
+    let widthTimer = null;
+    const ro = new ResizeObserver(() => {
+      clearTimeout(widthTimer);
+      widthTimer = setTimeout(() => {
+        localStorage.setItem('rps_w_right', String(Math.round(right.getBoundingClientRect().width)));
+      }, 300);
+    });
+    ro.observe(right);
+  }
   // Collapse buttons
   document.querySelectorAll('.rps-collapse').forEach(btn => {
     const target = btn.dataset.rpsTarget;
@@ -2312,6 +2675,7 @@ function renderGiftTable() {
     renderGroupsInto(embedContainer, { search });
   }
   renderGameplayUi();
+  renderGroupSpecialEffectsUi();
 }
 
 function renderGroupsInto(container, opts) {
@@ -4384,9 +4748,11 @@ function shouldDropDuplicate(ev) {
 // =================== Dịch & Đọc chat (TTS) ===================
 // Cấu hình lưu localStorage. Dịch qua main process (Google Translate), đọc qua
 // Web Speech API (speechSynthesis) có sẵn trong Chromium renderer.
+const TRANSLATE_AUTO_TO_VI = 'auto-vi';
+
 const chatVoice = {
   translateOn: localStorage.getItem('cv_translateOn') === '1',
-  translateTo: localStorage.getItem('cv_translateTo') || 'vi',
+  translateTo: localStorage.getItem('cv_translateTo') || TRANSLATE_AUTO_TO_VI,
   ttsOn: localStorage.getItem('cv_ttsOn') === '1',
   readName: localStorage.getItem('cv_readName') === '1',
   voiceURI: localStorage.getItem('cv_voice') || '',
@@ -4461,6 +4827,10 @@ const TTS_LANG_MAP = {
   ko: 'ko-KR', ja: 'ja-JP', id: 'id-ID',
 };
 
+function getTranslateTarget() {
+  return chatVoice.translateTo === TRANSLATE_AUTO_TO_VI ? 'vi' : chatVoice.translateTo;
+}
+
 let _ttsVoices = [];
 function reloadTtsVoices() {
   try { _ttsVoices = window.speechSynthesis ? speechSynthesis.getVoices() : []; } catch { _ttsVoices = []; }
@@ -4529,7 +4899,7 @@ async function drainGoogleTts() {
 let _ttsPending = 0;
 function speakText(text, lang) {
   if (!text) return;
-  const langCode = (lang || chatVoice.translateTo || 'vi').split('-')[0].toLowerCase();
+  const langCode = (lang || getTranslateTarget() || 'vi').split('-')[0].toLowerCase();
   // "Giọng mặc định" (voiceURI rỗng) → Google TTS: giọng Việt tự nhiên, không
   // cần cài giọng Windows. Người dùng chọn 1 giọng Windows cụ thể → Web Speech.
   if (!chatVoice.voiceURI) {
@@ -4600,14 +4970,15 @@ async function handleChatVoice(ev, div) {
   const needDetect = chatVoice.langPriority.length > 0;
   if (chatVoice.translateOn || needDetect) {
     try {
-      const r = await window.bigo.translateText({ text: content, to: chatVoice.translateTo });
+      const translateTo = getTranslateTarget();
+      const r = await window.bigo.translateText({ text: content, from: 'auto', to: translateTo });
       if (r && r.ok) {
         const detected = (r.detected || '').toLowerCase();
         // Ưu tiên ngôn ngữ nguồn: không thuộc list → bỏ qua cả dịch lẫn đọc.
         if (needDetect && !langInPriority(detected)) return;
         if (chatVoice.translateOn && r.text) {
           const translated = r.text.trim();
-          const isSelf = chatVoice.skipSelf && sameLang(detected, chatVoice.translateTo);
+          const isSelf = chatVoice.skipSelf && sameLang(detected, translateTo);
           if (translated && normEv(translated) !== normEv(content) && !isSelf && div && div.isConnected) {
             const t = document.createElement('span');
             t.className = 'chat-translated';
@@ -4616,7 +4987,7 @@ async function handleChatVoice(ev, div) {
             div.appendChild(t);
           }
           toRead = (translated && !isSelf) ? translated : content;
-          readLang = TTS_LANG_MAP[chatVoice.translateTo] || chatVoice.translateTo;
+          readLang = TTS_LANG_MAP[translateTo] || translateTo;
         }
       }
     } catch {}
@@ -4971,6 +5342,9 @@ let appSettings = {
   // Hiệu Ứng Đặc Biệt: trigger gift cho action đặc biệt
   specialEffects: {
     clearQueue:      { enabled: false, typeid: null, giftName: '', iconUrl: '' },
+    shuffleQueue:    { enabled: false, typeid: null, giftName: '', iconUrl: '' },
+    removeGift:      { enabled: false, typeid: null, giftName: '', iconUrl: '', targetTypeid: null, targetGiftName: '', targetIconUrl: '', removeCount: 1 },
+    blindBag:        { enabled: false, typeid: null, giftName: '', iconUrl: '' },
     // 4 speed riêng — tách audio (mp3/wav) vs video (mp4/webm) độc lập.
     // Video không nên tăng giảm tốc nhiều (cảm giác khó chịu) → user setup factor riêng.
     speedUpAudio:    { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 1.25, duration: 10 },
@@ -4980,6 +5354,7 @@ let appSettings = {
     // TÁP TIM: KPI hearts. Khi đạt target → phát media (mp3/mp4).
     heartGoal:       { enabled: false, target: 100, mediaFile: '', overlayId: '', currentCount: 0 },
   },
+  groupSpecialEffects: {},
   members: [],
   fxVolume: 100,
   maxListItems: 200,
@@ -4995,6 +5370,7 @@ async function saveAppSettings(patch) {
     if (patch.pkDuo) s.pkDuo = { ...(s.pkDuo || {}), ...patch.pkDuo };
     if (patch.scoreVote) s.scoreVote = { ...(s.scoreVote || {}), ...patch.scoreVote };
     if (patch.members) s.members = Array.isArray(patch.members) ? patch.members : [];
+    if (patch.groupSpecialEffects) s.groupSpecialEffects = patch.groupSpecialEffects;
     if (patch.specialEffects) {
       s.specialEffects = s.specialEffects || {};
       for (const [k, v] of Object.entries(patch.specialEffects)) {
@@ -5103,6 +5479,7 @@ async function initAppSettings(s) {
   appSettings.pkDuo = { ...appSettings.pkDuo, ...(s.pkDuo || {}) };
   appSettings.scoreVote = { ...appSettings.scoreVote, ...(s.scoreVote || {}) };
   appSettings.members = Array.isArray(s.members) ? s.members : [];
+  appSettings.groupSpecialEffects = s.groupSpecialEffects && typeof s.groupSpecialEffects === 'object' ? s.groupSpecialEffects : {};
   // Migrate old clearGift → specialEffects.clearQueue (backward compat)
   if (s.clearGift && !s.specialEffects?.clearQueue) {
     appSettings.specialEffects.clearQueue = {
@@ -5122,7 +5499,7 @@ async function initAppSettings(s) {
       appSettings.specialEffects.speedDownAudio = { ...appSettings.specialEffects.speedDownAudio, ...s.specialEffects.speedDown };
       appSettings.specialEffects.speedDownVideo = { ...appSettings.specialEffects.speedDownVideo, ...s.specialEffects.speedDown };
     }
-    for (const k of ['clearQueue','speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo','heartGoal']) {
+    for (const k of ['clearQueue','shuffleQueue','removeGift','blindBag','speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo','heartGoal']) {
       if (s.specialEffects[k]) {
         appSettings.specialEffects[k] = { ...appSettings.specialEffects[k], ...s.specialEffects[k] };
       }
@@ -5132,6 +5509,7 @@ async function initAppSettings(s) {
   appSettings.maxListItems = s.maxListItems || 200;
   // Apply special effects UI
   applySpecialEffectsUi();
+  renderGroupSpecialEffectsUi();
   applyHeartGoalUi();
   // Apply BGM
   if (els.bgmAudio) {
@@ -5210,6 +5588,9 @@ if (els.preFxEnabled) {
 
 const SE_LABELS = {
   clearQueue:      { id: 'seClearQueueLabel',      enabled: 'seClearQueueEnabled',      factor: null,                     duration: null },
+  shuffleQueue:    { id: 'seShuffleQueueLabel',    enabled: 'seShuffleQueueEnabled',    factor: null,                     duration: null },
+  removeGift:      { id: 'seRemoveGiftTriggerLabel', enabled: 'seRemoveGiftEnabled',    factor: null,                     duration: null },
+  blindBag:        { id: 'seBlindBagLabel',        enabled: 'seBlindBagEnabled',        factor: null,                     duration: null },
   speedUpAudio:    { id: 'seSpeedUpAudioLabel',    enabled: 'seSpeedUpAudioEnabled',    factor: 'seSpeedUpAudioFactor',   duration: 'seSpeedUpAudioDuration' },
   speedDownAudio:  { id: 'seSpeedDownAudioLabel',  enabled: 'seSpeedDownAudioEnabled',  factor: 'seSpeedDownAudioFactor', duration: 'seSpeedDownAudioDuration' },
   speedUpVideo:    { id: 'seSpeedUpVideoLabel',    enabled: 'seSpeedUpVideoEnabled',    factor: 'seSpeedUpVideoFactor',   duration: 'seSpeedUpVideoDuration' },
@@ -5222,13 +5603,7 @@ function applySpecialEffectsUi() {
     const labelEl = document.getElementById(ref.id);
     const enabledEl = document.getElementById(ref.enabled);
     if (labelEl) {
-      if (cfg.giftName) {
-        const idText = cfg.typeid ? ` (id ${cfg.typeid})` : '';
-        const iconHtml = cfg.iconUrl ? `<img src="${escapeHtml(cfg.iconUrl)}" style="width:18px;height:18px;vertical-align:middle;margin-right:6px;border-radius:3px" />` : '';
-        labelEl.innerHTML = `${iconHtml}<b>${escapeHtml(cfg.giftName)}</b>${idText}`;
-      } else {
-        labelEl.textContent = '— chưa chọn —';
-      }
+      labelEl.innerHTML = specialGiftLabelHtml(cfg);
     }
     if (enabledEl) enabledEl.checked = !!cfg.enabled;
     if (ref.factor) {
@@ -5240,6 +5615,11 @@ function applySpecialEffectsUi() {
       if (durEl && cfg.duration != null) durEl.value = cfg.duration;
     }
   }
+  const removeCfg = appSettings.specialEffects.removeGift || {};
+  const targetEl = document.getElementById('seRemoveGiftTargetLabel');
+  const countEl = document.getElementById('seRemoveGiftCount');
+  if (targetEl) targetEl.innerHTML = specialGiftLabelHtml(removeCfg, { id: 'targetTypeid', name: 'targetGiftName', icon: 'targetIconUrl' });
+  if (countEl) countEl.value = Math.max(1, Math.min(1000, parseInt(removeCfg.removeCount, 10) || 1));
 }
 
 // Dedicated master picker dialog
@@ -5247,7 +5627,14 @@ function openSpecialPicker(targetKey) {
   const dlg = document.getElementById('specialPickerDialog');
   if (!dlg) return;
   dlg.dataset.target = targetKey;
-  document.getElementById('specialPickerTitle').textContent = `Chọn quà tặng cho "${SE_TITLES[targetKey] || targetKey}"`;
+  let title = SE_TITLES[targetKey] || targetKey;
+  if (String(targetKey || '').startsWith('group:')) {
+    const [, groupId, featureKey, slot] = String(targetKey).split(':');
+    const group = findGroupById(groupId);
+    const featureTitle = (SE_GROUP_FEATURES.find(([k]) => k === featureKey) || [featureKey, featureKey])[1];
+    title = `${group?.name || groupId} · ${featureTitle}${slot === 'target' ? ' · quà B' : ''}`;
+  }
+  document.getElementById('specialPickerTitle').textContent = `Chọn quà tặng cho "${title}"`;
   const filter = document.getElementById('spMasterFilter');
   const sort = document.getElementById('spMasterSort');
   if (filter) filter.value = '';
@@ -5258,9 +5645,116 @@ function openSpecialPicker(targetKey) {
 
 const SE_TITLES = {
   clearQueue: 'Xoá danh sách hiệu ứng',
-  speedUp: 'Tăng tốc nhạc nền',
-  speedDown: 'Giảm tốc nhạc nền',
+  shuffleQueue: 'Xáo trộn HÀNH ĐỘNG',
+  removeGiftTrigger: 'Quà A kích hoạt xoá',
+  removeGiftTarget: 'Quà B bị xoá',
+  blindBag: 'Túi mù ngẫu nhiên',
+  speedUpAudio: 'Tăng tốc nhạc',
+  speedDownAudio: 'Giảm tốc nhạc',
+  speedUpVideo: 'Tăng tốc video',
+  speedDownVideo: 'Giảm tốc video',
 };
+
+const SE_GROUP_FEATURES = [
+  ['clearQueue', '🧹 Xoá HÀNH ĐỘNG'],
+  ['shuffleQueue', '🎲 Xáo trộn HÀNH ĐỘNG'],
+  ['removeGift', '🎯 Quà A xoá quà B'],
+  ['blindBag', '🎁 Túi mù ngẫu nhiên'],
+  ['speedUpAudio', '🎵⏩ Tăng tốc nhạc'],
+  ['speedDownAudio', '🎵⏪ Giảm tốc nhạc'],
+  ['speedUpVideo', '🎬⏩ Tăng tốc video'],
+  ['speedDownVideo', '🎬⏪ Giảm tốc video'],
+];
+
+function defaultGroupSpecialFeature(key) {
+  const base = appSettings.specialEffects?.[key] || {};
+  const next = { enabled: true, typeid: null, giftName: '', iconUrl: '' };
+  if (['speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].includes(key)) {
+    next.factor = base.factor;
+    next.duration = base.duration;
+  }
+  if (key === 'removeGift') {
+    next.targetTypeid = null;
+    next.targetGiftName = '';
+    next.targetIconUrl = '';
+    next.removeCount = 1;
+  }
+  return next;
+}
+
+function getGroupSpecialConfig(groupId, create = true) {
+  if (!appSettings.groupSpecialEffects || typeof appSettings.groupSpecialEffects !== 'object') appSettings.groupSpecialEffects = {};
+  if (!appSettings.groupSpecialEffects[groupId] && create) {
+    appSettings.groupSpecialEffects[groupId] = { enabled: true, collapsed: true, features: {} };
+  }
+  const cfg = appSettings.groupSpecialEffects[groupId];
+  if (cfg && !cfg.features) cfg.features = {};
+  return cfg || null;
+}
+
+async function persistGroupSpecialEffects() {
+  await saveAppSettings({ groupSpecialEffects: appSettings.groupSpecialEffects || {} });
+}
+
+function renderGroupSpecialEffectsUi() {
+  const list = document.getElementById('seGroupSpecialList');
+  if (!list) return;
+  const groups = (mapping.groups || []).filter(g => g.type !== 'comment');
+  if (!groups.length) {
+    list.innerHTML = '<div class="se-feature-empty">Chưa có nhóm quà. Tạo nhóm ở Cài đặt chung → 📂 Quản lý nhóm quà.</div>';
+    return;
+  }
+  list.innerHTML = groups.map(group => {
+    const cfg = getGroupSpecialConfig(group.id, false) || { enabled: true, collapsed: true, features: {} };
+    const features = cfg.features || {};
+    const featureKeys = Object.keys(features);
+    const available = SE_GROUP_FEATURES.filter(([key]) => !features[key]);
+    const body = cfg.collapsed ? '' : `<div class="se-group-body">
+      <div class="se-feature-add">
+        <select data-seg-add-select="${escapeHtml(group.id)}">
+          ${available.length ? available.map(([key, label]) => `<option value="${key}">${escapeHtml(label)}</option>`).join('') : '<option value="">Đã thêm đủ tính năng</option>'}
+        </select>
+        <button type="button" class="tiny primary" data-seg-add="${escapeHtml(group.id)}" ${available.length ? '' : 'disabled'}>+ Thêm tính năng</button>
+      </div>
+      <div class="se-feature-list">
+        ${featureKeys.length ? featureKeys.map(key => renderGroupSpecialFeature(group, key, features[key])).join('') : '<div class="se-feature-empty">Chưa thêm tính năng nào cho nhóm này.</div>'}
+      </div>
+    </div>`;
+    return `<div class="se-group-card ${cfg.enabled === false ? 'off' : ''}" data-seg-gid="${escapeHtml(group.id)}">
+      <div class="se-group-head">
+        <button type="button" class="tiny" data-seg-collapse="${escapeHtml(group.id)}">${cfg.collapsed ? '▶' : '▼'}</button>
+        <span class="se-group-title">${escapeHtml(group.name || group.id)}</span>
+        <span class="se-group-meta">${featureKeys.length} tính năng · ${(group.items || []).length} quà</span>
+        <label class="checkbox-row"><input type="checkbox" data-seg-enabled="${escapeHtml(group.id)}" ${cfg.enabled !== false ? 'checked' : ''}> Bật nhóm</label>
+      </div>
+      ${body}
+    </div>`;
+  }).join('');
+}
+
+function renderGroupSpecialFeature(group, key, cfg = {}) {
+  const title = (SE_GROUP_FEATURES.find(([k]) => k === key) || [key, key])[1];
+  const trigger = specialGiftLabelHtml(cfg);
+  const speedControls = ['speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].includes(key)
+    ? `<label>× <input type="number" data-seg-factor="${escapeHtml(group.id)}:${key}" step="0.05" min="0.25" max="3" value="${escapeHtml(cfg.factor ?? appSettings.specialEffects[key]?.factor ?? 1)}" style="width:64px"></label>
+       <label>⏱ <input type="number" data-seg-duration="${escapeHtml(group.id)}:${key}" min="1" max="600" value="${escapeHtml(cfg.duration ?? appSettings.specialEffects[key]?.duration ?? 10)}" style="width:64px">s</label>`
+    : '';
+  const removeTarget = key === 'removeGift'
+    ? `<div class="se-feature-row" style="margin-top:6px"><span>B:</span><span class="se-gift-label">${specialGiftLabelHtml(cfg, { id: 'targetTypeid', name: 'targetGiftName', icon: 'targetIconUrl' })}</span><button type="button" class="tiny" data-seg-pick="${escapeHtml(group.id)}:${key}:target">🎁 Chọn B</button><label>SL xoá <input type="number" data-seg-remove-count="${escapeHtml(group.id)}:${key}" min="1" max="1000" value="${escapeHtml(cfg.removeCount || 1)}" style="width:70px"></label></div>`
+    : '';
+  return `<div class="se-feature-card" data-seg-feature="${escapeHtml(group.id)}:${key}">
+    <div class="se-feature-card-head">
+      <span class="se-feature-title">${escapeHtml(title)}</span>
+      ${speedControls}
+      <span class="se-feature-spacer"></span>
+      <label class="checkbox-row"><input type="checkbox" data-seg-feature-enabled="${escapeHtml(group.id)}:${key}" ${cfg.enabled !== false ? 'checked' : ''}> Bật</label>
+      <button type="button" class="tiny primary" data-seg-test="${escapeHtml(group.id)}:${key}">▶ Test</button>
+      <button type="button" class="tiny danger" data-seg-remove="${escapeHtml(group.id)}:${key}">🗑</button>
+    </div>
+    <div class="se-feature-row"><span>A:</span><span class="se-gift-label">${trigger}</span><button type="button" class="tiny" data-seg-pick="${escapeHtml(group.id)}:${key}:trigger">🎁 Chọn</button></div>
+    ${removeTarget}
+  </div>`;
+}
 
 let _spRenderTimer = null;
 function scheduleSpecialPickerRender() {
@@ -5315,15 +5809,42 @@ function renderSpecialPickerTable() {
         if (e.target.classList && e.target.classList.contains('fav-btn')) return;
         const dlg = document.getElementById('specialPickerDialog');
         const targetKey = dlg.dataset.target;
-        if (!targetKey || !appSettings.specialEffects[targetKey]) return;
-        appSettings.specialEffects[targetKey].typeid = parseInt(row.dataset.typeid, 10);
-        appSettings.specialEffects[targetKey].giftName = row.dataset.name;
-        appSettings.specialEffects[targetKey].iconUrl = row.dataset.icon;
-        saveAppSettings({ specialEffects: { [targetKey]: {
-          typeid: appSettings.specialEffects[targetKey].typeid,
-          giftName: appSettings.specialEffects[targetKey].giftName,
-          iconUrl: appSettings.specialEffects[targetKey].iconUrl,
-        } } });
+        const typeid = parseInt(row.dataset.typeid, 10);
+        const giftName = row.dataset.name;
+        const iconUrl = row.dataset.icon;
+        if (String(targetKey || '').startsWith('group:')) {
+          const [, groupId, featureKey, slot] = String(targetKey).split(':');
+          const groupCfg = getGroupSpecialConfig(groupId);
+          const feature = groupCfg.features[featureKey] || defaultGroupSpecialFeature(featureKey);
+          if (slot === 'target') {
+            feature.targetTypeid = typeid;
+            feature.targetGiftName = giftName;
+            feature.targetIconUrl = iconUrl;
+          } else {
+            feature.typeid = typeid;
+            feature.giftName = giftName;
+            feature.iconUrl = iconUrl;
+          }
+          groupCfg.features[featureKey] = feature;
+          persistGroupSpecialEffects();
+          renderGroupSpecialEffectsUi();
+        } else if (targetKey === 'removeGiftTrigger') {
+          appSettings.specialEffects.removeGift.typeid = typeid;
+          appSettings.specialEffects.removeGift.giftName = giftName;
+          appSettings.specialEffects.removeGift.iconUrl = iconUrl;
+          saveAppSettings({ specialEffects: { removeGift: { typeid, giftName, iconUrl } } });
+        } else if (targetKey === 'removeGiftTarget') {
+          appSettings.specialEffects.removeGift.targetTypeid = typeid;
+          appSettings.specialEffects.removeGift.targetGiftName = giftName;
+          appSettings.specialEffects.removeGift.targetIconUrl = iconUrl;
+          saveAppSettings({ specialEffects: { removeGift: { targetTypeid: typeid, targetGiftName: giftName, targetIconUrl: iconUrl } } });
+        } else {
+          if (!targetKey || !appSettings.specialEffects[targetKey]) return;
+          appSettings.specialEffects[targetKey].typeid = typeid;
+          appSettings.specialEffects[targetKey].giftName = giftName;
+          appSettings.specialEffects[targetKey].iconUrl = iconUrl;
+          saveAppSettings({ specialEffects: { [targetKey]: { typeid, giftName, iconUrl } } });
+        }
         applySpecialEffectsUi();
         dlg.close();
       };
@@ -5348,15 +5869,27 @@ document.querySelectorAll('.se-pick').forEach(btn => {
 document.querySelectorAll('.se-unpick').forEach(btn => {
   btn.onclick = async () => {
     const key = btn.dataset.seKey;
-    if (!appSettings.specialEffects[key]) return;
-    appSettings.specialEffects[key].typeid = null;
-    appSettings.specialEffects[key].giftName = '';
-    appSettings.specialEffects[key].iconUrl = '';
-    await saveAppSettings({ specialEffects: { [key]: { typeid: null, giftName: '', iconUrl: '' } } });
+    if (key === 'removeGiftTrigger') {
+      appSettings.specialEffects.removeGift.typeid = null;
+      appSettings.specialEffects.removeGift.giftName = '';
+      appSettings.specialEffects.removeGift.iconUrl = '';
+      await saveAppSettings({ specialEffects: { removeGift: { typeid: null, giftName: '', iconUrl: '' } } });
+    } else if (key === 'removeGiftTarget') {
+      appSettings.specialEffects.removeGift.targetTypeid = null;
+      appSettings.specialEffects.removeGift.targetGiftName = '';
+      appSettings.specialEffects.removeGift.targetIconUrl = '';
+      await saveAppSettings({ specialEffects: { removeGift: { targetTypeid: null, targetGiftName: '', targetIconUrl: '' } } });
+    } else {
+      if (!appSettings.specialEffects[key]) return;
+      appSettings.specialEffects[key].typeid = null;
+      appSettings.specialEffects[key].giftName = '';
+      appSettings.specialEffects[key].iconUrl = '';
+      await saveAppSettings({ specialEffects: { [key]: { typeid: null, giftName: '', iconUrl: '' } } });
+    }
     applySpecialEffectsUi();
   };
 });
-['clearQueue','speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].forEach(key => {
+['clearQueue','shuffleQueue','removeGift','blindBag','speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].forEach(key => {
   const enabledEl = document.getElementById(SE_LABELS[key].enabled);
   if (enabledEl) enabledEl.addEventListener('change', async () => {
     appSettings.specialEffects[key].enabled = !!enabledEl.checked;
@@ -5382,6 +5915,103 @@ document.querySelectorAll('.se-unpick').forEach(btn => {
     });
   }
 });
+
+const seRemoveGiftCount = document.getElementById('seRemoveGiftCount');
+if (seRemoveGiftCount) {
+  seRemoveGiftCount.addEventListener('change', async () => {
+    const v = Math.max(1, Math.min(1000, parseInt(seRemoveGiftCount.value, 10) || 1));
+    seRemoveGiftCount.value = v;
+    appSettings.specialEffects.removeGift.removeCount = v;
+    await saveAppSettings({ specialEffects: { removeGift: { removeCount: v } } });
+  });
+}
+
+const btnRefreshGroupSpecial = document.getElementById('btnRefreshGroupSpecial');
+if (btnRefreshGroupSpecial) btnRefreshGroupSpecial.onclick = renderGroupSpecialEffectsUi;
+
+const seGroupSpecialList = document.getElementById('seGroupSpecialList');
+if (seGroupSpecialList) {
+  seGroupSpecialList.addEventListener('click', async (e) => {
+    const collapse = e.target.closest('[data-seg-collapse]');
+    const add = e.target.closest('[data-seg-add]');
+    const pick = e.target.closest('[data-seg-pick]');
+    const test = e.target.closest('[data-seg-test]');
+    const remove = e.target.closest('[data-seg-remove]');
+    if (collapse) {
+      const cfg = getGroupSpecialConfig(collapse.dataset.segCollapse);
+      cfg.collapsed = !cfg.collapsed;
+      await persistGroupSpecialEffects();
+      renderGroupSpecialEffectsUi();
+      return;
+    }
+    if (add) {
+      const groupId = add.dataset.segAdd;
+      const sel = [...seGroupSpecialList.querySelectorAll('[data-seg-add-select]')]
+        .find(el => el.dataset.segAddSelect === groupId);
+      const key = sel?.value;
+      if (!key) return;
+      const cfg = getGroupSpecialConfig(groupId);
+      cfg.collapsed = false;
+      cfg.features[key] = defaultGroupSpecialFeature(key);
+      await persistGroupSpecialEffects();
+      renderGroupSpecialEffectsUi();
+      return;
+    }
+    if (pick) {
+      const [groupId, key, slot] = pick.dataset.segPick.split(':');
+      openSpecialPicker(`group:${groupId}:${key}:${slot || 'trigger'}`);
+      return;
+    }
+    if (test) {
+      const [groupId, key] = test.dataset.segTest.split(':');
+      const group = findGroupById(groupId);
+      const cfg = getGroupSpecialConfig(groupId, false)?.features?.[key];
+      if (!cfg) return;
+      if (!cfg.giftName) { alert('Chưa chọn quà A/trigger cho tính năng này'); return; }
+      if (key === 'removeGift' && !cfg.targetGiftName) { alert('Chưa chọn quà B'); return; }
+      runSpecialFeatureAction(key, fakeGiftEventFromSpecialCfg(cfg, 'HP MEDIA'), cfg, group);
+      return;
+    }
+    if (remove) {
+      const [groupId, key] = remove.dataset.segRemove.split(':');
+      const cfg = getGroupSpecialConfig(groupId, false);
+      if (cfg?.features) delete cfg.features[key];
+      await persistGroupSpecialEffects();
+      renderGroupSpecialEffectsUi();
+    }
+  });
+
+  seGroupSpecialList.addEventListener('change', async (e) => {
+    const groupEnabled = e.target.closest('[data-seg-enabled]');
+    const featureEnabled = e.target.closest('[data-seg-feature-enabled]');
+    const factor = e.target.closest('[data-seg-factor]');
+    const duration = e.target.closest('[data-seg-duration]');
+    const removeCount = e.target.closest('[data-seg-remove-count]');
+    if (groupEnabled) {
+      const cfg = getGroupSpecialConfig(groupEnabled.dataset.segEnabled);
+      cfg.enabled = groupEnabled.checked;
+      await persistGroupSpecialEffects();
+      renderGroupSpecialEffectsUi();
+      return;
+    }
+    const applyFeatureValue = async (token, key, value) => {
+      const [groupId, featureKey] = token.split(':');
+      const cfg = getGroupSpecialConfig(groupId);
+      cfg.features[featureKey] = { ...(cfg.features[featureKey] || defaultGroupSpecialFeature(featureKey)), [key]: value };
+      await persistGroupSpecialEffects();
+    };
+    if (featureEnabled) {
+      const [groupId, featureKey] = featureEnabled.dataset.segFeatureEnabled.split(':');
+      const cfg = getGroupSpecialConfig(groupId);
+      cfg.features[featureKey] = { ...(cfg.features[featureKey] || defaultGroupSpecialFeature(featureKey)), enabled: featureEnabled.checked };
+      await persistGroupSpecialEffects();
+      return;
+    }
+    if (factor) await applyFeatureValue(factor.dataset.segFactor, 'factor', parseFloat(factor.value) || 1);
+    if (duration) await applyFeatureValue(duration.dataset.segDuration, 'duration', Math.max(1, Math.min(600, parseInt(duration.value, 10) || 10)));
+    if (removeCount) await applyFeatureValue(removeCount.dataset.segRemoveCount, 'removeCount', Math.max(1, Math.min(1000, parseInt(removeCount.value, 10) || 1)));
+  });
+}
 
 // =================== TÁP TIM (heart goal KPI) ===================
 // Trigger: khi tổng số tym đạt target → phát media. Counter reset sau đó.
@@ -5649,18 +6279,10 @@ function initHeartOpenApiUi(settings = {}) {
 
 // "▶ Test" button: phát thử ngay (không cần gift trigger).
 document.querySelectorAll('.se-test').forEach(btn => {
-  btn.onclick = () => {
-    const key = btn.dataset.seKey;
-    if (key === 'speedUp' || key === 'speedDown') {
-      triggerSpeedEffect(key);
-      appendLog(`[se:${key}] TEST ngay (không qua gift)`);
-    } else if (key === 'clearQueue') {
-      if (!confirm('Test xoá toàn bộ DSHT?')) return;
-      clearAllQueue();
-      appendLog(`[se:clearQueue] TEST clearAllQueue`);
-    }
-  };
+  btn.onclick = () => runSpecialTest(btn.dataset.seKey).catch(e => alert('Test lỗi: ' + e.message));
 });
+const btnSeRemoveGiftAddTargetTest = document.getElementById('btnSeRemoveGiftAddTargetTest');
+if (btnSeRemoveGiftAddTargetTest) btnSeRemoveGiftAddTargetTest.onclick = addRemoveGiftTargetTestItem;
 // Picker filter/sort live update
 ['spMasterFilter','spMasterSort','spMasterVnOnly','spMasterFavOnly'].forEach(id => {
   const el = document.getElementById(id);
@@ -5672,9 +6294,13 @@ document.querySelectorAll('.se-test').forEach(btn => {
 const btnResetBgmSpeed = document.getElementById('btnResetBgmSpeed');
 if (btnResetBgmSpeed) {
   btnResetBgmSpeed.onclick = () => {
-    if (_speedRevertTimer) { clearTimeout(_speedRevertTimer); _speedRevertTimer = null; }
-    _speedRevertEndsAt = 0;
-    _pendingSpeedKey = null;
+    for (const axis of ['audio', 'video']) {
+      const state = _speedAxisState[axis];
+      if (state.timer) clearTimeout(state.timer);
+      state.timer = null;
+      state.endsAt = 0;
+      state.pending = null;
+    }
     applyEffectSpeed(1.0);
   };
 }
@@ -5717,22 +6343,15 @@ function updateSpeedDisplay() {
 // (timer chưa expire), trigger MỚI sẽ KHÔNG apply ngay — thay vào đó được QUEUE
 // để apply sau khi current revert về 1.0. Tránh việc "ai tặng nhanh/chậm là
 // thay đổi liền" → effect dứt khoát theo duration đã cài.
-let _speedRevertTimer = null;
-let _speedRevertEndsAt = 0;     // timestamp ms — khi nào current speed effect kết thúc
-let _pendingSpeedKey = null;     // key tiếp theo đang đợi (latest wins)
+const _speedAxisState = {
+  audio: { timer: null, endsAt: 0, pending: null },
+  video: { timer: null, endsAt: 0, pending: null },
+};
 
-function triggerSpeedEffect(key) {
-  if (_speedRevertTimer) {
-    // Đang có speed effect active → queue trigger này, sẽ apply sau khi revert.
-    _pendingSpeedKey = key;
-    const remainMs = Math.max(0, _speedRevertEndsAt - Date.now());
-    const remainSec = Math.ceil(remainMs / 1000);
-    appendLog(`[se:${key}] đang có speed effect chạy → queued, áp dụng sau ${remainSec}s`);
-    const disp = document.getElementById('bgmSpeedDisplay');
-    if (disp) disp.textContent += ` · queued: ${key}`;
-    return;
-  }
-  _applyAndScheduleSpeed(key);
+function triggerSpeedEffect(key, cfgOverride = null) {
+  const axis = SPEED_AXIS[key] || 'both';
+  const axes = axis === 'both' ? ['audio', 'video'] : [axis];
+  for (const oneAxis of axes) triggerSpeedAxis(oneAxis, key, cfgOverride);
 }
 
 // Map key → axis ('audio' / 'video' / 'both') để biết apply lên đâu.
@@ -5743,31 +6362,44 @@ const SPEED_AXIS = {
   speedUp: 'both', speedDown: 'both',
 };
 
-function _applyAndScheduleSpeed(key) {
-  const cfg = appSettings.specialEffects?.[key];
+function triggerSpeedAxis(axis, key, cfgOverride = null) {
+  const state = _speedAxisState[axis];
+  if (!state) return;
+  if (state.timer) {
+    state.pending = { key, cfg: cfgOverride ? { ...cfgOverride } : null };
+    const remainMs = Math.max(0, state.endsAt - Date.now());
+    const remainSec = Math.ceil(remainMs / 1000);
+    appendLog(`[se:${key}] ${axis} đang chạy → queued, áp dụng sau ${remainSec}s`);
+    const disp = document.getElementById('bgmSpeedDisplay');
+    if (disp) disp.textContent += ` · queued ${axis}: ${key}`;
+    return;
+  }
+  _applyAndScheduleSpeedAxis(axis, key, cfgOverride);
+}
+
+function _applyAndScheduleSpeedAxis(axis, key, cfgOverride = null) {
+  const cfg = cfgOverride || appSettings.specialEffects?.[key];
   if (!cfg) return;
   const factor = parseFloat(cfg.factor) || 1;
   const duration = Math.max(1, parseInt(cfg.duration, 10) || 10);
-  const axis = SPEED_AXIS[key] || 'both';
   // Apply theo axis
   if (axis === 'audio') applyAudioSpeed(factor);
   else if (axis === 'video') applyVideoSpeed(factor);
-  else applyAllSpeed(factor);
-  _speedRevertEndsAt = Date.now() + duration * 1000;
-  _speedRevertTimer = setTimeout(() => {
+  const state = _speedAxisState[axis];
+  state.endsAt = Date.now() + duration * 1000;
+  state.timer = setTimeout(() => {
     // Revert cùng axis về 1.0
     if (axis === 'audio') applyAudioSpeed(1.0);
     else if (axis === 'video') applyVideoSpeed(1.0);
-    else applyAllSpeed(1.0);
     appendLog(`[se] ${key} (${axis}) kết thúc (${duration}s) → revert ×1.0`);
-    _speedRevertTimer = null;
-    _speedRevertEndsAt = 0;
-    if (_pendingSpeedKey) {
-      const nextKey = _pendingSpeedKey;
-      _pendingSpeedKey = null;
+    state.timer = null;
+    state.endsAt = 0;
+    if (state.pending) {
+      const nextJob = state.pending;
+      state.pending = null;
       setTimeout(() => {
-        appendLog(`[se] Apply pending speed: ${nextKey}`);
-        _applyAndScheduleSpeed(nextKey);
+        appendLog(`[se] Apply pending ${axis} speed: ${nextJob.key}`);
+        _applyAndScheduleSpeedAxis(axis, nextJob.key, nextJob.cfg);
       }, 100);
     }
   }, duration * 1000);
