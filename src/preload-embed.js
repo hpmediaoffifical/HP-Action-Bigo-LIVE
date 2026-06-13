@@ -187,7 +187,30 @@ function processElement(rootEl, opts = {}) {
     }
 
     const m = tryMatchChat(text);
-    if (!m) continue;
+    if (!m) {
+      // TÁP TIM: tin hệ thống "<user> gửi N lượt thích cho Idol ❤" KHÔNG có
+      // format "user: content" nên tryMatchChat trả null. Detect trực tiếp trên
+      // full text như fallback — nếu bỏ qua đây thì counter "Mục tiêu lượt tym"
+      // không bao giờ cộng từ tim thật (chỉ +10 Test chạy được).
+      const heartN = detectHeartFromChat(text);
+      if (heartN > 0) {
+        const heartUser = extractHeartUser(text);
+        const heartHash = `h|${normalize(text)}`;
+        const last = seenGifts.get(heartHash);
+        if (!(last && Date.now() - last < 800)) {
+          seenGifts.set(heartHash, Date.now());
+          elementContent.set(el, text);
+          gifts.push({ type: 'heart', user: heartUser, count: heartN, raw: text });
+          send('embed:scrape-error', { msg: `[heart parse] ${heartUser} | +${heartN} tym | raw: "${text.slice(0, 80)}"` });
+        }
+      } else if (HEART_LOOKS_RE.test(text)) {
+        // DIAGNOSTIC: text có vẻ là tim nhưng không tách được số → log raw 1 lần
+        // (elementContent throttle re-log) để bổ sung pattern cho đúng câu chữ BIGO.
+        elementContent.set(el, text);
+        send('embed:scrape-error', { msg: `[heart MISS] không tách được số tym | raw: "${text.slice(0, 140)}"` });
+      }
+      continue;
+    }
 
     const giftM = m.content.match(/sent\s+(?:a\s+)?(.+?)\s*[×xX](\d+)\s*$/);
     const isGift = !!giftM || /^sent\s+/i.test(m.content);
@@ -419,11 +442,17 @@ function detectBadges(text) {
 //
 // Match patterns trong content của chat row (sau khi tryMatchChat đã extract user/content).
 const HEART_CHAT_PATTERNS = [
-  /g[uưử]+i\s+(\d+)\s+l[uượ]+t?\s+th[ií]ch/iu,           // VN: "gửi N lượt thích"
+  /(\d+)\s*l[uượ]+t?\s*(?:yêu\s*)?th[ií]ch/iu,            // VN: "(gửi/tặng) N lượt thích" — khớp cả "500 lượt thích"
+  /th[ảa]\s*(\d+)\s*tim/iu,                                // VN: "thả N tim"
+  /g[uưử]+i\s*(\d+)\s*tim/iu,                              // VN: "gửi N tim"
   /sent\s+(\d+)\s+(?:hearts?|likes?|loves?)/i,             // EN: "sent N hearts/likes"
-  /发送\s*(\d+)\s*个?\s*[赞喜]/u,                          // CN: "发送N赞"
   /(\d+)\s+(?:hearts?|likes?)\s+(?:to|cho)/i,              // EN/VN mix: "100 likes to"
+  /发送\s*(\d+)\s*个?\s*[赞喜]/u,                          // CN: "发送N赞"
 ];
+
+// "Trông giống tim" — dùng để LOG khi text có vẻ là tim nhưng không tách được số
+// (giúp bổ sung pattern khi BIGO đổi câu chữ). KHÔNG dùng để đếm.
+const HEART_LOOKS_RE = /l[uượ]+t?\s*th[ií]ch|\blikes?\b|\bhearts?\b|[赞]|th[ảa]\s*\d*\s*tim|\d+\s*tim\b/iu;
 
 function detectHeartFromChat(content) {
   if (!content) return 0;
@@ -435,6 +464,16 @@ function detectHeartFromChat(content) {
     }
   }
   return 0;
+}
+
+// Tách tên user từ tin hệ thống tim ("<user> gửi N lượt thích / sent N likes /
+// 给 Idol 发送 N 赞"). Best-effort: lấy phần trước từ khoá, bỏ level badge đầu dòng.
+function extractHeartUser(text) {
+  const t = String(text || '').trim();
+  const m = t.match(/^([\s\S]{1,40}?)\s*(?:g[uưử]+i|sent|给)\b/iu);
+  let u = m ? m[1] : '';
+  u = u.replace(/^\s*(?:\[?Lv\.?\s*\d+\]?|\d{1,3})\s*/i, '').trim();
+  return u || 'Người xem';
 }
 
 function parseViewerCountFromRoomText(text) {

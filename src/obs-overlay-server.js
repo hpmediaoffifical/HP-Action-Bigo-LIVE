@@ -22,11 +22,13 @@ class ObsOverlayServer {
     this.rankingClients = new Set();
     this.scoreClients = new Set();
     this.pkDuoClients = new Set();
+    this.heartClients = new Set();
     this.gameplayConfig = { items: [], orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, slots: [] };
     this.gameplayCounts = {};
     this.rankingState = {};
     this.scoreState = {};
     this.pkDuoState = {};
+    this.heartState = {};
     this.media = new Map();   // mediaId -> absolute file path
   }
 
@@ -53,6 +55,8 @@ class ObsOverlayServer {
     this.scoreClients.clear();
     for (const res of this.pkDuoClients) { try { res.end(); } catch {} }
     this.pkDuoClients.clear();
+    for (const res of this.heartClients) { try { res.end(); } catch {} }
+    this.heartClients.clear();
     if (this.server) { try { this.server.close(); } catch {} }
     this.server = null;
   }
@@ -79,6 +83,10 @@ class ObsOverlayServer {
 
   getPkDuoUrl() {
     return `http://127.0.0.1:${this.port}/pk-duo?token=${encodeURIComponent(this.token)}`;
+  }
+
+  getHeartUrl() {
+    return `http://127.0.0.1:${this.port}/heart?token=${encodeURIComponent(this.token)}`;
   }
 
   setGameplayConfig(cfg) {
@@ -108,6 +116,11 @@ class ObsOverlayServer {
   sendPkDuoState(state) {
     this.pkDuoState = state || {};
     this._sendPkDuo('pkduo', this.pkDuoState);
+  }
+
+  sendHeartState(state) {
+    this.heartState = state || {};
+    this._sendHeart('heart', this.heartState);
   }
 
   hasClients(overlayId) {
@@ -161,6 +174,11 @@ class ObsOverlayServer {
     for (const res of this.pkDuoClients) { try { res.write(body); } catch {} }
   }
 
+  _sendHeart(event, data) {
+    const body = `event: ${event}\ndata: ${JSON.stringify(data || {})}\n\n`;
+    for (const res of this.heartClients) { try { res.write(body); } catch {} }
+  }
+
   _okToken(reqUrl) {
     return reqUrl.searchParams.get('token') === this.token;
   }
@@ -200,6 +218,8 @@ class ObsOverlayServer {
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-events') return this._serveRankingEvents(req, res);
     if (req.method === 'GET' && reqUrl.pathname === '/pk-duo') return this._serveFile(path.join(this.root, 'renderer', 'pk-duo-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/pk-duo-events') return this._servePkDuoEvents(req, res);
+    if (req.method === 'GET' && reqUrl.pathname === '/heart') return this._serveFile(path.join(this.root, 'renderer', 'heart-overlay-web.html'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/heart-events') return this._serveHeartEvents(req, res);
     if (req.method === 'GET' && reqUrl.pathname === '/score') return this._serveFile(path.join(this.root, 'renderer', 'score-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/score-events') return this._serveScoreEvents(req, res);
     if (req.method === 'GET' && reqUrl.pathname.startsWith('/gift-icon/')) return this._serveGiftIcon(reqUrl, res);
@@ -264,6 +284,16 @@ class ObsOverlayServer {
     res.write(`event: pkduo\ndata: ${JSON.stringify(this.pkDuoState || {})}\n\n`);
     this.pkDuoClients.add(res);
     req.on('close', () => this.pkDuoClients.delete(res));
+  }
+
+  _serveHeartEvents(req, res) {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(`event: heart\ndata: ${JSON.stringify(this.heartState || {})}\n\n`);
+    this.heartClients.add(res);
+    req.on('close', () => this.heartClients.delete(res));
   }
 
   _serveFile(filePath, res) {

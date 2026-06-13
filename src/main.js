@@ -127,8 +127,9 @@ if (process.platform === 'win32') {
 }
 
 let win;
-const MAIN_DEFAULT_SIZE = { width: 1580, height: 960 };
-const MAIN_MIN_SIZE = { width: 1120, height: 720 };
+const MAIN_DEFAULT_SIZE = { width: 1180, height: 780 };
+const MAIN_MIN_SIZE = { width: 960, height: 640 };
+const MAIN_MAX_INITIAL_SIZE = { width: 1240, height: 840 };
 let client = null;
 let listener = null;
 let parsedEventSeq = 0;
@@ -492,6 +493,14 @@ function getSavedBounds(key, fallback) {
   const s = loadSettings();
   return (s.windowBounds && s.windowBounds[key]) || fallback;
 }
+function getInitialMainBounds() {
+  const saved = getSavedBounds('main', MAIN_DEFAULT_SIZE) || MAIN_DEFAULT_SIZE;
+  return {
+    ...saved,
+    width: Math.min(Math.max(saved.width || MAIN_DEFAULT_SIZE.width, MAIN_MIN_SIZE.width), MAIN_MAX_INITIAL_SIZE.width),
+    height: Math.min(Math.max(saved.height || MAIN_DEFAULT_SIZE.height, MAIN_MIN_SIZE.height), MAIN_MAX_INITIAL_SIZE.height),
+  };
+}
 function trackWindowBounds(window, key) {
   if (!window) return;
   const save = () => {
@@ -560,10 +569,10 @@ function hardExitApp() {
 }
 
 function createWindow() {
-  const saved = getSavedBounds('main', MAIN_DEFAULT_SIZE);
+  const saved = getInitialMainBounds();
   win = new BrowserWindow({
-    width: Math.max(saved.width || MAIN_DEFAULT_SIZE.width, MAIN_MIN_SIZE.width),
-    height: Math.max(saved.height || MAIN_DEFAULT_SIZE.height, MAIN_MIN_SIZE.height),
+    width: saved.width,
+    height: saved.height,
     minWidth: MAIN_MIN_SIZE.width,
     minHeight: MAIN_MIN_SIZE.height,
     resizable: true,
@@ -1051,6 +1060,120 @@ ipcMain.handle('bigo:check-live', async (_e, bigoId) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
+// =================== Translate IPC (Dịch chat) ===================
+// Dịch text qua Google Translate endpoint free (client=gtx). Chạy ở MAIN process
+// để né CORS — renderer fetch thẳng sẽ bị chặn. Trả { ok, text, detected }.
+ipcMain.handle('translate:text', async (_e, opts = {}) => {
+  const text = String(opts.text || '').trim();
+  const tl = String(opts.to || 'vi');
+  const sl = String(opts.from || 'auto');
+  if (!text) return { ok: false, error: 'empty' };
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx`
+      + `&sl=${encodeURIComponent(sl)}&tl=${encodeURIComponent(tl)}&dt=t`
+      + `&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    const data = await res.json();
+    // data[0] = mảng segment [[translated, original, ...], ...]; data[2] = lang detect.
+    const translated = Array.isArray(data && data[0])
+      ? data[0].map(seg => (seg && seg[0]) || '').join('')
+      : '';
+    const detected = (data && data[2]) || sl;
+    return { ok: true, text: translated, detected };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// Đọc chat bằng Google Translate TTS — trả MP3 giọng tự nhiên (vd vi-VN) mà
+// KHÔNG cần cài giọng Windows. Cap ~200 ký tự / request (giới hạn endpoint).
+// Trả data URL base64 để renderer phát qua <audio>.
+ipcMain.handle('tts:google', async (_e, opts = {}) => {
+  const text = String(opts.text || '').trim().slice(0, 200);
+  const tl = String(opts.lang || 'vi');
+  if (!text) return { ok: false, error: 'empty' };
+  try {
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob`
+      + `&tl=${encodeURIComponent(tl)}&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://translate.google.com/',
+      },
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    const buf = Buffer.from(await res.arrayBuffer());
+    return { ok: true, dataUrl: `data:audio/mpeg;base64,${buf.toString('base64')}` };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// =================== Từ cấm đồng bộ Google Sheet ===================
+// Tab COMMENT, cột A của spreadsheet công khai. Lấy qua endpoint gviz CSV
+// (không cần API key), cache xuống file để dùng offline.
+const FORBIDDEN_SHEET_ID = '1Fv9Jdno_pPMTx_-tnwSfRObm1r1wKds_gaMBnfCDm4M';
+const FORBIDDEN_SHEET_TAB = 'COMMENT';
+const FORBIDDEN_CACHE_PATH = path.join(CONFIG_DIR, 'forbidden-words.json');
+
+// Parse cột A từ CSV gviz (giá trị có thể được bọc trong dấu ").
+function parseCsvFirstColumn(csv) {
+  const out = [];
+  for (const rawLine of String(csv).split(/\r?\n/)) {
+    if (!rawLine) continue;
+    let val;
+    if (rawLine[0] === '"') {
+      let j = 1, s = '';
+      while (j < rawLine.length) {
+        if (rawLine[j] === '"') {
+          if (rawLine[j + 1] === '"') { s += '"'; j += 2; continue; }
+          break;
+        }
+        s += rawLine[j]; j++;
+      }
+      val = s;
+    } else {
+      const c = rawLine.indexOf(',');
+      val = c >= 0 ? rawLine.slice(0, c) : rawLine;
+    }
+    val = val.trim();
+    if (val) out.push(val);
+  }
+  return out;
+}
+
+ipcMain.handle('forbidden:sync', async () => {
+  try {
+    // headers=0: ép gviz KHÔNG coi dòng 1 là header (nếu không nó gộp cả cột A
+    // thành 1 blob). Khi đó cột A = đúng danh sách từ cấm từng dòng.
+    const url = `https://docs.google.com/spreadsheets/d/${FORBIDDEN_SHEET_ID}`
+      + `/gviz/tq?tqx=out:csv&headers=0&sheet=${encodeURIComponent(FORBIDDEN_SHEET_TAB)}`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const csv = await res.text();
+    let words = parseCsvFirstColumn(csv);
+    // Bỏ ô tiêu đề "TỪ KHÓA CẤM".
+    if (words[0] && /TỪ\s*KHÓA\s*CẤM/i.test(words[0])) words = words.slice(1);
+    words = [...new Set(words.map(w => w.toLowerCase()).filter(Boolean))];
+    saveJson(FORBIDDEN_CACHE_PATH, { words, fetchedAt: Date.now() });
+    return { ok: true, words, count: words.length, source: 'sheet' };
+  } catch (e) {
+    const cached = loadJson(FORBIDDEN_CACHE_PATH, { words: [] });
+    const words = Array.isArray(cached.words) ? cached.words : [];
+    return { ok: false, error: e.message, words, count: words.length, source: 'cache' };
+  }
+});
+
+// Trả cache hiện có ngay (không gọi mạng) — dùng lúc khởi động.
+ipcMain.handle('forbidden:cached', () => {
+  const cached = loadJson(FORBIDDEN_CACHE_PATH, { words: [] });
+  const words = Array.isArray(cached.words) ? cached.words : [];
+  return { words, count: words.length, fetchedAt: cached.fetchedAt || 0 };
+});
+
 // =================== Gift master IPC ===================
 function decorateGift(g) {
   const typeid = Number(g.typeid);
@@ -1360,7 +1483,15 @@ ipcMain.handle('heart-overlay:update', (_e, payload) => {
   if (heartOverlay && !heartOverlay.isDestroyed()) {
     try { heartOverlay.webContents.send('heart-overlay:update', payload || {}); } catch {}
   }
+  // Đẩy cùng state ra OBS browser-source overlay (/heart) qua SSE.
+  if (obsOverlayServer) { try { obsOverlayServer.sendHeartState(payload || {}); } catch {} }
   return { ok: true };
+});
+ipcMain.handle('heart:copy-url', () => {
+  if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
+  const url = obsOverlayServer.getHeartUrl();
+  clipboard.writeText(url);
+  return { ok: true, url };
 });
 
 // =================== Popup window (Tương tác - chats) ===================

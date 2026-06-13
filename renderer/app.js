@@ -1909,7 +1909,7 @@ async function init() {
   const chatFont = document.getElementById('chatFontSize');
   if (chatFont) {
     const saved = parseInt(localStorage.getItem('chatFontSize') || '', 10);
-    if (saved >= 11 && saved <= 18) chatFont.value = saved;
+    if (saved >= 11 && saved <= 100) chatFont.value = saved;
     const apply = () => {
       const v = parseInt(chatFont.value, 10);
       if (els.liveChats) els.liveChats.style.fontSize = v + 'px';
@@ -1918,6 +1918,9 @@ async function init() {
     chatFont.addEventListener('input', apply);
     apply();
   }
+  // Dịch & Đọc chat (TTS) — wiring controls
+  initChatVoice();
+  initHeartOpenApiUi(s);
   // Pre-load master để gift table có icon ngay (background)
   ensureMasterLoaded().catch(() => {});
   updateBgmSidebarIcon();
@@ -3793,7 +3796,6 @@ async function overlayAction(act, id) {
   } else if (act === 'obs-copy') {
     const r = await window.bigo.obsOverlayCopyUrl(id);
     if (!r.ok) alert('Lỗi copy OBS link: ' + (r.error || 'unknown'));
-    else alert(`Đã copy link OBS Browser Source:\n${r.url}\n\nTrong OBS: Add Browser Source → paste URL này. Khi OBS đang mở link, hiệu ứng sẽ chạy qua localhost, không cần mở cửa sổ overlay desktop.`);
   } else if (act === 'hide') {
     await window.bigo.overlayHide(id);
   } else if (act === 'lock' || act === 'unlock') {
@@ -4379,6 +4381,422 @@ function shouldDropDuplicate(ev) {
   return false;
 }
 
+// =================== Dịch & Đọc chat (TTS) ===================
+// Cấu hình lưu localStorage. Dịch qua main process (Google Translate), đọc qua
+// Web Speech API (speechSynthesis) có sẵn trong Chromium renderer.
+const chatVoice = {
+  translateOn: localStorage.getItem('cv_translateOn') === '1',
+  translateTo: localStorage.getItem('cv_translateTo') || 'vi',
+  ttsOn: localStorage.getItem('cv_ttsOn') === '1',
+  readName: localStorage.getItem('cv_readName') === '1',
+  voiceURI: localStorage.getItem('cv_voice') || '',
+  rate: parseFloat(localStorage.getItem('cv_rate')) || 1,
+  // Nâng cao (modal ⚙️)
+  langPriority: parseJsonLS('cv_langPriority', []),   // [] = dịch tất cả
+  skipSelf: localStorage.getItem('cv_skipSelf') === '1',
+  readMode: localStorage.getItem('cv_readMode') || 'commentOnly',
+  readPriority: localStorage.getItem('cv_readPriority') || 'all',
+  cooldownSec: parseInt(localStorage.getItem('cv_cooldown'), 10) || 0,
+  volume: localStorage.getItem('cv_volume') != null ? parseInt(localStorage.getItem('cv_volume'), 10) : 100,
+  skipNumberOnly: localStorage.getItem('cv_skipNumberOnly') === '1',
+  stripNumbers: localStorage.getItem('cv_stripNumbers') === '1',
+  glossary: localStorage.getItem('cv_glossary') || '',
+  banned: localStorage.getItem('cv_banned') || '',
+};
+function parseJsonLS(key, fallback) {
+  try { const v = JSON.parse(localStorage.getItem(key) || ''); return Array.isArray(v) ? v : fallback; }
+  catch { return fallback; }
+}
+
+// Theo dõi người vừa tặng quà (cho "Ưu tiên đọc người tặng quà").
+const recentGifters = new Map(); // normUser -> ts
+function markGifter(user) {
+  if (user) recentGifters.set(normEv(user), Date.now());
+}
+function isRecentGifter(user, windowMs = 120000) {
+  const t = recentGifters.get(normEv(user));
+  return !!(t && Date.now() - t < windowMs);
+}
+// Cooldown đọc theo từng user.
+const _readCooldown = new Map(); // normUser -> ts
+
+// Parse "gốc=>thay" mỗi dòng → áp dụng thay thế (không phân biệt hoa thường).
+function applyGlossary(text) {
+  if (!chatVoice.glossary.trim()) return text;
+  let out = text;
+  for (const line of chatVoice.glossary.split('\n')) {
+    const idx = line.indexOf('=>');
+    if (idx < 0) continue;
+    const from = line.slice(0, idx).trim();
+    const to = line.slice(idx + 2).trim();
+    if (!from) continue;
+    try {
+      const re = new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      out = out.replace(re, to);
+    } catch {}
+  }
+  return out;
+}
+// Từ cấm đồng bộ từ Google Sheet (tab COMMENT, cột A) — nạp lúc init.
+let sheetBanned = [];
+function isBannedComment(text) {
+  const low = text.toLowerCase();
+  // Sheet (1000+ từ)
+  for (let i = 0; i < sheetBanned.length; i++) {
+    if (low.includes(sheetBanned[i])) return true;
+  }
+  // Bổ sung local
+  if (chatVoice.banned.trim()) {
+    for (const line of chatVoice.banned.split('\n')) {
+      const w = line.trim().toLowerCase();
+      if (w && low.includes(w)) return true;
+    }
+  }
+  return false;
+}
+
+// BCP-47 lang cho TTS theo mã đích Google Translate.
+const TTS_LANG_MAP = {
+  vi: 'vi-VN', en: 'en-US', 'zh-CN': 'zh-CN', th: 'th-TH',
+  ko: 'ko-KR', ja: 'ja-JP', id: 'id-ID',
+};
+
+let _ttsVoices = [];
+function reloadTtsVoices() {
+  try { _ttsVoices = window.speechSynthesis ? speechSynthesis.getVoices() : []; } catch { _ttsVoices = []; }
+  populateVoiceSelect();
+}
+
+function populateVoiceSelect() {
+  const sel = document.getElementById('chatTtsVoice');
+  if (!sel) return;
+  const cur = chatVoice.voiceURI;
+  sel.innerHTML = '<option value="">🌟 Giọng Google (tự nhiên)</option>';
+  for (const v of _ttsVoices) {
+    const opt = document.createElement('option');
+    opt.value = v.voiceURI;
+    opt.textContent = `${v.name} (${v.lang})`;
+    if (v.voiceURI === cur) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+function pickVoice(targetLang) {
+  if (chatVoice.voiceURI) {
+    const byUri = _ttsVoices.find(v => v.voiceURI === chatVoice.voiceURI);
+    if (byUri) return byUri;
+  }
+  if (targetLang) {
+    const prefix = targetLang.split('-')[0].toLowerCase();
+    const byLang = _ttsVoices.find(v => (v.lang || '').toLowerCase().startsWith(prefix));
+    if (byLang) return byLang;
+  }
+  return null;
+}
+
+// Google TTS queue — phát MP3 tuần tự để chat không chồng tiếng.
+const _gttsQueue = [];
+let _gttsBusy = false;
+let _gttsAudio = null;
+function enqueueGoogleTts(text, langCode) {
+  // Backlog protection: chat dồn dập → bỏ bớt để không đọc trễ.
+  if (_gttsQueue.length > 4) return;
+  _gttsQueue.push({ text, langCode });
+  drainGoogleTts();
+}
+async function drainGoogleTts() {
+  if (_gttsBusy) return;
+  const job = _gttsQueue.shift();
+  if (!job) return;
+  _gttsBusy = true;
+  try {
+    const r = await window.bigo.ttsGoogle({ text: job.text, lang: job.langCode });
+    if (r && r.ok && r.dataUrl) {
+      await new Promise((resolve) => {
+        const a = new Audio(r.dataUrl);
+        _gttsAudio = a;
+        a.playbackRate = chatVoice.rate;
+        a.volume = Math.max(0, Math.min(1, chatVoice.volume / 100));
+        a.onended = a.onerror = () => resolve();
+        a.play().catch(() => resolve());
+      });
+    }
+  } catch {}
+  _gttsBusy = false;
+  if (_gttsQueue.length) drainGoogleTts();
+}
+
+let _ttsPending = 0;
+function speakText(text, lang) {
+  if (!text) return;
+  const langCode = (lang || chatVoice.translateTo || 'vi').split('-')[0].toLowerCase();
+  // "Giọng mặc định" (voiceURI rỗng) → Google TTS: giọng Việt tự nhiên, không
+  // cần cài giọng Windows. Người dùng chọn 1 giọng Windows cụ thể → Web Speech.
+  if (!chatVoice.voiceURI) {
+    enqueueGoogleTts(text, langCode);
+    return;
+  }
+  if (!window.speechSynthesis) { enqueueGoogleTts(text, langCode); return; }
+  // Backlog protection: chat dồn dập → bỏ qua bớt để không đọc trễ hàng phút.
+  if (_ttsPending > 3) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    if (lang) u.lang = lang;
+    u.rate = chatVoice.rate;
+    u.volume = Math.max(0, Math.min(1, chatVoice.volume / 100));
+    const v = pickVoice(lang);
+    if (v) u.voice = v;
+    _ttsPending++;
+    u.onend = u.onerror = () => { _ttsPending = Math.max(0, _ttsPending - 1); };
+    speechSynthesis.speak(u);
+  } catch {}
+}
+
+// Thông báo hệ thống BIGO (tặng quà, follow, vào phòng...) lọt vào khung chat —
+// KHÔNG dịch/đọc để tránh spam, chỉ đọc bình luận thật của người xem.
+const CHAT_NOREAD_PATTERNS = [
+  /^\s*sent\b/i,                          // "sent" / "sent a gift" — quà
+  /became\s+a\s+fan/i,                    // "became a Fan"
+  /won'?t\s+miss\s+the\s+next\s+live/i,   // "Won't miss the next LIVE"
+  /\bjoined\b|entered\s+the\s+room/i,     // vào phòng
+  /shared\s+this\s+live/i,                // chia sẻ LIVE
+  /follow(?:ed|ing)?\s+the\s+host/i,      // theo dõi host
+  /l[uượ]+t?\s+th[ií]ch|sent\s+\d+\s+(?:likes?|hearts?)/i, // lượt thích
+];
+function isSystemNotice(content) {
+  return CHAT_NOREAD_PATTERNS.some(re => re.test(content));
+}
+
+// So khớp 2 mã ngôn ngữ theo prefix ('zh-CN' ~ 'zh').
+function sameLang(a, b) {
+  return String(a || '').split('-')[0].toLowerCase() === String(b || '').split('-')[0].toLowerCase();
+}
+function langInPriority(detected) {
+  return chatVoice.langPriority.some(code => sameLang(code, detected));
+}
+
+// Xử lý 1 chat: dịch (append vào row) + đọc. div = chat-row đã append.
+async function handleChatVoice(ev, div) {
+  if (!chatVoice.translateOn && !chatVoice.ttsOn) return;
+  let content = String(ev.content || '').trim();
+  if (!content) return;
+  // Bỏ qua dòng không có chữ cái (emoji/ký hiệu/số thuần) — không cần dịch/đọc.
+  if (!/\p{L}/u.test(content)) return;
+  if (isSystemNotice(content)) return;        // thông báo hệ thống
+  if (isBannedComment(content)) return;       // chứa từ cấm
+
+  content = applyGlossary(content);           // thay thế từ/cụm
+
+  // Quyền ĐỌC theo ưu tiên (không ảnh hưởng hiển thị bản dịch).
+  let canRead = true;
+  const hasBadge = Array.isArray(ev.badges) && ev.badges.length > 0;
+  if (chatVoice.readPriority === 'gifters') canRead = isRecentGifter(ev.user);
+  else if (chatVoice.readPriority === 'vip') canRead = hasBadge;
+  else if (chatVoice.readPriority === 'giftersOrVip') canRead = isRecentGifter(ev.user) || hasBadge;
+
+  let toRead = content;
+  let readLang = '';
+
+  const needDetect = chatVoice.langPriority.length > 0;
+  if (chatVoice.translateOn || needDetect) {
+    try {
+      const r = await window.bigo.translateText({ text: content, to: chatVoice.translateTo });
+      if (r && r.ok) {
+        const detected = (r.detected || '').toLowerCase();
+        // Ưu tiên ngôn ngữ nguồn: không thuộc list → bỏ qua cả dịch lẫn đọc.
+        if (needDetect && !langInPriority(detected)) return;
+        if (chatVoice.translateOn && r.text) {
+          const translated = r.text.trim();
+          const isSelf = chatVoice.skipSelf && sameLang(detected, chatVoice.translateTo);
+          if (translated && normEv(translated) !== normEv(content) && !isSelf && div && div.isConnected) {
+            const t = document.createElement('span');
+            t.className = 'chat-translated';
+            t.style.cssText = 'color:#7cc6ff; font-style:italic; margin-left:4px';
+            t.textContent = '➜ ' + translated;
+            div.appendChild(t);
+          }
+          toRead = (translated && !isSelf) ? translated : content;
+          readLang = TTS_LANG_MAP[chatVoice.translateTo] || chatVoice.translateTo;
+        }
+      }
+    } catch {}
+  }
+
+  if (chatVoice.ttsOn && canRead) {
+    // Bỏ dãy số dài (ID, số điện thoại) nếu bật.
+    if (chatVoice.stripNumbers) toRead = toRead.replace(/\d{5,}/g, '').replace(/\s+/g, ' ').trim();
+    if (!toRead || !/\p{L}/u.test(toRead)) return;
+    // Cooldown chống spam theo từng user.
+    if (chatVoice.cooldownSec > 0 && ev.user) {
+      const key = normEv(ev.user);
+      const last = _readCooldown.get(key);
+      if (last && Date.now() - last < chatVoice.cooldownSec * 1000) return;
+      _readCooldown.set(key, Date.now());
+    }
+    const wantName = chatVoice.readName || chatVoice.readMode === 'nameAndComment';
+    const prefix = wantName && ev.user ? `${ev.user}: ` : '';
+    speakText(prefix + toRead, readLang || undefined);
+  }
+}
+
+function initChatVoice() {
+  const cbTr = document.getElementById('chatTranslateOn');
+  const selTo = document.getElementById('chatTranslateTo');
+  const cbTts = document.getElementById('chatTtsOn');
+  const cbName = document.getElementById('chatReadName');
+  const selVoice = document.getElementById('chatTtsVoice');
+  const rate = document.getElementById('chatTtsRate');
+
+  if (cbTr) {
+    cbTr.checked = chatVoice.translateOn;
+    cbTr.addEventListener('change', () => {
+      chatVoice.translateOn = cbTr.checked;
+      localStorage.setItem('cv_translateOn', cbTr.checked ? '1' : '0');
+    });
+  }
+  if (selTo) {
+    selTo.value = chatVoice.translateTo;
+    selTo.addEventListener('change', () => {
+      chatVoice.translateTo = selTo.value;
+      localStorage.setItem('cv_translateTo', selTo.value);
+    });
+  }
+  if (cbTts) {
+    cbTts.checked = chatVoice.ttsOn;
+    cbTts.addEventListener('change', () => {
+      chatVoice.ttsOn = cbTts.checked;
+      localStorage.setItem('cv_ttsOn', cbTts.checked ? '1' : '0');
+      // Bật lần đầu: kích hoạt voice list (Chromium load async).
+      if (cbTts.checked) reloadTtsVoices();
+    });
+  }
+  if (cbName) {
+    cbName.checked = chatVoice.readName;
+    cbName.addEventListener('change', () => {
+      chatVoice.readName = cbName.checked;
+      localStorage.setItem('cv_readName', cbName.checked ? '1' : '0');
+    });
+  }
+  if (selVoice) {
+    selVoice.addEventListener('change', () => {
+      chatVoice.voiceURI = selVoice.value;
+      localStorage.setItem('cv_voice', selVoice.value);
+    });
+  }
+  if (rate) {
+    rate.value = String(chatVoice.rate);
+    rate.addEventListener('input', () => {
+      chatVoice.rate = parseFloat(rate.value) || 1;
+      localStorage.setItem('cv_rate', rate.value);
+    });
+  }
+  if (window.speechSynthesis) {
+    reloadTtsVoices();
+    speechSynthesis.onvoiceschanged = reloadTtsVoices;
+  }
+  initVoiceSettingsModal();
+  initForbiddenSync();
+}
+
+// Nạp từ cấm: dùng cache ngay (offline), rồi đồng bộ Sheet nền.
+function setForbiddenStatus(msg) {
+  const el = document.getElementById('vsForbiddenStatus');
+  if (el) el.textContent = msg;
+}
+async function syncForbidden(manual) {
+  setForbiddenStatus(manual ? 'Đang đồng bộ…' : 'Đang cập nhật…');
+  try {
+    const r = await window.bigo.forbiddenSync();
+    sheetBanned = Array.isArray(r.words) ? r.words : sheetBanned;
+    if (r.ok) setForbiddenStatus(`✅ ${r.count} từ cấm (đã đồng bộ Sheet)`);
+    else setForbiddenStatus(`⚠️ Lỗi mạng — dùng ${r.count} từ đã lưu`);
+  } catch (e) {
+    setForbiddenStatus(`⚠️ ${e.message}`);
+  }
+}
+async function initForbiddenSync() {
+  // 1) Cache trước để có hiệu lực ngay cả khi offline.
+  try {
+    const c = await window.bigo.forbiddenCached();
+    if (Array.isArray(c.words)) sheetBanned = c.words;
+    setForbiddenStatus(sheetBanned.length ? `${sheetBanned.length} từ cấm (bộ nhớ)` : 'Chưa có — bấm Đồng bộ');
+  } catch {}
+  // 2) Đồng bộ Sheet nền.
+  syncForbidden(false);
+  const btn = document.getElementById('vsForbiddenSync');
+  if (btn) btn.onclick = () => syncForbidden(true);
+}
+
+// Modal ⚙️ — cài đặt nâng cao. Bind trực tiếp: mọi thay đổi lưu ngay localStorage.
+function initVoiceSettingsModal() {
+  const dlg = document.getElementById('voiceSettingsDialog');
+  const btn = document.getElementById('btnVoiceSettings');
+  if (!dlg || !btn) return;
+  btn.onclick = () => dlg.showModal();
+
+  // Ưu tiên ngôn ngữ nguồn (checkboxes)
+  const langWrap = document.getElementById('vsLangPriority');
+  if (langWrap) {
+    langWrap.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.checked = chatVoice.langPriority.includes(cb.value);
+      cb.addEventListener('change', () => {
+        const set = new Set(chatVoice.langPriority);
+        if (cb.checked) set.add(cb.value); else set.delete(cb.value);
+        chatVoice.langPriority = [...set];
+        localStorage.setItem('cv_langPriority', JSON.stringify(chatVoice.langPriority));
+      });
+    });
+  }
+
+  const bindCheck = (id, key, ls) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.checked = chatVoice[key];
+    el.addEventListener('change', () => {
+      chatVoice[key] = el.checked;
+      localStorage.setItem(ls, el.checked ? '1' : '0');
+    });
+  };
+  const bindSelect = (id, key, ls, parse) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = String(chatVoice[key]);
+    el.addEventListener('change', () => {
+      chatVoice[key] = parse ? parse(el.value) : el.value;
+      localStorage.setItem(ls, el.value);
+    });
+  };
+  const bindText = (id, key, ls) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = chatVoice[key];
+    el.addEventListener('input', () => {
+      chatVoice[key] = el.value;
+      localStorage.setItem(ls, el.value);
+    });
+  };
+
+  bindCheck('vsSkipSelf', 'skipSelf', 'cv_skipSelf');
+  bindSelect('vsReadPriority', 'readPriority', 'cv_readPriority');
+  bindSelect('vsCooldown', 'cooldownSec', 'cv_cooldown', v => parseInt(v, 10) || 0);
+  bindCheck('vsSkipNumberOnly', 'skipNumberOnly', 'cv_skipNumberOnly');
+  bindCheck('vsStripNumbers', 'stripNumbers', 'cv_stripNumbers');
+  bindText('vsGlossary', 'glossary', 'cv_glossary');
+  bindText('vsBanned', 'banned', 'cv_banned');
+
+  const vol = document.getElementById('vsVolume');
+  const volV = document.getElementById('vsVolumeV');
+  if (vol) {
+    vol.value = String(chatVoice.volume);
+    if (volV) volV.textContent = String(chatVoice.volume);
+    vol.addEventListener('input', () => {
+      chatVoice.volume = parseInt(vol.value, 10);
+      if (volV) volV.textContent = vol.value;
+      localStorage.setItem('cv_volume', vol.value);
+    });
+  }
+}
+
 function renderParsed(ev) {
   // Bỏ gift_overlay UI render hoàn toàn — đây là duplicate của gift event từ chat
   if (ev.type === 'gift_overlay') {
@@ -4417,6 +4835,8 @@ function renderParsed(ev) {
     els.liveChats.appendChild(div);
     while (els.liveChats.children.length > 200) els.liveChats.firstChild.remove();
     els.liveChats.scrollTop = els.liveChats.scrollHeight;
+    // Dịch + đọc (TTS) — fire-and-forget, không chặn render.
+    handleChatVoice(ev, div);
     return;
   }
   if (ev.type === 'gift' || ev.type === 'gift_overlay') {
@@ -4431,6 +4851,7 @@ function renderParsed(ev) {
       sessionStats.giftCount += (ev.gift_count || 1) * (ev.combo || 1);
       sessionStats.diamond += giftDiamondPointsFromEvent(ev);
       if (ev.user) sessionStats.users.add(ev.user);
+      markGifter(ev.user);
       if (matched && hasEffectMedia(matched) && !matched.background) {
         sessionStats.effects += playTimes;
       }
@@ -4452,6 +4873,55 @@ function renderParsed(ev) {
   }
 }
 
+const seenHeartSeqs = new Set();
+function shouldSkipHeartBySeq(ev) {
+  const seq = String(ev?.data_seq || '').trim();
+  if (!seq) return false;
+  if (seenHeartSeqs.has(seq)) return true;
+  seenHeartSeqs.add(seq);
+  if (seenHeartSeqs.size > 2000) {
+    const first = seenHeartSeqs.values().next().value;
+    if (first) seenHeartSeqs.delete(first);
+  }
+  return false;
+}
+
+function normalizeIncomingEvent(ev, source = 'dom') {
+  if (!ev || typeof ev !== 'object') return ev;
+  const out = { ...ev, source: ev.source || source };
+  if (out.type === 'msg') out.type = 'chat';
+
+  if (source === 'open-api') {
+    const displayName = out.nick_name || out.user_name || '';
+    if (displayName) {
+      if (out.user && !out.user_openid) out.user_openid = out.user;
+      out.user = displayName;
+    }
+    if (out.user_img && !out.user_avatar_url) out.user_avatar_url = out.user_img;
+    if (out.gift_url && !out.gift_icon) out.gift_icon = out.gift_url;
+    if (out.type === 'gift' && out.gift_count == null && out.count != null) out.gift_count = out.count;
+  }
+
+  if (out.type === 'heart') {
+    out.count = Math.max(1, parseInt(out.count, 10) || 1);
+  }
+  return out;
+}
+
+function handleParsedLiveEvent(ev, source = 'dom') {
+  const parsed = normalizeIncomingEvent(ev, source);
+  if (!parsed) return;
+  if (parsed.type === 'gift' || parsed.type === 'chat') nudgeAutoFocusOverlays();
+  if (parsed.type === 'heart') {
+    if (!shouldSkipHeartBySeq(parsed)) {
+      if (source === 'open-api') appendLog(`[open-api:heart] +${parsed.count || 1} tym từ ${parsed.user || parsed.user_openid || 'viewer'}`);
+      bumpHeartCount(parsed.count || 1);
+    }
+    return;
+  }
+  renderParsed(parsed);
+}
+
 // Forward to queue popup if open
 function forwardToQueuePopup(item) {
   if (window.bigo.popupSendQueue) {
@@ -4470,14 +4940,7 @@ function nudgeAutoFocusOverlays() {
 
 function renderEmbedEvent(ev) {
   if (ev.kind === 'parsed') {
-    // Auto-focus on gift or chat event
-    if (ev.type === 'gift' || ev.type === 'chat') nudgeAutoFocusOverlays();
-    // Heart event → bump heart KPI counter
-    if (ev.type === 'heart') {
-      const n = parseInt(ev.count, 10) || 1;
-      bumpHeartCount(n);
-    }
-    return renderParsed(ev);
+    return handleParsedLiveEvent(ev, 'dom');
   }
   if (ev.kind === 'meta') {
     if (ev.viewerCount != null) setLiveViewerCount(ev);
@@ -4922,9 +5385,8 @@ document.querySelectorAll('.se-unpick').forEach(btn => {
 
 // =================== TÁP TIM (heart goal KPI) ===================
 // Trigger: khi tổng số tym đạt target → phát media. Counter reset sau đó.
-// Nguồn data heart count: scraper bigo.tv (preload-embed) phải detect heart UI
-// element và emit 'heart_count' event. Hiện tại scraper CHƯA detect → tính năng
-// này wire UI + logic, chờ DOM live test để add scraper hook.
+// Nguồn data heart count: DOM scraper detect tin hệ thống hoặc Open API trả
+// { type:'heart', count:N, data_seq }. Handler chung nhận → bumpHeartCount(n).
 function applyHeartGoalUi() {
   const cfg = appSettings.specialEffects?.heartGoal || {};
   const enabledEl = document.getElementById('seHeartEnabled');
@@ -4976,15 +5438,21 @@ function applyHeartGoalUi() {
   }
 }
 
+let _heartGoalCompleting = false; // guard: chỉ phát hiệu ứng 1 LẦN mỗi chu kỳ đạt mục tiêu
+
 function bumpHeartCount(n = 1) {
   const cfg = appSettings.specialEffects.heartGoal;
   if (!cfg || !cfg.enabled) return;
+  // Đang trong chu kỳ hoàn thành (2.5s) → bỏ qua bump để KHÔNG cộng dồn tiếp và
+  // KHÔNG phát hiệu ứng/âm thanh lần 2 (tránh 2 tiếng chồng nhau khi tim dồn qua mốc).
+  if (_heartGoalCompleting) return;
   cfg.currentCount = (cfg.currentCount || 0) + n;
   const countEl = document.getElementById('seHeartCount');
   if (countEl) countEl.textContent = cfg.currentCount;
   // Update vòng tròn overlay nếu đang mở
   pushHeartOverlayUpdate();
   if (cfg.currentCount >= (cfg.target || 100)) {
+    _heartGoalCompleting = true;
     appendLog(`[se:heartGoal] Đạt ${cfg.currentCount}/${cfg.target} tym → phát media`);
     if (cfg.mediaFile && cfg.overlayId) {
       const payload = resolveMediaPayload(cfg.mediaFile);
@@ -4996,6 +5464,7 @@ function bumpHeartCount(n = 1) {
       if (countEl) countEl.textContent = 0;
       saveAppSettings({ specialEffects: { heartGoal: { currentCount: 0 } } });
       pushHeartOverlayUpdate();
+      _heartGoalCompleting = false;
     }, 2500);
   }
 }
@@ -5059,6 +5528,7 @@ function pushHeartOverlayUpdate() {
     saveAppSettings({ specialEffects: { heartGoal: { mediaFile: picked.fileUrl } } });
   };
   if (resetBtn) resetBtn.onclick = () => {
+    _heartGoalCompleting = false;
     appSettings.specialEffects.heartGoal.currentCount = 0;
     document.getElementById('seHeartCount').textContent = 0;
     saveAppSettings({ specialEffects: { heartGoal: { currentCount: 0 } } });
@@ -5085,6 +5555,14 @@ function pushHeartOverlayUpdate() {
   if (hideOvBtn) hideOvBtn.onclick = () => {
     if (window.bigo.heartOverlayHide) window.bigo.heartOverlayHide();
   };
+  // Copy link OBS (Browser Source, nền trong suốt) cho Táp tim
+  const copyUrlBtn = document.getElementById('btnHeartCopyUrl');
+  if (copyUrlBtn) copyUrlBtn.onclick = async () => {
+    pushHeartOverlayUpdate(); // seed state cho client OBS vừa kết nối
+    const r = await window.bigo.heartCopyUrl().catch(e => ({ ok: false, error: e.message }));
+    if (r?.ok) appendLog('[se:heartGoal] đã copy link OBS: ' + r.url);
+    else alert(r?.error || 'Không copy được link Táp tim');
+  };
   // Color pickers — save + update overlay realtime
   for (const [id, key] of [['seHeartRingColor','ringColor'],['seHeartRingComplete','ringComplete'],['seHeartTextColor','textColor']]) {
     const el = document.getElementById(id);
@@ -5098,6 +5576,76 @@ function pushHeartOverlayUpdate() {
     });
   }
 })();
+
+function initHeartOpenApiUi(settings = {}) {
+  const api = settings.openApi || {};
+  const envEl = document.getElementById('heartApiEnv');
+  const gameEl = document.getElementById('heartApiGameId');
+  const openidEl = document.getElementById('heartApiOpenid');
+  const tokenEl = document.getElementById('heartApiToken');
+  const startBtn = document.getElementById('btnHeartApiStart');
+  const stopBtn = document.getElementById('btnHeartApiStop');
+  const testBtn = document.getElementById('btnHeartApiTest');
+  const statusEl = document.getElementById('heartApiStatus');
+  if (!envEl || !gameEl || !openidEl || !tokenEl || !startBtn) return;
+
+  envEl.value = api.env || settings.env || 'prod';
+  gameEl.value = api.gameId || settings.gameId || '';
+  openidEl.value = api.openid || settings.openid || '';
+  tokenEl.value = api.accessToken || settings.accessToken || '';
+
+  const setStatus = (text, ok) => {
+    if (!statusEl) return;
+    statusEl.textContent = text;
+    statusEl.style.color = ok ? '#7fdda0' : '#ffb627';
+  };
+  const saveApiSettings = async () => {
+    const s = await window.bigo.settingsLoad();
+    s.openApi = {
+      ...(s.openApi || {}),
+      env: envEl.value,
+      gameId: gameEl.value.trim(),
+      openid: openidEl.value.trim(),
+      accessToken: tokenEl.value.trim(),
+      source: 'open-api',
+    };
+    await window.bigo.settingsSave(s);
+    return s.openApi;
+  };
+
+  for (const el of [envEl, gameEl, openidEl, tokenEl]) {
+    el.addEventListener('change', () => saveApiSettings().catch(() => {}));
+  }
+
+  startBtn.onclick = async () => {
+    const cfg = await saveApiSettings();
+    if (!cfg.accessToken || !cfg.gameId || !cfg.openid) {
+      setStatus('thiếu access_token / game_id / openid', false);
+      return;
+    }
+    setStatus('đang enable_danmu...', false);
+    appendLog('[open-api] start enable_danmu + poll_data theo tài liệu BIGO');
+    const res = await window.bigo.start({ env: cfg.env, accessToken: cfg.accessToken, gameId: cfg.gameId, openid: cfg.openid });
+    if (res?.ok) {
+      setStatus(`đang chạy · game_sess=${res.gameSess}`, true);
+      appendLog(`[open-api] started game_sess=${res.gameSess}`);
+    } else {
+      setStatus(res?.error || 'start lỗi', false);
+      appendLog(`[open-api] start lỗi: ${res?.error || 'unknown'}`);
+    }
+  };
+
+  if (stopBtn) stopBtn.onclick = async () => {
+    await window.bigo.stop();
+    setStatus('đã stop', false);
+    appendLog('[open-api] stopped');
+  };
+
+  if (testBtn) testBtn.onclick = async () => {
+    await window.bigo.testEvent('heart');
+    setStatus('đã gửi sample heart +10', true);
+  };
+}
 
 // "▶ Test" button: phát thử ngay (không cần gift trigger).
 document.querySelectorAll('.se-test').forEach(btn => {
@@ -7627,6 +8175,7 @@ if (sidebarBgmBtn) {
 
 // =================== Wire up ===================
 window.bigo.onLog(appendLog);
+window.bigo.onEvent((ev) => handleParsedLiveEvent(ev, 'open-api'));
 window.bigo.onEmbedEvent(renderEmbedEvent);
 
 init();

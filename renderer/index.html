@@ -103,11 +103,11 @@
               </div>
             </div>
             <div id="queueCardSettings" class="queue-settings-popover">
-              <label>Icon quà <span id="qCardIconVal">34</span>px
-                <input type="range" id="qCardIcon" min="24" max="80" value="34" />
+              <label>Icon quà <span id="qCardIconVal">38</span>px
+                <input type="range" id="qCardIcon" min="24" max="80" value="38" />
               </label>
-              <label>Số lượng <span id="qCardCountVal">11</span>px
-                <input type="range" id="qCardCount" min="8" max="24" value="11" />
+              <label>Số lượng <span id="qCardCountVal">13</span>px
+                <input type="range" id="qCardCount" min="8" max="24" value="13" />
               </label>
             </div>
             <div id="miniQueueCards" class="queue-cards"></div>
@@ -128,11 +128,26 @@
               <h2>💬 TƯƠNG TÁC</h2>
               <div style="display:flex; gap:6px; align-items:center; font-size:11px; color:#8a8f9a">
                 <span>A-</span>
-                <input type="range" id="chatFontSize" min="11" max="100" value="12" style="width:80px" />
+                <input type="range" id="chatFontSize" min="11" max="100" value="14" style="width:80px" />
                 <span style="font-size:14px">A+</span>
                 <button id="btnPopupChats" class="tiny" title="Mở popup riêng">📤</button>
                 <button class="tiny rps-collapse" data-rps-target="chats" title="Thu gọn / mở">▼</button>
               </div>
+            </div>
+            <div class="chat-tools" style="display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; padding:4px 6px; font-size:11px; color:#8a8f9a; border-bottom:1px solid rgba(255,255,255,.06)">
+              <label style="display:flex; align-items:center; gap:3px; cursor:pointer">
+                <input type="checkbox" id="chatTranslateOn"> 🌐 Dịch sang
+              </label>
+              <select id="chatTranslateTo" style="font-size:11px">
+                <option value="vi">Tiếng Việt</option>
+                <option value="en">English</option>
+                <option value="zh-CN">中文</option>
+                <option value="th">ไทย</option>
+                <option value="ko">한국어</option>
+                <option value="ja">日本語</option>
+                <option value="id">Indonesia</option>
+              </select>
+              <button id="btnVoiceSettings" class="tiny" title="Cài đặt Dịch & Đọc: bật đọc, giọng, tốc độ, ưu tiên ngôn ngữ, lọc spam, từ điển">⚙️ Cài đặt</button>
             </div>
             <div id="liveChats" class="chats"></div>
           </div>
@@ -156,11 +171,11 @@
           </div>
         </div>
         <div id="queueSettings" class="row queue-settings-popover" style="margin-bottom:8px; align-items:center">
-          <label>Cỡ chữ <span id="qSizeFontVal" style="color:#ffd166">13</span>px
-            <input type="range" id="qSizeFont" min="11" max="100" value="13" />
+          <label>Cỡ chữ <span id="qSizeFontVal" style="color:#ffd166">15</span>px
+            <input type="range" id="qSizeFont" min="11" max="100" value="15" />
           </label>
-          <label>Cỡ icon <span id="qSizeIconVal" style="color:#ffd166">36</span>px
-            <input type="range" id="qSizeIcon" min="24" max="72" value="36" />
+          <label>Cỡ icon <span id="qSizeIconVal" style="color:#ffd166">40</span>px
+            <input type="range" id="qSizeIcon" min="24" max="72" value="40" />
           </label>
           <label>&nbsp;
             <button id="btnClearQueue" class="tiny">🗑 Xoá list</button>
@@ -755,7 +770,7 @@
         <div class="se-row" style="border-top: 2px solid #1c1f28; margin-top:12px; padding-top:12px">
           <div class="se-row-head">
             <span class="se-icon">❤</span>
-            <b class="se-title">Mục tiêu lượt tym (Táp tim)</b>
+            <b class="se-title">Mục tiêu lượt tym (Táp tim nhé)</b>
             <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#8a8f9a">🎯 <input type="number" id="seHeartTarget" min="1" max="10000" value="100" style="width:80px" /> tym</label>
             <label class="checkbox-row" style="margin-left:auto"><input type="checkbox" id="seHeartEnabled" /> Bật</label>
           </div>
@@ -776,11 +791,27 @@
             <label style="font-size:11px; color:#8a8f9a; display:flex; align-items:center; gap:4px">Chữ <input type="color" id="seHeartTextColor" value="#ffffff" style="width:32px; height:24px; padding:0; border:none; background:transparent; cursor:pointer" /></label>
             <button type="button" class="tiny primary" id="btnHeartOverlayShow" title="Hiện vòng tròn overlay (OBS capture window)">🎯 Hiện overlay</button>
             <button type="button" class="tiny" id="btnHeartOverlayHide">🚫 Ẩn</button>
+            <button type="button" class="tiny" id="btnHeartCopyUrl" title="Copy link Browser Source cho OBS (nền trong suốt)">🔗 Copy link OBS</button>
           </div>
           <div class="hint small" style="margin-top:6px">
             📌 Khi tổng số tym đạt <b>mục tiêu</b> → app phát file đã chọn + vòng tròn overlay đổi màu xanh "🎉 ĐẠT MỤC TIÊU!".
             Counter reset sau 2.5s. Bấm <b>🎯 Hiện overlay</b> để OBS capture window vòng tròn.
-            <span style="color:#ffb627">⚠️ Scraper detect heart count đang trong development — dùng <b>+10 Test</b> để test vòng tròn ngay.</span>
+            <span style="color:#7fdda0">✅ Tự đếm tim thật từ DOM scraper hoặc Open API khi viewer táp tim trong LIVE. Bấm <b>+10 Test</b> để thử vòng tròn không cần chờ tim.</span>
+          </div>
+          <div class="se-row-body" style="margin-top:8px; flex-wrap:wrap; gap:6px">
+            <b style="color:#ffd166; font-size:12px; width:100%">Open API theo tài liệu /broom/pull_data:</b>
+            <select id="heartApiEnv" style="padding:4px 8px; background:#1c1f28; color:#fff; border:1px solid #3a3f4b; border-radius:4px">
+              <option value="prod">prod</option>
+              <option value="gray">gray</option>
+              <option value="test">test</option>
+            </select>
+            <input id="heartApiGameId" placeholder="game_id" style="width:100px; padding:4px 8px" />
+            <input id="heartApiOpenid" placeholder="streamer openid" style="width:150px; padding:4px 8px" />
+            <input id="heartApiToken" type="password" placeholder="access_token" style="min-width:180px; flex:1; padding:4px 8px" />
+            <button type="button" class="tiny primary" id="btnHeartApiStart">Start API</button>
+            <button type="button" class="tiny" id="btnHeartApiStop">Stop</button>
+            <button type="button" class="tiny" id="btnHeartApiTest">Test heart API</button>
+            <span id="heartApiStatus" style="color:#8a8f9a; font-size:11px">chưa chạy</span>
           </div>
         </div>
 
@@ -1213,6 +1244,102 @@
       <div class="modal-actions">
         <button value="cancel">Huỷ</button>
         <button id="dlgOverlaySave" class="primary" value="default">Lưu</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- =================== DIALOG: Cài đặt Dịch & Đọc nâng cao =================== -->
+  <dialog id="voiceSettingsDialog" class="modal">
+    <form method="dialog" style="min-width:520px; max-width:600px">
+      <h3 style="margin:0 0 10px">⚙️ Cài đặt Dịch &amp; Đọc</h3>
+
+      <fieldset style="border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:10px 12px; margin-bottom:12px">
+        <legend style="padding:0 6px; font-weight:600">🔊 Đọc thành tiếng</legend>
+        <div style="display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13px">
+          <label><input type="checkbox" id="chatTtsOn"> Bật đọc to bình luận</label>
+          <label title="Đọc kèm tên người gửi"><input type="checkbox" id="chatReadName"> Đọc kèm tên người gửi</label>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; font-size:13px; margin-top:10px">
+          <label style="display:flex; flex-direction:column; gap:3px">Giọng đọc
+            <select id="chatTtsVoice"><option value="">🌟 Giọng Google (tự nhiên)</option></select>
+          </label>
+          <label style="display:flex; flex-direction:column; gap:3px">Tốc độ đọc
+            <input type="range" id="chatTtsRate" min="0.5" max="2" step="0.1" value="1">
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset style="border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:10px 12px; margin-bottom:12px">
+        <legend style="padding:0 6px; font-weight:600">🌐 Ưu tiên ngôn ngữ dịch</legend>
+        <p style="margin:2px 0 8px; font-size:12px; color:#8a8f9a">Chỉ dịch &amp; đọc bình luận thuộc các ngôn ngữ được tích. <b>Không tích gì = dịch tất cả.</b></p>
+        <div id="vsLangPriority" style="display:flex; flex-wrap:wrap; gap:6px 14px; font-size:13px">
+          <label><input type="checkbox" value="en"> English</label>
+          <label><input type="checkbox" value="zh-CN"> 中文 (Trung)</label>
+          <label><input type="checkbox" value="th"> ไทย (Thái)</label>
+          <label><input type="checkbox" value="ko"> 한국어 (Hàn)</label>
+          <label><input type="checkbox" value="ja"> 日本語 (Nhật)</label>
+          <label><input type="checkbox" value="id"> Indonesia</label>
+          <label><input type="checkbox" value="vi"> Tiếng Việt</label>
+          <label><input type="checkbox" value="ar"> العربية (Ả Rập)</label>
+          <label><input type="checkbox" value="hi"> हिन्दी (Ấn)</label>
+          <label><input type="checkbox" value="es"> Español</label>
+        </div>
+        <label style="display:flex; align-items:center; gap:6px; margin-top:10px; font-size:13px">
+          <input type="checkbox" id="vsSkipSelf"> Không dịch nếu bình luận đã đúng ngôn ngữ đích
+        </label>
+      </fieldset>
+
+      <fieldset style="border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:10px 12px; margin-bottom:12px">
+        <legend style="padding:0 6px; font-weight:600">🔊 Ưu tiên đọc &amp; chống spam</legend>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; font-size:13px">
+          <label style="display:flex; flex-direction:column; gap:3px">Ưu tiên đọc cho
+            <select id="vsReadPriority">
+              <option value="all">Tất cả bình luận</option>
+              <option value="gifters">Chỉ người vừa tặng quà</option>
+              <option value="vip">Chỉ user có huy hiệu (VIP/SVIP/Top)</option>
+              <option value="giftersOrVip">Tặng quà hoặc có huy hiệu</option>
+            </select>
+          </label>
+          <label style="display:flex; flex-direction:column; gap:3px">Chống spam (nghỉ/người)
+            <select id="vsCooldown">
+              <option value="0">Không giới hạn</option>
+              <option value="3">3 giây/người</option>
+              <option value="4">4 giây/người</option>
+              <option value="5">5 giây/người</option>
+              <option value="8">8 giây/người</option>
+              <option value="10">10 giây/người</option>
+            </select>
+          </label>
+          <label style="display:flex; flex-direction:column; gap:3px">Âm lượng (<span id="vsVolumeV">100</span>%)
+            <input type="range" id="vsVolume" min="0" max="100" step="5" value="100">
+          </label>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:10px; font-size:13px">
+          <label><input type="checkbox" id="vsSkipNumberOnly"> Bỏ bình luận chỉ toàn số/ký hiệu</label>
+          <label><input type="checkbox" id="vsStripNumbers"> Không đọc dãy số dài (ID, số điện thoại)</label>
+        </div>
+      </fieldset>
+
+      <fieldset style="border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:10px 12px; margin-bottom:6px">
+        <legend style="padding:0 6px; font-weight:600">📖 Từ điển &amp; từ cấm</legend>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px">
+          <label style="display:flex; flex-direction:column; gap:3px">Thay thế (mỗi dòng: <code>gốc=&gt;thay</code>)
+            <textarea id="vsGlossary" rows="4" spellcheck="false" placeholder="hp=>HP Media&#10;ny=>người yêu" style="resize:vertical"></textarea>
+          </label>
+          <label style="display:flex; flex-direction:column; gap:3px">Từ cấm bổ sung (mỗi dòng 1 từ)
+            <textarea id="vsBanned" rows="4" spellcheck="false" placeholder="spam&#10;quảng cáo" style="resize:vertical"></textarea>
+          </label>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:10px; font-size:12px">
+          <button type="button" id="vsForbiddenSync" class="ghost mini">🔄 Đồng bộ từ cấm (Sheet)</button>
+          <span id="vsForbiddenStatus" style="color:#8a8f9a">…</span>
+        </div>
+        <p style="margin:6px 0 0; font-size:11px; color:#8a8f9a">Tự lấy từ Google Sheet tab <b>COMMENT</b>, cột A. Bình luận chứa từ cấm sẽ bị bỏ qua (không dịch/đọc).</p>
+      </fieldset>
+
+      <div class="modal-actions" style="margin-top:12px">
+        <button value="cancel">Đóng</button>
+        <button class="primary" value="default" id="vsSave">Lưu</button>
       </div>
     </form>
   </dialog>

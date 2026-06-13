@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld('bigo', {
   heartOverlayShow: () => ipcRenderer.invoke('heart-overlay:show'),
   heartOverlayHide: () => ipcRenderer.invoke('heart-overlay:hide'),
   heartOverlayUpdate: (payload) => ipcRenderer.invoke('heart-overlay:update', payload),
+  heartCopyUrl: () => ipcRenderer.invoke('heart:copy-url'),
 
   // License (Google Apps Script)
   licenseMachineId: () => ipcRenderer.invoke('license:machine-id'),
@@ -85,6 +86,14 @@ contextBridge.exposeInMainWorld('bigo', {
   stop: () => ipcRenderer.invoke('bigo:stop'),
   testEvent: (type) => ipcRenderer.invoke('bigo:test-event', type),
   checkLive: (bigoId) => ipcRenderer.invoke('bigo:check-live', bigoId),
+
+  // Dịch chat (Google Translate qua main process — né CORS)
+  translateText: (opts) => ipcRenderer.invoke('translate:text', opts),
+  // Đọc chat bằng Google TTS (giọng Việt tự nhiên, không cần cài giọng Windows)
+  ttsGoogle: (opts) => ipcRenderer.invoke('tts:google', opts),
+  // Từ cấm đồng bộ từ Google Sheet (tab COMMENT, cột A)
+  forbiddenSync: () => ipcRenderer.invoke('forbidden:sync'),
+  forbiddenCached: () => ipcRenderer.invoke('forbidden:cached'),
 
   // Web Embed listener
   embedStart: (opts) => ipcRenderer.invoke('embed:start', opts),

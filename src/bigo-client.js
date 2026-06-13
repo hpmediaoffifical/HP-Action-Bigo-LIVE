@@ -89,7 +89,7 @@ class BigoClient {
     if (res.context) this.context = res.context;
     if (Array.isArray(res.danmu_data)) {
       for (const room of res.danmu_data) {
-        const datas = Array.isArray(room.datas) ? room.datas : [];
+        const datas = Array.isArray(room.datas) ? room.datas : (Array.isArray(room.data) ? room.data : []);
         for (const d of datas) {
           const ts = Number(d.ts || 0);
           if (ts > this.lastTs) this.lastTs = ts;
