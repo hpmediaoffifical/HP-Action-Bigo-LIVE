@@ -12,13 +12,316 @@
       "isCommon": true
     },
     {
-      "id": "g_default",
-      "name": "Mặc định",
+      "id": "g_mox8ulzfk04f",
+      "name": "NPC",
+      "type": "gift",
+      "enabled": false,
+      "collapsed": false,
+      "bigoId": "npccc",
+      "items": [
+        {
+          "id": "i_mqczee00unyz",
+          "matchKeys": [
+            "6210",
+            "Shaved Ice"
+          ],
+          "alias": "Shaved Ice",
+          "mediaFile": "",
+          "mediaFiles": [],
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": false,
+          "background": false,
+          "priority": 0
+        }
+      ],
+      "bgmFile": "file:///G:/MUSIC BG/HİlXg - Reay kill - YouTube.mp3",
+      "bgmFileName": "HİlXg - Reay kill - YouTube.mp3",
+      "memberIds": []
+    },
+    {
+      "id": "g_mox9je2347fw",
+      "name": "Peo",
       "type": "gift",
       "enabled": true,
       "collapsed": false,
+      "bigoId": "aaaaa",
+      "items": [
+        {
+          "id": "i_moz6mor4q7nf",
+          "matchKeys": [
+            "1",
+            "Flower"
+          ],
+          "alias": "💓Heart Rose",
+          "mediaFile": "02. Bướm Ảo.webm",
+          "mediaFiles": [
+            "02. Bướm Ảo.webm"
+          ],
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": false,
+          "background": false,
+          "priority": 0
+        },
+        {
+          "id": "i_moxb2tre7cfv",
+          "matchKeys": [
+            "6422",
+            "Mace X GALA"
+          ],
+          "alias": "HÔN TÔI ĐI",
+          "mediaFile": "file:///G:/NPC 2026/NATRA/Webm/06. boom khong no 2 (1).webm",
+          "mediaFiles": [
+            "file:///G:/NPC 2026/NATRA/Webm/06. boom khong no 2 (1).webm"
+          ],
+          "overlayId": "ov_mp8krs9oy0ph",
+          "pauseBgm": false,
+          "preEffect": false,
+          "background": true,
+          "priority": 0
+        },
+        {
+          "id": "g_mox4yxkelnd9",
+          "matchKeys": [
+            "1",
+            "Flower",
+            "1140",
+            "Kiss",
+            "3121",
+            "Pink Rose",
+            "501139",
+            "502703",
+            "Fragrant",
+            "503665",
+            "وردة العائلة",
+            "9",
+            "3355",
+            "7340"
+          ],
+          "alias": "Flower",
+          "mediaFile": "Tơ nhện.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": false,
+          "priority": 0,
+          "mediaFiles": [
+            "Tơ nhện.webm"
+          ]
+        },
+        {
+          "id": "i_moxc5oh9rk0x",
+          "matchKeys": [
+            "2463",
+            "Bell",
+            "7750",
+            "Bell-测试68372/60190"
+          ],
+          "alias": "CHUÔNG XA NGÃ",
+          "mediaFile": "10. Trói Dây Leo 1.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 0,
+          "mediaFiles": [
+            "10. Trói Dây Leo 1.webm"
+          ]
+        },
+        {
+          "id": "i_moxdzuao0rkl",
+          "matchKeys": [
+            "5355",
+            "Duck Box"
+          ],
+          "alias": "Duck Box",
+          "mediaFile": "Do For Love 29s.mp3",
+          "mediaFiles": [
+            "Do For Love 29s.mp3"
+          ],
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": true,
+          "priority": 0
+        },
+        {
+          "id": "i_moxf76ewyq6n",
+          "matchKeys": [
+            "503633",
+            "Ashkin DINO"
+          ],
+          "alias": "Galaxy Ring",
+          "mediaFile": "01. Kim Mộc Thủy Hỏa Thổ.webm",
+          "mediaFiles": [
+            "01. Kim Mộc Thủy Hỏa Thổ.webm"
+          ],
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 0
+        },
+        {
+          "id": "i_moxg99g7o4l1",
+          "matchKeys": [
+            "500858",
+            "Gold"
+          ],
+          "alias": "Gold",
+          "mediaFile": "11. Tức Giận.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 2,
+          "mediaFiles": [
+            "11. Tức Giận.webm"
+          ]
+        },
+        {
+          "id": "i_moxfttwodyvs",
+          "matchKeys": [
+            "504532",
+            "Red Cap"
+          ],
+          "alias": "Red Cap",
+          "mediaFile": "Knock Knock 12s.mp3",
+          "mediaFiles": [
+            "Knock Knock 12s.mp3"
+          ],
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 0
+        },
+        {
+          "id": "g_mox5xbantd65",
+          "matchKeys": [
+            "5773",
+            "Heart Lock",
+            "7511"
+          ],
+          "alias": "Heart Lock",
+          "mediaFile": "Tơ nhện.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": true,
+          "priority": 0,
+          "mediaFiles": [
+            "Tơ nhện.webm"
+          ]
+        },
+        {
+          "id": "i_moyckldem98z",
+          "matchKeys": [
+            "504198",
+            "Mauve Wing"
+          ],
+          "alias": "Interstellar Watch",
+          "mediaFile": "04. Chưởng Năng Lượng.webm",
+          "mediaFiles": [
+            "04. Chưởng Năng Lượng.webm"
+          ],
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 0
+        },
+        {
+          "id": "i_moyjykqqw23n",
+          "matchKeys": [
+            "501505",
+            "Golden hourglass"
+          ],
+          "alias": "Golden hourglass",
+          "mediaFile": "03. Chớp Mắt.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 0,
+          "mediaFiles": [
+            "03. Chớp Mắt.webm"
+          ]
+        },
+        {
+          "id": "g_mox4yljml3od",
+          "matchKeys": [
+            "2968",
+            "Blue Flower"
+          ],
+          "alias": "Blue Flower",
+          "mediaFile": "02. Bướm Ảo.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": true,
+          "preEffect": false,
+          "priority": 3,
+          "mediaFiles": [
+            "02. Bướm Ảo.webm"
+          ]
+        },
+        {
+          "id": "i_mox9vw2zsv1c",
+          "matchKeys": [
+            "500348",
+            "Bluelover"
+          ],
+          "alias": "Bluelover",
+          "mediaFile": "05. Đá Rơi.webm",
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": false,
+          "priority": 0,
+          "mediaFiles": [
+            "05. Đá Rơi.webm"
+          ]
+        },
+        {
+          "id": "g_mox7x2tvggnl",
+          "matchKeys": [
+            "501947",
+            "Star Food Box"
+          ],
+          "alias": "Star Food Box",
+          "mediaFile": "07. Đóng cửa.webm",
+          "mediaFiles": [
+            "07. Đóng cửa.webm"
+          ],
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": false,
+          "priority": 0
+        }
+      ],
+      "memberIds": [
+        "mem_1778392676154_h8oda",
+        "mem_1778392683647_keb5j",
+        "mem_1778392688744_wzhcr",
+        "mem_1778393039617_3dj2p"
+      ],
+      "bgmFile": null,
+      "bgmFileName": ""
+    },
+    {
+      "id": "g_mox9jh2358um",
+      "name": "Ada",
+      "type": "gift",
+      "enabled": false,
+      "collapsed": false,
       "bigoId": "",
-      "items": []
+      "items": [
+        {
+          "id": "i_mqczeaq7iueo",
+          "matchKeys": [
+            "501505",
+            "Golden hourglass"
+          ],
+          "alias": "Golden hourglass",
+          "mediaFile": "",
+          "mediaFiles": [],
+          "overlayId": "ov_mowzeyw8m6as",
+          "pauseBgm": false,
+          "preEffect": false,
+          "background": false,
+          "priority": 0
+        }
+      ]
     }
   ],
   "overlays": [

@@ -260,9 +260,10 @@ function pushPlayBatch(item, ev, playTimes) {
   const baseUser = ev?.user || 'NHPHUNG';
   // Avatar: NHPHUNG → logo HP. User thường → raw avatar (nếu scraper bắt được).
   const baseAvatar = resolveAvatarForUser(baseUser, ev?.user_avatar_url);
-  const baseName = item?.alias || ev?.gift_name || (item?.matchKeys || [])[0] || '?';
-  const baseId = ev?.gift_id ?? null;
-  const baseIcon = ev?.gift_icon || ev?.gift_icon_url || (item ? getGiftIcon(item) : '');
+  const baseAlias = item ? getGameplayItemName(item) : '';
+  const baseName = getEventGiftNames(ev)[0] || baseAlias || '?';
+  const baseId = getEventGiftId(ev);
+  const baseIcon = getEventGiftIcon(ev) || (item ? getGiftIcon(item) : '');
   const baseGiftKey = buildQueueGiftKey(baseId, baseName, baseIcon);
   const baseDiamond = ev?.total_diamond != null && playTimes > 0
     ? Math.max(1, Math.round(ev.total_diamond / playTimes))
@@ -280,6 +281,7 @@ function pushPlayBatch(item, ev, playTimes) {
       ts: Date.now() + i,
       user: baseUser, avatar: baseAvatar,
       gift_name: baseName, gift_id: baseId, gift_icon: baseIcon,
+      gift_alias: baseAlias,
       gift_key: baseGiftKey,
       level: baseLevel,
       count: 1, step: i + 1, total: playTimes,
@@ -694,17 +696,93 @@ function levelTier(lv) {
   return 6;
 }
 
-// Match 1 special effect cfg với 1 gift event (by typeid hoặc giftName).
+function getEventGiftId(ev) {
+  const candidates = [
+    ev?.gift_id, ev?.giftId, ev?.gift_type_id, ev?.giftTypeId,
+    ev?.typeid, ev?.type_id, ev?.gift?.typeid, ev?.gift?.id, ev?.gift?.gift_id,
+  ];
+  for (const v of candidates) {
+    if (v == null || v === '') continue;
+    return v;
+  }
+  return null;
+}
+
+function getEventGiftNames(ev) {
+  const names = [
+    ev?.gift_name, ev?.giftName, ev?.gift_name_vn, ev?.name,
+    ev?.gift?.name, ev?.gift?.gift_name,
+  ];
+  const out = [];
+  const seen = new Set();
+  for (const name of names) {
+    const raw = String(name || '').trim();
+    if (!raw) continue;
+    const key = normalizeGameplayGiftKey(raw);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(raw);
+  }
+  return out;
+}
+
+function getEventGiftIcon(ev) {
+  return ev?.gift_icon || ev?.gift_icon_url || ev?.gift_url || ev?.iconUrl || ev?.icon || ev?.gift?.img_url || ev?.gift?.icon || '';
+}
+
+function getSpecialCfgId(cfg, prefix = '') {
+  return prefix ? cfg?.[`${prefix}Typeid`] : cfg?.typeid;
+}
+
+function getSpecialCfgName(cfg, prefix = '') {
+  return prefix ? cfg?.[`${prefix}GiftName`] : cfg?.giftName;
+}
+
+function getSpecialCfgIcon(cfg, prefix = '') {
+  return prefix ? cfg?.[`${prefix}IconUrl`] : cfg?.iconUrl;
+}
+
+function specialCfgHasGiftIdentity(cfg, prefix = '') {
+  return !!(getSpecialCfgId(cfg, prefix) || getSpecialCfgName(cfg, prefix) || getSpecialCfgIcon(cfg, prefix));
+}
+
+function specialCfgToGiftEvent(cfg, prefix = '') {
+  return {
+    gift_id: getSpecialCfgId(cfg, prefix) || null,
+    gift_name: getSpecialCfgName(cfg, prefix) || '',
+    gift_icon: getSpecialCfgIcon(cfg, prefix) || '',
+  };
+}
+
+function idsEqual(a, b) {
+  if (a == null || b == null || a === '' || b === '') return false;
+  const an = Number(a);
+  const bn = Number(b);
+  if (Number.isFinite(an) && Number.isFinite(bn)) return an === bn;
+  return String(a).trim() === String(b).trim();
+}
+
+function specialCfgMatchesGiftEvent(ev, cfg, prefix = '') {
+  if (!cfg || !specialCfgHasGiftIdentity(cfg, prefix)) return false;
+  const cfgId = getSpecialCfgId(cfg, prefix);
+  const evId = getEventGiftId(ev);
+  if (idsEqual(cfgId, evId)) return true;
+
+  const cfgName = normalizeGameplayGiftKey(getSpecialCfgName(cfg, prefix));
+  if (cfgName) {
+    const eventNames = getEventGiftNames(ev).map(normalizeGameplayGiftKey).filter(Boolean);
+    if (eventNames.includes(cfgName)) return true;
+  }
+
+  const cfgIcon = normalizeGameplayIconUrl(getSpecialCfgIcon(cfg, prefix));
+  const evIcon = normalizeGameplayIconUrl(getEventGiftIcon(ev));
+  return !!cfgIcon && !!evIcon && cfgIcon === evIcon;
+}
+
+// Match 1 special effect cfg với 1 gift event (by id/name/icon, nhiều nguồn event).
 function matchSpecialGift(ev, cfg) {
   if (!cfg || !cfg.enabled) return false;
-  if (!cfg.typeid && !cfg.giftName) return false;
-  if (cfg.typeid && ev.gift_id && Number(ev.gift_id) === Number(cfg.typeid)) return true;
-  if (cfg.giftName && ev.gift_name) {
-    const a = String(ev.gift_name).toLowerCase().trim();
-    const b = String(cfg.giftName).toLowerCase().trim();
-    if (a === b) return true;
-  }
-  return false;
+  return specialCfgMatchesGiftEvent(ev, cfg);
 }
 
 function specialGiftLabelHtml(cfg, fields = { id: 'typeid', name: 'giftName', icon: 'iconUrl' }) {
@@ -719,20 +797,24 @@ function specialGiftLabelHtml(cfg, fields = { id: 'typeid', name: 'giftName', ic
 
 function queueItemMatchesSpecialTarget(q, cfg) {
   if (!q || !cfg) return false;
-  if (cfg.targetTypeid && q.gift_id != null && Number(q.gift_id) === Number(cfg.targetTypeid)) return true;
-  const targetName = normalizeGameplayGiftKey(cfg.targetGiftName || '');
+  const targetEv = specialCfgToGiftEvent(cfg, 'target');
+  if (!specialCfgHasGiftIdentity(cfg, 'target')) return false;
+  if (idsEqual(cfg.targetTypeid, q.gift_id)) return true;
+  const targetName = normalizeGameplayGiftKey(targetEv.gift_name || '');
   if (targetName) {
-    const qNames = [q.gift_name, q.effect_name].map(normalizeGameplayGiftKey).filter(Boolean);
+    const qNames = [q.gift_name, q.effect_name, q.gift_alias].map(normalizeGameplayGiftKey).filter(Boolean);
     if (qNames.includes(targetName)) return true;
   }
-  const targetIcon = normalizeGameplayIconUrl(cfg.targetIconUrl || '');
+  const targetIcon = normalizeGameplayIconUrl(targetEv.gift_icon || '');
   const qIcon = normalizeGameplayIconUrl(q.gift_icon || '');
-  return !!targetIcon && !!qIcon && targetIcon === qIcon;
+  if (targetIcon && qIcon && targetIcon === qIcon) return true;
+  const found = q.itemId ? findItemById(q.itemId)?.item : null;
+  return !!found && itemMatchesGameplayGift(found, targetEv);
 }
 
 function removeQueueGiftBySpecialTarget(cfg, maxRemove) {
   const limit = Math.max(0, Math.min(10000, parseInt(maxRemove, 10) || 0));
-  if (!limit || !cfg?.targetGiftName) return 0;
+  if (!limit || !specialCfgHasGiftIdentity(cfg, 'target')) return 0;
   const ids = [];
   for (const q of queueItems.filter(x => x.status === 'queued')) {
     if (ids.length >= limit) break;
@@ -791,8 +873,7 @@ function getBlindBagCandidates(sourceGroup = null, triggerCfg = appSettings?.spe
     : getEnabledGiftItems();
   for (const item of sourceItems) {
     if (!hasEffectMedia(item) || !item.overlayId) continue;
-    if (triggerCfg.typeid && firstNumericMatchKey(item) && Number(firstNumericMatchKey(item)) === Number(triggerCfg.typeid)) continue;
-    if (triggerCfg.giftName && getGameplayMatchKeys(item).some(k => normalizeGameplayGiftKey(k) === normalizeGameplayGiftKey(triggerCfg.giftName))) continue;
+    if (specialCfgHasGiftIdentity(triggerCfg) && itemMatchesGameplayGift(item, specialCfgToGiftEvent(triggerCfg))) continue;
     candidates.push({ kind: 'item', item });
   }
   const canShuffle = queueItems.filter(q => q.status === 'queued').length >= 2;
@@ -803,7 +884,7 @@ function getBlindBagCandidates(sourceGroup = null, triggerCfg = appSettings?.spe
   for (const key of ['clearQueue','shuffleQueue','removeGift','speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo']) {
     const seCfg = sourceFeatures[key];
     if (key === 'shuffleQueue' && !canShuffle) continue;
-    if (key === 'removeGift' && !seCfg?.targetGiftName) continue;
+    if (key === 'removeGift' && !specialCfgHasGiftIdentity(seCfg, 'target')) continue;
     if (seCfg?.enabled) candidates.push({ kind: 'action', action: key, cfg: seCfg, title: BLIND_BAG_ACTION_TITLES[key] || key });
   }
   return candidates;
@@ -922,7 +1003,7 @@ function runSpecialFeatureAction(key, ev, cfg, sourceGroup = null) {
 function checkGroupSpecialEffectsTriggers(ev) {
   const all = appSettings?.groupSpecialEffects || {};
   let triggered = false;
-  for (const group of (mapping.groups || []).filter(g => isGroupSpecialActive(g))) {
+  for (const group of (mapping.groups || []).filter(g => isGroupSpecialRunnable(g))) {
     const groupCfg = all[group.id];
     if (!groupCfg) continue;
     const features = groupCfg.features || {};
@@ -932,6 +1013,20 @@ function checkGroupSpecialEffectsTriggers(ev) {
       runSpecialFeatureAction(key, ev, cfg, group);
       triggered = true;
     }
+  }
+  return triggered;
+}
+
+function checkLegacySpecialEffectsTriggers(ev) {
+  const common = getCommonGroup();
+  const commonFeatures = getGroupSpecialConfig(common.id, false)?.features || {};
+  let triggered = false;
+  for (const key of SE_GROUP_KEYS) {
+    if (commonFeatures[key]) continue;
+    const cfg = appSettings?.specialEffects?.[key];
+    if (!matchSpecialGift(ev, cfg)) continue;
+    runSpecialFeatureAction(key, ev, cfg, common);
+    triggered = true;
   }
   return triggered;
 }
@@ -952,18 +1047,20 @@ function fakeGiftEventFromSpecialCfg(cfg, fallbackName = 'HP MEDIA') {
 }
 
 function findSpecialTargetItem(cfg) {
-  if (!cfg?.targetGiftName && !cfg?.targetTypeid && !cfg?.targetIconUrl) return null;
-  const ev = {
-    gift_id: cfg.targetTypeid || null,
-    gift_name: cfg.targetGiftName || '',
-    gift_icon: cfg.targetIconUrl || '',
-  };
-  return getEnabledGiftItems().find(item => itemMatchesGameplayGift(item, ev)) || null;
+  if (!specialCfgHasGiftIdentity(cfg, 'target')) return null;
+  const ev = specialCfgToGiftEvent(cfg, 'target');
+  const seen = new Set();
+  const items = [...getEnabledGiftItems(), ...getAllItems()].filter(item => {
+    if (!item?.id || seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+  return items.find(item => itemMatchesGameplayGift(item, ev)) || null;
 }
 
 function addRemoveGiftTargetTestItem() {
   const cfg = appSettings?.specialEffects?.removeGift || {};
-  if (!cfg.targetGiftName) {
+  if (!specialCfgHasGiftIdentity(cfg, 'target')) {
     alert('Chưa chọn quà B để test');
     return;
   }
@@ -1016,8 +1113,8 @@ async function runSpecialTest(key) {
   }
   if (key === 'removeGift') {
     const cfg = se.removeGift || {};
-    if (!cfg.giftName) { alert('Chưa chọn quà A'); return; }
-    if (!cfg.targetGiftName) { alert('Chưa chọn quà B'); return; }
+    if (!specialCfgHasGiftIdentity(cfg)) { alert('Chưa chọn quà A'); return; }
+    if (!specialCfgHasGiftIdentity(cfg, 'target')) { alert('Chưa chọn quà B'); return; }
     triggerRemoveGiftSpecial(fakeGiftEventFromSpecialCfg(cfg, 'HP MEDIA'), cfg);
     return;
   }
@@ -1028,7 +1125,7 @@ async function runSpecialTest(key) {
   }
   if (key === 'blindBag') {
     const cfg = se.blindBag || {};
-    if (!cfg.giftName) { alert('Chưa chọn ICON túi mù'); return; }
+    if (!specialCfgHasGiftIdentity(cfg)) { alert('Chưa chọn ICON túi mù'); return; }
     triggerBlindBagSpecial(fakeGiftEventFromSpecialCfg(cfg, 'Túi mù HP MEDIA'), cfg);
     return;
   }
@@ -1042,7 +1139,9 @@ async function runSpecialTest(key) {
 // Trả về true nếu gift này match ít nhất 1 trigger (caller có thể dùng để skip
 // duplicate flow nếu cần).
 function checkSpecialEffectsTriggers(ev) {
-  return checkGroupSpecialEffectsTriggers(ev);
+  const groupTriggered = checkGroupSpecialEffectsTriggers(ev);
+  const legacyTriggered = checkLegacySpecialEffectsTriggers(ev);
+  return groupTriggered || legacyTriggered;
 }
 
 // Backward compat shim
@@ -1796,17 +1895,20 @@ function showLicenseExpiredPopup(info) {
 }
 
 async function verifyLicense(key, action = 'verify') {
+  verifyLicense.lastError = null;
   const statusEl = document.getElementById('licenseStatus');
   if (!key) {
     if (statusEl) { statusEl.textContent = '⚠️ Chưa nhập key'; statusEl.style.color = '#ff6b6b'; }
+    verifyLicense.lastError = { message: 'Vui lòng nhập KEY bản quyền.', code: 'empty_key', offline: false };
     return null;
   }
   if (statusEl) { statusEl.textContent = '⏳ Đang xác minh...'; statusEl.style.color = '#8a8f9a'; }
   const machineId = await ensureMachineId();
   const r = await window.bigo.licenseVerify({ key, machineId, action });
   if (!r.ok) {
+    verifyLicense.lastError = { message: r.error || 'KEY không hợp lệ', code: r.errorCode || '', offline: !!r._offline };
     if (statusEl) {
-      statusEl.textContent = `✗ Lỗi: ${r.error}`;
+      statusEl.textContent = `✗ Lỗi: ${verifyLicense.lastError.message}`;
       statusEl.style.color = '#ff6b6b';
     }
     return null;
@@ -1814,6 +1916,7 @@ async function verifyLicense(key, action = 'verify') {
   // Apps Script có thể trả { ok: false, error } hoặc { ... data ... }
   const data = r.data;
   if (data && data.error) {
+    verifyLicense.lastError = { message: data.error, code: data.errorCode || '', offline: !!data._offline };
     if (statusEl) {
       statusEl.textContent = `✗ ${data.error}`;
       statusEl.style.color = '#ff6b6b';
@@ -1821,6 +1924,7 @@ async function verifyLicense(key, action = 'verify') {
     return null;
   }
   if (data && data.ok === false) {
+    verifyLicense.lastError = { message: data.message || data.error || 'Key không hợp lệ', code: data.errorCode || '', offline: !!data._offline };
     if (statusEl) {
       statusEl.textContent = `✗ ${data.message || data.error || 'Key không hợp lệ'}`;
       statusEl.style.color = '#ff6b6b';
@@ -1829,6 +1933,7 @@ async function verifyLicense(key, action = 'verify') {
   }
   // Apps Script có thể wrap { ok: true, data: {...} } hoặc trả thẳng row data
   const info = data?.data || data || {};
+  verifyLicense.lastError = null;
   renderLicenseStatus(info);
   updateHeaderLicense(info);
   checkLicenseReminder(info);
@@ -1881,6 +1986,11 @@ function updateLicenseLockoutUi() {
 }
 
 function recordLicenseFailure(message) {
+  const countable = arguments.length < 2 || arguments[1] !== false;
+  if (!countable) {
+    setLicenseGateMessage(message || 'Không kiểm tra được KEY. Vui lòng thử lại.', 'err');
+    return;
+  }
   const count = (parseInt(localStorage.getItem('hp_license_fail_count') || '0', 10) || 0) + 1;
   if (count >= 5) {
     localStorage.setItem('hp_license_lock_until', String(Date.now() + 60000));
@@ -1892,6 +2002,11 @@ function recordLicenseFailure(message) {
   // Hint: KEY user nhập đã được lưu, sau khi gia hạn / mở khóa chỉ cần KÍCH HOẠT lại
   const msg = message || 'KEY sai hoặc không hợp lệ';
   setLicenseGateMessage(`${msg} (${count}/5 lần) — KEY đã được ghi nhớ, sau khi gia hạn/mở khóa bấm KÍCH HOẠT lại.`, 'err');
+}
+
+function isWrongKeyError(err) {
+  if (!err || !err.code) return true;
+  return ['invalid_key', 'activate_failed'].includes(err.code);
 }
 
 function waitForLicenseGateUnlock() {
@@ -1936,13 +2051,15 @@ async function submitLicenseGateKey(key, action = 'activate') {
     const info = await verifyLicense(key, action);
     const usable = isLicenseUsable(info);
     if (!info || !usable.ok) {
-      recordLicenseFailure(usable.error || 'KEY sai hoặc không hợp lệ');
+      const err = verifyLicense.lastError;
+      const countable = err ? isWrongKeyError(err) : usable.error === 'KEY sai hoặc không hợp lệ';
+      recordLicenseFailure((err && err.message) || usable.error || 'KEY sai hoặc không hợp lệ', countable);
       return false;
     }
     await unlockLicenseGate(info, key, machineId);
     return true;
   } catch (e) {
-    recordLicenseFailure(e?.message || 'Không kiểm tra được KEY');
+    recordLicenseFailure(e?.message || 'Không kiểm tra được KEY', false);
     return false;
   } finally {
     if (!document.body.classList.contains('license-ok') && !updateLicenseLockoutUi()) {
@@ -1979,14 +2096,8 @@ async function ensureLicenseGate() {
     setLicenseGateMessage('Nhập KEY bản quyền để tiếp tục.', '');
     return waitForLicenseGateUnlock();
   }
-  const machineId = await ensureMachineId();
-  const cachedMachine = localStorage.getItem('hp_license_machine_id') || '';
-  if (cachedMachine && cachedMachine !== machineId) {
-    setLicenseGateMessage('KEY này đã được kích hoạt trên thiết bị khác.', 'err');
-  } else {
-    const ok = await submitLicenseGateKey(cachedKey, 'verify');
-    if (ok) return true;
-  }
+  const ok = await submitLicenseGateKey(cachedKey, 'verify');
+  if (ok) return true;
   return waitForLicenseGateUnlock();
 }
 
@@ -2899,11 +3010,11 @@ function buildGameplayConfig() {
 
 function itemMatchesGameplayGift(item, ev) {
   const keys = getGameplayMatchKeys(item);
-  if (ev?.gift_id != null && keys.some(k => k === String(ev.gift_id))) return true;
-  const name = String(ev?.gift_name || '').toLowerCase().trim();
-  const normalizedName = normalizeGameplayGiftKey(ev?.gift_name);
-  if (normalizedName && keys.some(k => normalizeGameplayGiftKey(k) === normalizedName)) return true;
-  const icon = String(ev?.gift_icon || ev?.gift_icon_url || '').trim();
+  const eventId = getEventGiftId(ev);
+  if (eventId != null && keys.some(k => idsEqual(k, eventId))) return true;
+  const eventNames = getEventGiftNames(ev).map(normalizeGameplayGiftKey).filter(Boolean);
+  if (eventNames.length && keys.some(k => eventNames.includes(normalizeGameplayGiftKey(k)))) return true;
+  const icon = String(getEventGiftIcon(ev) || '').trim();
   const itemIcon = String(getGameplayItemIcon(item) || '').trim();
   return !!icon && !!itemIcon && normalizeGameplayIconUrl(icon) === normalizeGameplayIconUrl(itemIcon);
 }
@@ -3343,13 +3454,15 @@ function forwardGameplayGiftEvent(ev) {
 }
 
 function isSpecialTriggerItem(item) {
-  const keys = new Set((item?.matchKeys || []).map(k => String(k).toLowerCase().trim()).filter(Boolean));
-  if (item?.alias) keys.add(String(item.alias).toLowerCase().trim());
-  const se = appSettings?.specialEffects || {};
-  for (const cfg of Object.values(se)) {
+  if (!item) return false;
+  const configs = [];
+  configs.push(...Object.values(appSettings?.specialEffects || {}));
+  for (const groupCfg of Object.values(appSettings?.groupSpecialEffects || {})) {
+    configs.push(...Object.values(groupCfg?.features || {}));
+  }
+  for (const cfg of configs) {
     if (!cfg || typeof cfg !== 'object') continue;
-    if (cfg.typeid != null && keys.has(String(cfg.typeid).toLowerCase())) return true;
-    if (cfg.giftName && keys.has(String(cfg.giftName).toLowerCase().trim())) return true;
+    if (specialCfgHasGiftIdentity(cfg) && itemMatchesGameplayGift(item, specialCfgToGiftEvent(cfg))) return true;
   }
   return false;
 }
@@ -4776,6 +4889,31 @@ function applyGlossary(text) {
   }
   return out;
 }
+
+function limitRepeatedWords(text, maxRepeat = 3) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const out = [];
+  let lastKey = '';
+  let count = 0;
+  for (const word of words) {
+    const key = normEv(word).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    if (key && key === lastKey) count++;
+    else { lastKey = key; count = 1; }
+    if (!key || count <= maxRepeat) out.push(word);
+  }
+  return out.join(' ');
+}
+
+function prepareChatServiceText(text) {
+  return limitRepeatedWords(String(text || '')
+    .normalize('NFKC')
+    .replace(/[​-‏‪-‮⁠-⁯﻿]/g, '')
+    .replace(/[︀-️]/g, '')
+    .replace(/(\p{L})\1{4,}/giu, '$1$1$1')
+    .replace(/([!?.,~\-_=+*#])\1{4,}/g, '$1$1$1')
+    .replace(/\s+/g, ' ')
+    .trim());
+}
 // Từ cấm đồng bộ từ Google Sheet (tab COMMENT, cột A) — nạp lúc init.
 let sheetBanned = [];
 function isBannedComment(text) {
@@ -4843,9 +4981,31 @@ let _gttsBusy = false;
 let _gttsAudio = null;
 function enqueueGoogleTts(text, langCode) {
   // Backlog protection: chat dồn dập → bỏ bớt để không đọc trễ.
-  if (_gttsQueue.length > 4) return;
+  if (_gttsQueue.length > 12) return;
   _gttsQueue.push({ text, langCode });
   drainGoogleTts();
+}
+
+function splitTtsText(text, max = 180, maxChunks = 6) {
+  const input = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!input) return [];
+  if (input.length <= max) return [input];
+  const parts = [];
+  let pos = 0;
+  while (pos < input.length && parts.length < maxChunks) {
+    let end = Math.min(pos + max, input.length);
+    if (end < input.length) {
+      const slice = input.slice(pos, end);
+      const punct = Math.max(slice.lastIndexOf('. '), slice.lastIndexOf('! '), slice.lastIndexOf('? '), slice.lastIndexOf(', '));
+      const space = slice.lastIndexOf(' ');
+      const cut = punct > max * 0.4 ? punct + 1 : (space > max * 0.55 ? space : -1);
+      if (cut > 0) end = pos + cut;
+    }
+    const part = input.slice(pos, end).trim();
+    if (part) parts.push(part);
+    pos = end;
+  }
+  return parts;
 }
 async function drainGoogleTts() {
   if (_gttsBusy) return;
@@ -4876,10 +5036,13 @@ function speakText(text, lang) {
   // "Giọng mặc định" (voiceURI rỗng) → Google TTS: giọng Việt tự nhiên, không
   // cần cài giọng Windows. Người dùng chọn 1 giọng Windows cụ thể → Web Speech.
   if (!chatVoice.voiceURI) {
-    enqueueGoogleTts(text, langCode);
+    for (const part of splitTtsText(text)) enqueueGoogleTts(part, langCode);
     return;
   }
-  if (!window.speechSynthesis) { enqueueGoogleTts(text, langCode); return; }
+  if (!window.speechSynthesis) {
+    for (const part of splitTtsText(text)) enqueueGoogleTts(part, langCode);
+    return;
+  }
   // Backlog protection: chat dồn dập → bỏ qua bớt để không đọc trễ hàng phút.
   if (_ttsPending > 3) return;
   try {
@@ -4929,6 +5092,8 @@ async function handleChatVoice(ev, div) {
   if (isBannedComment(content)) return;       // chứa từ cấm
 
   content = applyGlossary(content);           // thay thế từ/cụm
+  const serviceContent = prepareChatServiceText(content);
+  if (!serviceContent || !/\p{L}/u.test(serviceContent)) return;
 
   // Quyền ĐỌC theo ưu tiên (không ảnh hưởng hiển thị bản dịch).
   let canRead = true;
@@ -4937,14 +5102,14 @@ async function handleChatVoice(ev, div) {
   else if (chatVoice.readPriority === 'vip') canRead = hasBadge;
   else if (chatVoice.readPriority === 'giftersOrVip') canRead = isRecentGifter(ev.user) || hasBadge;
 
-  let toRead = content;
+  let toRead = serviceContent;
   let readLang = '';
 
   const needDetect = chatVoice.langPriority.length > 0;
   if (chatVoice.translateOn || needDetect) {
     try {
       const translateTo = getTranslateTarget();
-      const r = await window.bigo.translateText({ text: content, from: 'auto', to: translateTo });
+      const r = await window.bigo.translateText({ text: serviceContent, from: 'auto', to: translateTo });
       if (r && r.ok) {
         const detected = (r.detected || '').toLowerCase();
         // Ưu tiên ngôn ngữ nguồn: không thuộc list → bỏ qua cả dịch lẫn đọc.
@@ -4952,14 +5117,14 @@ async function handleChatVoice(ev, div) {
         if (chatVoice.translateOn && r.text) {
           const translated = r.text.trim();
           const isSelf = chatVoice.skipSelf && sameLang(detected, translateTo);
-          if (translated && normEv(translated) !== normEv(content) && !isSelf && div && div.isConnected) {
+          if (translated && normEv(translated) !== normEv(serviceContent) && !isSelf && div && div.isConnected) {
             const t = document.createElement('span');
             t.className = 'chat-translated';
             t.style.cssText = 'color:#7cc6ff; font-style:italic; margin-left:4px';
             t.textContent = '➜ ' + translated;
             div.appendChild(t);
           }
-          toRead = (translated && !isSelf) ? translated : content;
+          toRead = (translated && !isSelf) ? translated : serviceContent;
           readLang = TTS_LANG_MAP[translateTo] || translateTo;
         }
       }
@@ -5235,6 +5400,14 @@ function normalizeIncomingEvent(ev, source = 'dom') {
   const out = { ...ev, source: ev.source || source };
   if (out.type === 'msg') out.type = 'chat';
 
+  if (out.type === 'gift' || out.type === 'gift_overlay') {
+    const id = getEventGiftId(out);
+    if (out.gift_id == null && id != null) out.gift_id = id;
+    if (!out.gift_name) out.gift_name = getEventGiftNames(out)[0] || '';
+    if (!out.gift_icon) out.gift_icon = getEventGiftIcon(out);
+    if (out.gift_count == null && out.count != null) out.gift_count = out.count;
+  }
+
   if (source === 'open-api') {
     const displayName = out.nick_name || out.user_name || '';
     if (displayName) {
@@ -5243,7 +5416,6 @@ function normalizeIncomingEvent(ev, source = 'dom') {
     }
     if (out.user_img && !out.user_avatar_url) out.user_avatar_url = out.user_img;
     if (out.gift_url && !out.gift_icon) out.gift_icon = out.gift_url;
-    if (out.type === 'gift' && out.gift_count == null && out.count != null) out.gift_count = out.count;
   }
 
   if (out.type === 'heart') {
@@ -5671,6 +5843,10 @@ function isGroupSpecialActive(group) {
   return !!group && group.type !== 'comment' && (group.isCommon || group.enabled !== false);
 }
 
+function isGroupSpecialRunnable(group) {
+  return !!group && group.type !== 'comment';
+}
+
 function isGroupSpecialVisible(group) {
   return !!group && group.type !== 'comment';
 }
@@ -5982,8 +6158,8 @@ if (seGroupSpecialList) {
       const group = findGroupById(groupId);
       const cfg = getGroupSpecialConfig(groupId, false)?.features?.[key];
       if (!cfg) return;
-      if (!cfg.giftName) { alert('Chưa chọn quà A/trigger cho tính năng này'); return; }
-      if (key === 'removeGift' && !cfg.targetGiftName) { alert('Chưa chọn quà B'); return; }
+      if (!specialCfgHasGiftIdentity(cfg)) { alert('Chưa chọn quà A/trigger cho tính năng này'); return; }
+      if (key === 'removeGift' && !specialCfgHasGiftIdentity(cfg, 'target')) { alert('Chưa chọn quà B'); return; }
       runSpecialFeatureAction(key, fakeGiftEventFromSpecialCfg(cfg, 'HP MEDIA'), cfg, group);
       return;
     }

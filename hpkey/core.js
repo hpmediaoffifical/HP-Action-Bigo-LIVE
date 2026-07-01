@@ -25,6 +25,13 @@ function signBody(body) {
   return crypto.createHmac('sha256', cfg.HMAC_SECRET).update(canonical(body)).digest('hex');
 }
 
+function normalizeKey(rawKey) {
+  return String(rawKey || '')
+    .normalize('NFKC')
+    .replace(/[\s\u200B-\u200D\uFEFF]/g, '')
+    .trim();
+}
+
 function apiCall(action, extra) {
   const body = Object.assign(
     { action, p: cfg.PRODUCT, ts: Math.floor(Date.now() / 1000) },
@@ -85,7 +92,7 @@ function verifyToken(token, hwid) {
  *   { ok:false, error:<ma>, _offline?:bool }
  */
 async function activate(rawKey) {
-  const key = String(rawKey || '').trim();
+  const key = normalizeKey(rawKey);
   if (!key) return { ok: false, error: 'empty_key' };
   if (!cfg.HMAC_SECRET || cfg.HMAC_SECRET.indexOf('DAN_') === 0
       || PUBLIC_KEY_B64.indexOf('DAN_') === 0) {
@@ -116,12 +123,13 @@ const ERR_VI = {
   unknown_product: 'Game chưa được cấu hình trên hệ thống bản quyền — liên hệ HP Media.',
   bad_token: 'Phản hồi kích hoạt không hợp lệ (sai chữ ký) — liên hệ HP Media.',
   activate_failed: 'KEY không hợp lệ.',
+  revoked: 'KEY đã bị thu hồi hoặc không còn hợp lệ trên thiết bị này.',
 };
 function errVi(code) { return ERR_VI[code] || ('Lỗi kích hoạt: ' + code); }
 
 /** Check 1 lan (action 'verify' - cung dong vai tro heartbeat). */
 async function verifyKey(rawKey) {
-  const key = String(rawKey || '').trim();
+  const key = normalizeKey(rawKey);
   if (!key) return { ok: false, error: 'empty_key' };
   if (!cfg.HMAC_SECRET || PUBLIC_KEY_B64.indexOf('DAN_') === 0) {
     return { ok: false, error: 'not_configured' };
@@ -166,4 +174,4 @@ function startWatch(opts) {
   return function stop() { clearInterval(timer); };
 }
 
-module.exports = { activate, verifyKey, startWatch, errVi };
+module.exports = { activate, verifyKey, startWatch, errVi, normalizeKey };

@@ -7,9 +7,18 @@
  */
 const core = require('./core');
 
-async function licenseVerify(key) {
-  const r = await core.activate(key);
-  if (!r.ok) return { ok: false, error: core.errVi(r.error) };
+async function licenseVerify(key, action = 'verify') {
+  const mode = String(action || 'verify').toLowerCase() === 'activate' ? 'activate' : 'verify';
+  let r = mode === 'verify'
+    ? await core.verifyKey(key)
+    : await core.activate(key);
+  // If a key is already bound to this machine, some backends reject activate
+  // because the seat is full. Verify still confirms whether this HWID is allowed.
+  if (!r.ok && mode === 'activate' && r.error === 'device_limit_reached') {
+    const verify = await core.verifyKey(key);
+    if (verify.ok) r = verify;
+  }
+  if (!r.ok) return { ok: false, error: core.errVi(r.error), errorCode: r.error, _offline: !!r._offline };
   const p = r.payload;
   return {
     ok: true,

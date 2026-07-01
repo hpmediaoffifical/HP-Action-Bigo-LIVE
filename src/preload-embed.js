@@ -13,15 +13,18 @@ function send(channel, payload) {
 
 const seenChats = new Map();
 const seenGifts = new Map();
+const CHAT_TEXT_MIN_LEN = 5;
+const MAX_ELEMENT_TEXT_LENGTH = 1400;
+const CHAT_EVENT_DEDUP_WINDOW_MS = 1200;
 
 // First-match wins. Tat ca pattern cho phep username "ID:394471037" qua alternation.
 // \b word boundary sau level de xu ly textContent thieu space giua badge va name.
 const CHAT_PATTERNS = [
-  /^\s*Lv\.?\s*(\d+)\b\s*(ID:\d+|[^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
-  /^\s*\[Lv\.?(\d+)\]\s*(ID:\d+|[^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
-  /^\s*(\d{1,3})\b\s*(ID:\d+|[^:：\n]{1,80}?)\s*[:：]\s*(.{1,500})\s*$/u,
+  /^\s*Lv\.?\s*(\d+)\b\s*(ID:\d+|[^:：\n]{1,80}?)\s*[:：]\s*(.{1,1200})\s*$/u,
+  /^\s*\[Lv\.?(\d+)\]\s*(ID:\d+|[^:：\n]{1,80}?)\s*[:：]\s*(.{1,1200})\s*$/u,
+  /^\s*(\d{1,3})\b\s*(ID:\d+|[^:：\n]{1,80}?)\s*[:：]\s*(.{1,1200})\s*$/u,
   // Fallback khong co level — yeu cau space quanh ":" giam false positive.
-  /^\s*(ID:\d+|[^:：\n\d][^:：\n]{0,79}?)\s+[:：]\s+(.{1,500})\s*$/u,
+  /^\s*(ID:\d+|[^:：\n\d][^:：\n]{0,79}?)\s+[:：]\s+(.{1,1200})\s*$/u,
 ];
 
 function tryMatchChat(text) {
@@ -162,7 +165,7 @@ function processElement(rootEl, opts = {}) {
     if (el.nodeType !== 1) continue;
     if (!isVisibleElement(el)) continue;
     const text = (el.textContent || '').trim();
-    if (text.length < 5 || text.length > 300) continue;
+    if (text.length < CHAT_TEXT_MIN_LEN || text.length > MAX_ELEMENT_TEXT_LENGTH) continue;
     // Layer A: same element + same text → skip.
     if (elementContent.get(el) === text) continue;
 
@@ -295,10 +298,11 @@ function processElement(rootEl, opts = {}) {
         });
         continue;
       }
-      // CHAT DEDUP DÀI — chats lặp lại trong 60s thường là DOM re-scan, không
-      // phải user spam thật (Bigo cap ~3s/msg). Hash dài để giảm noise.
+      // Chỉ dedup rất ngắn để bắt DOM re-render. Không chặn lâu theo nội dung,
+      // vì viewer có thể gửi lại cùng câu và vẫn cần hiện/dịch/đọc.
       const chatHash = `c|${m.level}|${normalize(m.user)}|${normalize(m.content)}`;
-      if (seenChats.has(chatHash)) continue;
+      const lastChat = seenChats.get(chatHash);
+      if (lastChat && Date.now() - lastChat < CHAT_EVENT_DEDUP_WINDOW_MS) continue;
       seenChats.set(chatHash, Date.now());
       // Detect VIP/SVIP/Top/Family badges từ FULL text (badges thường nằm
       // ngoài m.content — trước colon).
@@ -343,7 +347,7 @@ function attachMutationObserver() {
       for (const node of m.removedNodes) {
         if (!node || node.nodeType !== 1) continue;
         const text = (node.textContent || '').trim();
-        if (text.length >= 5 && text.length <= 300) {
+        if (text.length >= CHAT_TEXT_MIN_LEN && text.length <= MAX_ELEMENT_TEXT_LENGTH) {
           recentRemovedText.set(text, nowMs);
         }
       }

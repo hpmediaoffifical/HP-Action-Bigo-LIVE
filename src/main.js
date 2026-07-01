@@ -439,10 +439,26 @@ function localIconUrl(typeid) {
   return p ? 'file:///' + p.replace(/\\/g, '/') : null;
 }
 
+function normalizeGiftEventFields(ev) {
+  if (!ev || (ev.type !== 'gift' && ev.type !== 'gift_overlay')) return ev;
+  if (ev.gift_id == null) {
+    ev.gift_id = ev.giftId ?? ev.gift_type_id ?? ev.giftTypeId ?? ev.typeid ?? ev.type_id ?? ev.gift?.typeid ?? ev.gift?.id ?? ev.gift?.gift_id ?? ev.gift_id;
+  }
+  if (!ev.gift_name) {
+    ev.gift_name = ev.giftName || ev.gift?.name || ev.gift?.gift_name || ev.name || '';
+  }
+  if (!ev.gift_icon) {
+    ev.gift_icon = ev.gift_icon_url || ev.gift_url || ev.iconUrl || ev.icon || ev.gift?.img_url || ev.gift?.icon || '';
+  }
+  if (ev.gift_count == null && ev.count != null) ev.gift_count = ev.count;
+  return ev;
+}
+
 function enrichGiftEvent(ev) {
   if (!ev || (ev.type !== 'gift' && ev.type !== 'gift_overlay')) return ev;
+  normalizeGiftEventFields(ev);
   let meta = null;
-  const iconUrl = ev.gift_icon_url || ev.icon;
+  const iconUrl = ev.gift_icon || ev.gift_icon_url || ev.gift_url || ev.iconUrl || ev.icon;
   if (iconUrl && giftMaster.byImgUrl) meta = giftMaster.byImgUrl.get(iconUrl);
   if (!meta && ev.gift_name && giftMaster.byName) {
     const arr = giftMaster.byName.get(String(ev.gift_name).toLowerCase().trim());
@@ -757,32 +773,20 @@ ipcMain.handle('updater:state', () => autoUpdater.getState());
 // Backend cu (Google Apps Script) da thay bang HP KEY. Cau hinh: hpkey/config.js
 // + hpkey/public-key.js. Giu nguyen IPC interface => renderer khong phai sua.
 
-// Generate machine ID — hash hardware để bind 1 key vào 1 máy.
+// Generate machine ID bằng đúng HWID mà HP KEY gửi lên server.
 ipcMain.handle('license:machine-id', () => {
-  const os = require('os');
-  const crypto = require('crypto');
-  const parts = [os.hostname(), os.platform(), os.arch(), os.cpus()[0]?.model || ''];
-  const ifaces = os.networkInterfaces();
-  // Lấy MAC đầu tiên non-virtual
-  for (const name of Object.keys(ifaces)) {
-    for (const i of (ifaces[name] || [])) {
-      if (!i.internal && i.mac && i.mac !== '00:00:00:00:00:00') {
-        parts.push(i.mac);
-        break;
-      }
-    }
-  }
-  return crypto.createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 32);
+  return require('../hpkey/hwid').getHWID();
 });
 
 // Xac thuc qua HP KEY (hpvn.media). Tra ve { ok:true, data:{TRANG_THAI,...} }
 // hoac { ok:false, error } - dung shape renderer dang doc.
 let _hpkeyCurrentKey = '';
 let _hpkeyWatching = false;
-ipcMain.handle('license:verify', async (_e, { key }) => {
-  const res = await require('../hpkey/validate').licenseVerify(key);
+ipcMain.handle('license:verify', async (_e, { key, action }) => {
+  const normalizedKey = require('../hpkey/core').normalizeKey(key);
+  const res = await require('../hpkey/validate').licenseVerify(normalizedKey, action);
   if (res && res.ok) {
-    _hpkeyCurrentKey = String(key || '').trim();
+    _hpkeyCurrentKey = normalizedKey;
     if (!_hpkeyWatching) {
       _hpkeyWatching = true;
       // Check key real-time: cam key tren admin -> dong app trong <= RECHECK_SECONDS
@@ -1037,7 +1041,11 @@ ipcMain.handle('bigo:start', async (_e, opts) => {
   if (client) await client.stop().catch(() => {});
   client = new BigoClient({
     env: opts.env, accessToken: opts.accessToken, gameId: opts.gameId, openid: opts.openid,
-    onEvent: (ev) => { if (win && !win.isDestroyed()) win.webContents.send('bigo:event', ev); },
+    onEvent: (ev) => {
+      normalizeGiftEventFields(ev);
+      enrichGiftEvent(ev);
+      if (win && !win.isDestroyed()) win.webContents.send('bigo:event', ev);
+    },
     onLog: (msg) => { if (win && !win.isDestroyed()) win.webContents.send('bigo:log', msg); },
   });
   try { await client.start(); return { ok: true, gameSess: client.gameSess }; }
@@ -1074,33 +1082,104 @@ ipcMain.handle('bigo:check-live', async (_e, bigoId) => {
 // =================== Translate IPC (Dịch chat) ===================
 // Dịch text qua Google Translate endpoint free (client=gtx). Chạy ở MAIN process
 // để né CORS — renderer fetch thẳng sẽ bị chặn. Trả { ok, text, detected }.
+const translateCache = new Map();
+const TRANSLATE_CACHE_TTL_MS = 10 * 60 * 1000;
+const TRANSLATE_CACHE_MAX = 500;
+const TRANSLATE_CHUNK_MAX = 900;
+
+function translateCacheKey(text, sl, tl) {
+  return `${sl}|${tl}|${crypto.createHash('sha1').update(text).digest('hex')}`;
+}
+
+function getTranslateCache(key) {
+  const hit = translateCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.ts > TRANSLATE_CACHE_TTL_MS) {
+    translateCache.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+
+function setTranslateCache(key, value) {
+  translateCache.set(key, { value, ts: Date.now() });
+  if (translateCache.size > TRANSLATE_CACHE_MAX) {
+    const first = translateCache.keys().next().value;
+    if (first) translateCache.delete(first);
+  }
+}
+
+function splitTranslateText(text, max = TRANSLATE_CHUNK_MAX) {
+  if (text.length <= max) return [text];
+  const parts = [];
+  let pos = 0;
+  while (pos < text.length) {
+    let end = Math.min(pos + max, text.length);
+    if (end < text.length) {
+      const slice = text.slice(pos, end);
+      const punct = Math.max(slice.lastIndexOf('. '), slice.lastIndexOf('! '), slice.lastIndexOf('? '), slice.lastIndexOf(', '));
+      const space = slice.lastIndexOf(' ');
+      const cut = punct > max * 0.45 ? punct + 1 : (space > max * 0.55 ? space : -1);
+      if (cut > 0) end = pos + cut;
+    }
+    const part = text.slice(pos, end).trim();
+    if (part) parts.push(part);
+    pos = end;
+  }
+  return parts;
+}
+
+async function fetchTranslateChunk(text, sl, tl) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx`
+        + `&sl=${encodeURIComponent(sl)}&tl=${encodeURIComponent(tl)}&dt=t`
+        + `&q=${encodeURIComponent(text)}`;
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const translated = Array.isArray(data && data[0])
+        ? data[0].map(seg => (seg && seg[0]) || '').join('')
+        : '';
+      return { text: translated, detected: (data && data[2]) || sl };
+    } catch (e) {
+      lastError = e;
+      if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 250));
+    }
+  }
+  throw lastError || new Error('translate failed');
+}
+
 ipcMain.handle('translate:text', async (_e, opts = {}) => {
   const text = String(opts.text || '').trim();
   const tl = String(opts.to || 'vi');
   const sl = String(opts.from || 'auto');
   if (!text) return { ok: false, error: 'empty' };
+  const cacheKey = translateCacheKey(text, sl, tl);
+  const cached = getTranslateCache(cacheKey);
+  if (cached) return cached;
   try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx`
-      + `&sl=${encodeURIComponent(sl)}&tl=${encodeURIComponent(tl)}&dt=t`
-      + `&q=${encodeURIComponent(text)}`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-    });
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-    const data = await res.json();
-    // data[0] = mảng segment [[translated, original, ...], ...]; data[2] = lang detect.
-    const translated = Array.isArray(data && data[0])
-      ? data[0].map(seg => (seg && seg[0]) || '').join('')
-      : '';
-    const detected = (data && data[2]) || sl;
-    return { ok: true, text: translated, detected };
+    const chunks = splitTranslateText(text);
+    const translatedParts = [];
+    let detected = sl;
+    for (const chunk of chunks) {
+      const r = await fetchTranslateChunk(chunk, sl, tl);
+      translatedParts.push(r.text);
+      if (!detected || detected === 'auto' || detected === sl) detected = r.detected || detected;
+    }
+    const result = { ok: true, text: translatedParts.join(' ').replace(/\s+/g, ' ').trim(), detected };
+    setTranslateCache(cacheKey, result);
+    return result;
   } catch (e) {
     return { ok: false, error: e.message };
   }
 });
 
 // Đọc chat bằng Google Translate TTS — trả MP3 giọng tự nhiên (vd vi-VN) mà
-// KHÔNG cần cài giọng Windows. Cap ~200 ký tự / request (giới hạn endpoint).
+// KHÔNG cần cài giọng Windows. Renderer đã chia đoạn; main vẫn cap phòng thủ.
 // Trả data URL base64 để renderer phát qua <audio>.
 ipcMain.handle('tts:google', async (_e, opts = {}) => {
   const text = String(opts.text || '').trim().slice(0, 200);
@@ -1109,12 +1188,23 @@ ipcMain.handle('tts:google', async (_e, opts = {}) => {
   try {
     const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob`
       + `&tl=${encodeURIComponent(tl)}&q=${encodeURIComponent(text)}`;
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://translate.google.com/',
-      },
-    });
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://translate.google.com/',
+    };
+    let res = null;
+    let lastError = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        res = await fetch(url, { headers });
+        if (res.ok) break;
+        lastError = new Error(`HTTP ${res.status}`);
+      } catch (e) {
+        lastError = e;
+      }
+      if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    if (!res) throw lastError || new Error('TTS fetch failed');
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
     const buf = Buffer.from(await res.arrayBuffer());
     return { ok: true, dataUrl: `data:audio/mpeg;base64,${buf.toString('base64')}` };

@@ -18,7 +18,7 @@ const { app, dialog, BrowserWindow, ipcMain } = require('electron');
 const UPDATE_FEED = {
   provider: 'github',
   owner: 'hpmediaoffifical',
-  repo: 'HP-Action-Bigo-LIVE',
+  repo: 'H-P-A-c-t-i-o-n-B-i-g-o-L-I-V-E',
 };
 
 let autoUpdater = null;
@@ -80,8 +80,11 @@ function log(msg) {
 
 function formatUpdaterError(err) {
   const raw = err?.message || String(err || 'Unknown error');
-  if (/latest\.yml/i.test(raw) || /404/i.test(raw)) {
-    return 'Không tìm thấy file cập nhật latest.yml trên GitHub Release. Hãy publish lại bản release bằng npm run release (kèm latest.yml + file Setup .exe).';
+  if (/latest\.yml/i.test(raw)) {
+    return 'Không tìm thấy latest.yml trên GitHub Release mới nhất. Hãy publish lại bằng npm run release để upload đủ latest.yml, file Setup .exe và .blockmap.';
+  }
+  if (/404/i.test(raw)) {
+    return 'Không tìm thấy tài nguyên cập nhật trên GitHub Release. Kiểm tra release mới nhất đã upload đủ latest.yml, file Setup .exe, .blockmap và app đang trỏ đúng repo.';
   }
   return raw.split('\n')[0];
 }
