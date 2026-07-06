@@ -800,9 +800,26 @@
             <input type="number" id="maxListItems" value="200" min="20" max="1000" />
           </label>
         </div>
+        <div class="row">
+          <label class="checkbox-row" title="Áp dụng cho toàn bộ hiệu ứng/quà: khi hiệu ứng bắt đầu app bấm phím này 1 lần và tự bấm lại trước khi hiệu ứng kết thúc theo số giây đã đặt.">
+            <input type="checkbox" id="obsHotkeyEnabled" /> ⌨ Bấm phím tắt OBS khi mọi hiệu ứng phát
+          </label>
+        </div>
+        <div class="row">
+          <label>Phím tắt OBS
+            <div style="display:flex; gap:6px">
+              <input id="obsHotkey" placeholder="Bấm tổ hợp phím, mặc định Ctrl+1" autocomplete="off" readonly style="flex:1" />
+              <button type="button" id="btnClearObsHotkey" class="tiny danger" title="Xoá phím tắt OBS">Xoá</button>
+            </div>
+          </label>
+          <label>Bấm lại trước khi hết (giây)
+            <input type="number" id="obsHotkeyDelay" min="0" max="3600" step="0.1" value="0" />
+          </label>
+        </div>
         <div class="hint small">
           Nhạc nền sẽ phát loop, có thể chọn output device (loa ngoài hoặc cable virtual cho OBS).
           Khi gift bật <b>"Tạm dừng nhạc nền khi phát"</b>, nhạc nền tự pause trong lúc effect chạy rồi resume.
+          Hotkey OBS ở trên là cấu hình chung, áp dụng cho mọi overlay/hiệu ứng đang phát; ví dụ effect 7 giây và nhập 3 thì app bấm lại ở giây thứ 4.
         </div>
       </div>
 

@@ -357,6 +357,7 @@ async function playQueueItem(q) {
   const payload = resolveMediaPayload(q.mediaFile);
   const r = await window.bigo.overlayPlay({ overlayId: q.overlayId, ...payload }).catch(e => ({ ok: false, error: e.message }));
   if (r && r.ok === false) await handleMissingQueueMedia(q);
+  else triggerEffectHotkeyCycle(appSettings.obsHotkey, q.effect_name || q.gift_name || 'effect', q.mediaFile);
 }
 
 async function handleMissingQueueMedia(q) {
@@ -1381,6 +1382,7 @@ const els = {
   bgmVol: $('bgmVol'), bgmVolVal: $('bgmVolVal'),
   fxVol: $('fxVol'), fxVolVal: $('fxVolVal'),
   maxListItems: $('maxListItems'),
+  obsHotkeyEnabled: $('obsHotkeyEnabled'), obsHotkey: $('obsHotkey'), obsHotkeyDelay: $('obsHotkeyDelay'), btnClearObsHotkey: $('btnClearObsHotkey'),
   memberEditId: $('memberEditId'), memberName: $('memberName'), memberAvatar: $('memberAvatar'), btnMemberPickAvatar: $('btnMemberPickAvatar'), btnMemberClearForm: $('btnMemberClearForm'), btnMemberSave: $('btnMemberSave'), membersList: $('membersList'),
   miniQueueCards: $('miniQueueCards'),
   qCardIcon: $('qCardIcon'), qCardIconVal: $('qCardIconVal'),
@@ -1529,6 +1531,130 @@ function isAudioEffectFile(mediaFile) {
 }
 function autoEnablePauseBgmForAudio(mediaFile) {
   if (els.dlgPauseBgm && isAudioEffectFile(mediaFile)) els.dlgPauseBgm.checked = true;
+}
+
+function normalizeObsHotkeyConfig(cfg) {
+  const hotkey = String(cfg?.hotkey || '').trim();
+  const delaySeconds = Math.max(0, Math.min(3600, parseFloat(cfg?.delaySeconds) || 0));
+  return { enabled: !!cfg?.enabled && !!hotkey, hotkey, delaySeconds };
+}
+
+function readSettingsObsHotkeyConfig() {
+  return normalizeObsHotkeyConfig({
+    enabled: !!els.obsHotkeyEnabled?.checked,
+    hotkey: els.obsHotkey?.value || '',
+    delaySeconds: els.obsHotkeyDelay?.value || 0,
+  });
+}
+
+function hotkeyKeyLabel(e) {
+  if (!e) return '';
+  if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return '';
+  if (/^F\d{1,2}$/i.test(e.key)) return e.key.toUpperCase();
+  if (/^Key[A-Z]$/.test(e.code || '')) return e.code.slice(3).toUpperCase();
+  if (/^Digit\d$/.test(e.code || '')) return e.code.slice(5);
+  if (/^Numpad\d$/.test(e.code || '')) return e.code.toUpperCase();
+  const special = {
+    ' ': 'Space', Spacebar: 'Space', Escape: 'Esc', Esc: 'Esc', Enter: 'Enter', Tab: 'Tab',
+    Backspace: 'Backspace', Delete: 'Delete', Insert: 'Insert', Home: 'Home', End: 'End',
+    PageUp: 'PageUp', PageDown: 'PageDown', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
+  };
+  if (special[e.key]) return special[e.key];
+  if (e.key && e.key.length === 1) return e.key.toUpperCase();
+  return String(e.key || '').trim();
+}
+
+function hotkeyFromKeyboardEvent(e) {
+  const parts = [];
+  if (e.ctrlKey) parts.push('Ctrl');
+  if (e.altKey) parts.push('Alt');
+  if (e.shiftKey) parts.push('Shift');
+  if (e.metaKey) parts.push('Win');
+  const key = hotkeyKeyLabel(e);
+  if (key) parts.push(key);
+  return key ? parts.join('+') : '';
+}
+
+const _mediaDurationCache = new Map();
+
+async function resolveMediaUrlForMetadata(mediaFile) {
+  const payload = resolveMediaPayload(mediaFile);
+  if (payload?.fileUrl) return payload.fileUrl;
+  if (payload?.file && window.bigo?.effectsResolveUrl) {
+    const r = await window.bigo.effectsResolveUrl(payload.file).catch(() => null);
+    if (r?.ok && r.url) return r.url;
+  }
+  return '';
+}
+
+function readMediaDurationSeconds(url, mediaFile) {
+  return new Promise(resolve => {
+    if (!url) { resolve(null); return; }
+    const el = isAudioEffectFile(mediaFile) ? new Audio() : document.createElement('video');
+    let done = false;
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      el.removeEventListener('loadedmetadata', onLoaded);
+      el.removeEventListener('error', onError);
+      try { el.removeAttribute('src'); el.load(); } catch {}
+      resolve(value);
+    };
+    const onLoaded = () => {
+      const duration = Number(el.duration);
+      finish(Number.isFinite(duration) && duration > 0 ? duration : null);
+    };
+    const onError = () => finish(null);
+    const timer = setTimeout(() => finish(null), 4000);
+    el.preload = 'metadata';
+    el.addEventListener('loadedmetadata', onLoaded, { once: true });
+    el.addEventListener('error', onError, { once: true });
+    el.src = url;
+    try { el.load(); } catch { finish(null); }
+  });
+}
+
+async function getMediaDurationSeconds(mediaFile) {
+  const key = String(mediaFile || '').trim();
+  if (!key) return null;
+  if (_mediaDurationCache.has(key)) return _mediaDurationCache.get(key);
+  const promise = (async () => {
+    const url = await resolveMediaUrlForMetadata(key);
+    return readMediaDurationSeconds(url, key);
+  })();
+  _mediaDurationCache.set(key, promise);
+  const duration = await promise.catch(() => null);
+  _mediaDurationCache.set(key, duration);
+  return duration;
+}
+
+async function scheduleHotkeyRepeatByMediaDuration(hotkeyCfg, mediaFile, send, startedAt) {
+  const offsetMs = hotkeyCfg.delaySeconds * 1000;
+  const duration = await getMediaDurationSeconds(mediaFile);
+  const targetMs = Number.isFinite(duration) && duration > 0
+    ? (duration * 1000) - offsetMs
+    : offsetMs;
+  const elapsedMs = performance.now() - startedAt;
+  setTimeout(() => send('bấm lại'), Math.max(0, targetMs - elapsedMs));
+}
+
+function triggerEffectHotkeyCycle(cfg, label = '', mediaFile = '') {
+  const hotkeyCfg = normalizeObsHotkeyConfig(cfg);
+  if (!hotkeyCfg.enabled || !window.bigo?.hotkeySend) return;
+  const startedAt = performance.now();
+  const send = (phase) => {
+    window.bigo.hotkeySend({ hotkey: hotkeyCfg.hotkey })
+      .then(r => {
+        if (r?.ok === false) appendLog(`[hotkey] lỗi ${phase}: ${r.error || hotkeyCfg.hotkey}`);
+        else appendLog(`[hotkey] ${phase}: ${hotkeyCfg.hotkey}${label ? ` (${label})` : ''}`);
+      })
+      .catch(e => appendLog(`[hotkey] lỗi ${phase}: ${e.message || e}`));
+  };
+  send('bấm');
+  if (hotkeyCfg.delaySeconds > 0) {
+    scheduleHotkeyRepeatByMediaDuration(hotkeyCfg, mediaFile, send, startedAt);
+  }
 }
 function appendLog(msg) {
   // Log panel đã được bỏ. Giữ console.log để debug qua DevTools.
@@ -1697,7 +1823,12 @@ async function playBackgroundEffect(item, ev, playTimes) {
       isBackground: true,
     });
     const payload = resolveMediaPayload(mediaFile);
-    window.bigo.overlayPlay({ overlayId: item.overlayId, ...payload }).catch(e => appendLog(`[bg] lỗi phát nền: ${e.message}`));
+    window.bigo.overlayPlay({ overlayId: item.overlayId, ...payload })
+      .then(r => {
+        if (r && r.ok === false) appendLog(`[bg] lỗi phát nền: ${r.error || 'không phát được'}`);
+        else if (status === 'playing') triggerEffectHotkeyCycle(appSettings.obsHotkey, effectNameFromMediaFile(mediaFile) || name, mediaFile);
+      })
+      .catch(e => appendLog(`[bg] lỗi phát nền: ${e.message}`));
   }
   refreshBackgroundUi();
   appendLog(`[bg] ${name}: phát nền x${total}`);
@@ -1709,7 +1840,10 @@ function onBackgroundEffectEnded(overlayId) {
   if (idx === -1) return false;
   backgroundItems.splice(idx, 1);
   const next = backgroundItems.find(q => q.overlayId === overlayId && q.status === 'queued');
-  if (next) next.status = 'playing';
+  if (next) {
+    next.status = 'playing';
+    triggerEffectHotkeyCycle(appSettings.obsHotkey, next.effect_name || next.gift_name || 'background', next.mediaFile);
+  }
   refreshBackgroundUi();
   return true;
 }
@@ -5559,6 +5693,7 @@ let appSettings = {
   members: [],
   fxVolume: 100,
   maxListItems: 200,
+  obsHotkey: { enabled: false, hotkey: 'Ctrl+1', delaySeconds: 0 },
 };
 
 async function saveAppSettings(patch) {
@@ -5580,6 +5715,7 @@ async function saveAppSettings(patch) {
     }
     if ('fxVolume' in patch) s.fxVolume = patch.fxVolume;
     if ('maxListItems' in patch) s.maxListItems = patch.maxListItems;
+    if (patch.obsHotkey) s.obsHotkey = { ...(s.obsHotkey || {}), ...patch.obsHotkey };
   }
   await window.bigo.settingsSave(s);
 }
@@ -5708,6 +5844,7 @@ async function initAppSettings(s) {
   }
   appSettings.fxVolume = s.fxVolume != null ? s.fxVolume : 100;
   appSettings.maxListItems = s.maxListItems || 200;
+  appSettings.obsHotkey = normalizeObsHotkeyConfig(s.obsHotkey || appSettings.obsHotkey);
   // Apply special effects UI
   applySpecialEffectsUi();
   renderGroupSpecialEffectsUi();
@@ -5725,6 +5862,9 @@ async function initAppSettings(s) {
   if (els.bgmVol) { els.bgmVol.value = appSettings.bgm.volume || 80; els.bgmVolVal.textContent = els.bgmVol.value; }
   if (els.fxVol) { els.fxVol.value = appSettings.fxVolume; els.fxVolVal.textContent = appSettings.fxVolume; }
   if (els.maxListItems) els.maxListItems.value = appSettings.maxListItems;
+  if (els.obsHotkeyEnabled) els.obsHotkeyEnabled.checked = !!appSettings.obsHotkey.enabled;
+  if (els.obsHotkey) els.obsHotkey.value = appSettings.obsHotkey.hotkey || '';
+  if (els.obsHotkeyDelay) els.obsHotkeyDelay.value = appSettings.obsHotkey.delaySeconds || 0;
   renderMembersList();
   applyRankingSettingsUi();
   applyScoreSettingsUi();
@@ -6723,6 +6863,41 @@ if (els.maxListItems) {
   els.maxListItems.addEventListener('change', () => {
     appSettings.maxListItems = parseInt(els.maxListItems.value, 10) || 200;
     saveAppSettings({ maxListItems: appSettings.maxListItems });
+  });
+}
+function saveObsHotkeySettings() {
+  appSettings.obsHotkey = readSettingsObsHotkeyConfig();
+  saveAppSettings({ obsHotkey: appSettings.obsHotkey });
+}
+if (els.obsHotkeyEnabled) els.obsHotkeyEnabled.addEventListener('change', saveObsHotkeySettings);
+if (els.obsHotkey) {
+  els.obsHotkey.addEventListener('focus', () => {
+    els.obsHotkey.placeholder = 'Bấm tổ hợp phím...';
+  });
+  els.obsHotkey.addEventListener('blur', () => {
+    els.obsHotkey.placeholder = 'Bấm tổ hợp phím, mặc định Ctrl+1';
+  });
+  els.obsHotkey.addEventListener('keydown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      els.obsHotkey.value = '';
+      saveObsHotkeySettings();
+      return;
+    }
+    const hotkey = hotkeyFromKeyboardEvent(e);
+    if (!hotkey) return;
+    els.obsHotkey.value = hotkey;
+    if (els.obsHotkeyEnabled) els.obsHotkeyEnabled.checked = true;
+    saveObsHotkeySettings();
+  });
+}
+if (els.obsHotkeyDelay) els.obsHotkeyDelay.addEventListener('change', saveObsHotkeySettings);
+if (els.btnClearObsHotkey) {
+  els.btnClearObsHotkey.addEventListener('click', () => {
+    if (els.obsHotkey) els.obsHotkey.value = '';
+    if (els.obsHotkeyEnabled) els.obsHotkeyEnabled.checked = false;
+    saveObsHotkeySettings();
   });
 }
 

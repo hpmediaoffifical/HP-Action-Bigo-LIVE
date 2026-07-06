@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, nativeImage, dialog, shell, clipboard, scre
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { execFile } = require('child_process');
 const { BigoClient } = require('./bigo-client');
 const { BigoWebListener } = require('./web-embed');
 const { OverlayManager } = require('./overlay-manager');
@@ -151,6 +152,57 @@ function saveJson(p, obj) {
   fs.writeFileSync(p, JSON.stringify(obj, null, 2), 'utf8');
 }
 function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+const HOTKEY_VK = {
+  CTRL: 0x11, CONTROL: 0x11,
+  SHIFT: 0x10,
+  ALT: 0x12, OPTION: 0x12,
+  WIN: 0x5B, WINDOWS: 0x5B, META: 0x5B, CMD: 0x5B, COMMAND: 0x5B,
+  SPACE: 0x20, ENTER: 0x0D, RETURN: 0x0D, ESC: 0x1B, ESCAPE: 0x1B, TAB: 0x09,
+  BACKSPACE: 0x08, DELETE: 0x2E, DEL: 0x2E, INSERT: 0x2D, INS: 0x2D,
+  HOME: 0x24, END: 0x23, PAGEUP: 0x21, PAGEDOWN: 0x22, PGUP: 0x21, PGDN: 0x22,
+  UP: 0x26, DOWN: 0x28, LEFT: 0x25, RIGHT: 0x27,
+  PLUS: 0xBB, '+': 0xBB, MINUS: 0xBD, '-': 0xBD,
+  COMMA: 0xBC, ',': 0xBC, PERIOD: 0xBE, '.': 0xBE, SLASH: 0xBF, '/': 0xBF,
+  SEMICOLON: 0xBA, ';': 0xBA, QUOTE: 0xDE, "'": 0xDE, BACKQUOTE: 0xC0, '`': 0xC0,
+  LBRACKET: 0xDB, '[': 0xDB, RBRACKET: 0xDD, ']': 0xDD, BACKSLASH: 0xDC, '\\': 0xDC,
+};
+for (let i = 1; i <= 24; i++) HOTKEY_VK[`F${i}`] = 0x70 + i - 1;
+for (let i = 0; i <= 9; i++) {
+  HOTKEY_VK[String(i)] = 0x30 + i;
+  HOTKEY_VK[`NUMPAD${i}`] = 0x60 + i;
+}
+for (let i = 0; i < 26; i++) HOTKEY_VK[String.fromCharCode(65 + i)] = 0x41 + i;
+
+function parseHotkeyKeys(hotkey) {
+  const parts = String(hotkey || '')
+    .split(/[+\s]+/)
+    .map(s => s.trim().toUpperCase())
+    .filter(Boolean);
+  const keys = [];
+  for (const part of parts) {
+    const vk = HOTKEY_VK[part];
+    if (!vk) return null;
+    if (!keys.includes(vk)) keys.push(vk);
+  }
+  return keys.length ? keys : null;
+}
+
+function sendGlobalHotkey(hotkey) {
+  if (process.platform !== 'win32') return Promise.resolve({ ok: false, error: 'Chỉ hỗ trợ Windows' });
+  const keys = parseHotkeyKeys(hotkey);
+  if (!keys) return Promise.resolve({ ok: false, error: 'Phím tắt không hợp lệ' });
+  const nums = keys.map(n => parseInt(n, 10)).filter(n => Number.isInteger(n) && n > 0 && n <= 255);
+  if (!nums.length) return Promise.resolve({ ok: false, error: 'Phím tắt không hợp lệ' });
+  const ps = `$ErrorActionPreference='Stop'; Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);' -Name Keyboard -Namespace Win32; $keys=@(${nums.join(',')}); foreach($k in $keys){[Win32.Keyboard]::keybd_event([byte]$k,0,0,[UIntPtr]::Zero)}; Start-Sleep -Milliseconds 45; [array]::Reverse($keys); foreach($k in $keys){[Win32.Keyboard]::keybd_event([byte]$k,0,2,[UIntPtr]::Zero)}`;
+  const encoded = Buffer.from(ps, 'utf16le').toString('base64');
+  return new Promise((resolve) => {
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true, timeout: 5000 }, (err) => {
+      if (err) resolve({ ok: false, error: err.message || String(err) });
+      else resolve({ ok: true });
+    });
+  });
+}
 
 // =================== Mapping schema v2 ===================
 function defaultOverlay(name = 'Overlay 1') {
@@ -905,6 +957,16 @@ ipcMain.handle('effects:exists', (_e, mediaFile) => {
     } catch {}
   }
   return false;
+});
+
+ipcMain.handle('effects:resolve-url', (_e, mediaFile) => {
+  if (!mediaFile || typeof mediaFile !== 'string') return { ok: false, error: 'thiếu file' };
+  for (const p of mediaCandidatePaths(mediaFile)) {
+    try {
+      if (fs.existsSync(p)) return { ok: true, url: fileUrl(p) };
+    } catch {}
+  }
+  return { ok: false, error: 'file không tồn tại' };
 });
 
 // Pick BGM file - giữ nguyên ở vị trí gốc, trả về file:// URL
@@ -1927,6 +1989,8 @@ ipcMain.handle('overlay:set-speed', (_e, opts) => {
   if (obsOverlayServer) obsOverlayServer.setSpeed(payload);
   return { ok: true, ...payload };
 });
+
+ipcMain.handle('hotkey:send', (_e, { hotkey } = {}) => sendGlobalHotkey(hotkey));
 
 // Stop hiệu ứng đang playing trên overlay (user xoá item khỏi DSHT)
 ipcMain.handle('overlay:stop-effect', (_e, overlayId) => {
