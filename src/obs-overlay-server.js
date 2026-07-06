@@ -29,6 +29,7 @@ class ObsOverlayServer {
     this.scoreState = {};
     this.pkDuoState = {};
     this.heartState = {};
+    this.speed = { audioRate: 1, videoRate: 1 };
     this.media = new Map();   // mediaId -> absolute file path
   }
 
@@ -144,7 +145,8 @@ class ObsOverlayServer {
   }
 
   setSpeed(payload) {
-    for (const overlayId of this.clients.keys()) this._send(overlayId, 'set-speed', payload);
+    this.speed = { ...(this.speed || { audioRate: 1, videoRate: 1 }), ...(payload || {}) };
+    for (const overlayId of this.clients.keys()) this._send(overlayId, 'set-speed', this.speed);
   }
 
   _send(overlayId, event, data) {
@@ -240,6 +242,7 @@ class ObsOverlayServer {
       'X-Accel-Buffering': 'no',
     });
     res.write(`event: ready\ndata: ${JSON.stringify({ overlayId, ts: Date.now() })}\n\n`);
+    res.write(`event: set-speed\ndata: ${JSON.stringify({ overlayId, ...(this.speed || { audioRate: 1, videoRate: 1 }) })}\n\n`);
     if (!this.clients.has(overlayId)) this.clients.set(overlayId, new Set());
     this.clients.get(overlayId).add(res);
     req.on('close', () => this.clients.get(overlayId)?.delete(res));

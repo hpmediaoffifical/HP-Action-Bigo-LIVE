@@ -42,9 +42,10 @@ function clampToScreen(b) {
 }
 
 class OverlayWindow {
-  constructor(cfg, onBoundsSave) {
+  constructor(cfg, onBoundsSave, onReady) {
     this.cfg = cfg;
     this.onBoundsSave = onBoundsSave || (() => {});
+    this.onReady = onReady || (() => {});
     this.win = null;
     this._saveTimer = null;
   }
@@ -93,7 +94,10 @@ class OverlayWindow {
     });
     this.win.setMenuBarVisibility(false);
     this.win.loadFile(RENDERER_PATH);
-    this.win.webContents.once('did-finish-load', () => this.applyConfig());
+    this.win.webContents.once('did-finish-load', () => {
+      this.applyConfig();
+      try { this.onReady(this); } catch {}
+    });
 
     // ========== Bounds tracking listeners ==========
     // 'move' / 'resize' fire continuously khi user đang drag → debounce 400ms để giảm I/O.
@@ -190,8 +194,9 @@ class OverlayWindow {
 }
 
 class OverlayManager {
-  constructor({ onBoundsChanged }) {
+  constructor({ onBoundsChanged, onWindowReady } = {}) {
     this.onBoundsChanged = onBoundsChanged || (() => {});
+    this.onWindowReady = onWindowReady || (() => {});
     this.overlays = new Map(); // id -> OverlayWindow
   }
 
@@ -202,6 +207,8 @@ class OverlayManager {
       // Không còn monkey-patch fragile.
       ov = new OverlayWindow(cfg, (b) => {
         try { this.onBoundsChanged(cfg.id, b); } catch (e) { console.warn('[overlay bounds save]', e); }
+      }, (overlayWindow) => {
+        try { this.onWindowReady(cfg.id, overlayWindow); } catch (e) { console.warn('[overlay ready]', e); }
       });
       this.overlays.set(cfg.id, ov);
     } else {

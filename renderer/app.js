@@ -219,6 +219,8 @@ const backgroundItems = []; // hiệu ứng NỀN: phát song song, chỉ để 
 const QUEUE_MAX = 5000; // Cho phép hold 5000 items in-memory; render UI giới hạn theo maxListItems.
 let queuePaused = false;
 const missingMediaWarned = new Set();
+const directAudioEffects = new Map(); // queueId -> Audio, dùng khi MP3 không cần overlay.
+const directBackgroundAudioEffects = new Map(); // backgroundId -> Audio, dùng cho MP3 nền không overlay.
 
 function loadQueueSettings() {
   try {
@@ -340,7 +342,7 @@ async function playQueueItem(q) {
     setTimeout(() => completeQueueItemById(q.id), 250);
     return;
   }
-  if (!q || !q.overlayId || !q.mediaFile || !window.bigo.overlayPlay) return;
+  if (!q || !q.mediaFile) return;
   if (q.pauseBgm) pauseBgmForEffect();
   if (window.bigo.effectsExists) {
     let exists = true;
@@ -354,10 +356,106 @@ async function playQueueItem(q) {
       return;
     }
   }
+  if (!q.overlayId) {
+    if (isAudioEffectFile(q.mediaFile)) {
+      playDirectAudioQueueItem(q);
+    } else {
+      appendLog(`[queue] bỏ qua video chưa chọn overlay: ${fileDisplayLabel(q.mediaFile)}`);
+      completeQueueItemById(q.id);
+    }
+    return;
+  }
+  if (!window.bigo.overlayPlay) return;
   const payload = resolveMediaPayload(q.mediaFile);
   const r = await window.bigo.overlayPlay({ overlayId: q.overlayId, ...payload }).catch(e => ({ ok: false, error: e.message }));
   if (r && r.ok === false) await handleMissingQueueMedia(q);
   else triggerEffectHotkeyCycle(appSettings.obsHotkey, q.effect_name || q.gift_name || 'effect', q.mediaFile);
+}
+
+async function playDirectAudioQueueItem(q) {
+  stopDirectAudioEffect(q.id);
+  const url = await resolveMediaUrlForMetadata(q.mediaFile).catch(() => '');
+  if (!queueItems.some(item => item.id === q.id && item.status === 'playing')) return;
+  if (!url) { await handleMissingQueueMedia(q); return; }
+  const audio = new Audio(url);
+  directAudioEffects.set(q.id, audio);
+  audio.volume = Math.max(0, Math.min(1, (appSettings.fxVolume || 100) / 100));
+  audio.playbackRate = clampSpeedRate(typeof _currentAudioSpeed === 'number' ? _currentAudioSpeed : 1);
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    stopDirectAudioEffect(q.id);
+    if (queueItems.some(item => item.id === q.id && item.status === 'playing')) completeQueueItemById(q.id);
+  };
+  audio.addEventListener('ended', finish, { once: true });
+  audio.addEventListener('error', () => {
+    appendLog(`[queue] lỗi phát MP3: ${fileDisplayLabel(q.mediaFile)}`);
+    finish();
+  }, { once: true });
+  if (audio.setSinkId && appSettings?.bgm?.deviceId) {
+    try { await audio.setSinkId(appSettings.bgm.deviceId); } catch {}
+  }
+  audio.play()
+    .then(() => {
+      if (directAudioEffects.get(q.id) === audio) triggerEffectHotkeyCycle(appSettings.obsHotkey, q.effect_name || q.gift_name || 'effect', q.mediaFile);
+    })
+    .catch(e => {
+      appendLog(`[queue] lỗi phát MP3: ${e?.message || e}`);
+      finish();
+    });
+}
+
+function stopDirectAudioEffect(id) {
+  const audio = directAudioEffects.get(id);
+  if (!audio) return;
+  directAudioEffects.delete(id);
+  try {
+    audio.pause();
+    audio.currentTime = 0;
+    audio.removeAttribute('src');
+    audio.load();
+  } catch {}
+}
+
+function stopAllDirectAudioEffects() {
+  for (const id of [...directAudioEffects.keys()]) stopDirectAudioEffect(id);
+  for (const id of [...directBackgroundAudioEffects.keys()]) stopDirectBackgroundAudioEffect(id);
+}
+
+async function playDirectBackgroundAudioItem(q) {
+  stopDirectBackgroundAudioEffect(q.id);
+  const url = await resolveMediaUrlForMetadata(q.mediaFile).catch(() => '');
+  if (!backgroundItems.some(item => item.id === q.id)) return;
+  if (!url) return;
+  const audio = new Audio(url);
+  directBackgroundAudioEffects.set(q.id, audio);
+  audio.volume = Math.max(0, Math.min(1, (appSettings.fxVolume || 100) / 100));
+  audio.playbackRate = clampSpeedRate(typeof _currentAudioSpeed === 'number' ? _currentAudioSpeed : 1);
+  const finish = () => {
+    stopDirectBackgroundAudioEffect(q.id);
+    const idx = backgroundItems.findIndex(item => item.id === q.id);
+    if (idx !== -1) backgroundItems.splice(idx, 1);
+    refreshBackgroundUi();
+  };
+  audio.addEventListener('ended', finish, { once: true });
+  audio.addEventListener('error', finish, { once: true });
+  if (audio.setSinkId && appSettings?.bgm?.deviceId) {
+    try { await audio.setSinkId(appSettings.bgm.deviceId); } catch {}
+  }
+  audio.play().catch(finish);
+}
+
+function stopDirectBackgroundAudioEffect(id) {
+  const audio = directBackgroundAudioEffects.get(id);
+  if (!audio) return;
+  directBackgroundAudioEffects.delete(id);
+  try {
+    audio.pause();
+    audio.currentTime = 0;
+    audio.removeAttribute('src');
+    audio.load();
+  } catch {}
 }
 
 async function handleMissingQueueMedia(q) {
@@ -618,6 +716,7 @@ async function removeQueueItemById(id) {
   if (removed.status === 'playing' && removed.overlayId && window.bigo.overlayStopEffect) {
     window.bigo.overlayStopEffect(removed.overlayId).catch(() => {});
   }
+  if (removed.status === 'playing') stopDirectAudioEffect(removed.id);
   // Mark playing cho item tiếp theo (nếu có)
   if (removed.status === 'playing' && queueItems.length > 0) {
     markNextQueueItemPlaying(removed.overlayId ? 550 : 0);
@@ -640,6 +739,7 @@ function clearAllQueue() {
       window.bigo.overlayStopEffect(ov.id).catch(() => {});
     }
   }
+  stopAllDirectAudioEffects();
   // Decrement counter
   sessionStats.effects = Math.max(0, sessionStats.effects - queueItems.length);
   updateConnectStats();
@@ -842,6 +942,7 @@ function removeQueueGiftBySpecialTarget(cfg, maxRemove) {
     if (q.status === 'playing') {
       stoppedPlaying = true;
       if (q.overlayId && window.bigo.overlayStopEffect) window.bigo.overlayStopEffect(q.overlayId).catch(() => {});
+      stopDirectAudioEffect(q.id);
     }
     queueItems.splice(i, 1);
   }
@@ -869,11 +970,13 @@ function firstNumericMatchKey(item) {
 const BLIND_BAG_ACTION_TITLES = {
   shuffleQueue: 'Xáo trộn HÀNH ĐỘNG',
   clearQueue: 'Xoá danh sách hiệu ứng',
-  speedUpAudio: 'Tăng tốc nhạc',
-  speedDownAudio: 'Giảm tốc nhạc',
-  speedUpVideo: 'Tăng tốc video',
-  speedDownVideo: 'Giảm tốc video',
+  speedUpAudio: 'Tăng tốc MP3 riêng',
+  speedDownAudio: 'Giảm tốc MP3 riêng',
+  speedUpAll: 'Tăng tốc chung',
+  speedDownAll: 'Giảm tốc chung',
 };
+
+const SPEED_EFFECT_KEYS = ['speedUpAudio', 'speedDownAudio', 'speedUpAll', 'speedDownAll'];
 
 function getBlindBagCandidates(sourceGroup = null, triggerCfg = appSettings?.specialEffects?.blindBag || {}) {
   const candidates = [];
@@ -881,7 +984,7 @@ function getBlindBagCandidates(sourceGroup = null, triggerCfg = appSettings?.spe
     ? (sourceGroup.items || []).map(item => ({ ...item, _group: sourceGroup }))
     : getEnabledGiftItems();
   for (const item of sourceItems) {
-    if (!hasEffectMedia(item) || !item.overlayId) continue;
+    if (!canPlayEffectItem(item)) continue;
     if (specialCfgHasGiftIdentity(triggerCfg) && itemMatchesGameplayGift(item, specialCfgToGiftEvent(triggerCfg))) continue;
     candidates.push({ kind: 'item', item });
   }
@@ -890,7 +993,7 @@ function getBlindBagCandidates(sourceGroup = null, triggerCfg = appSettings?.spe
   const sourceFeatures = sourceGroup
     ? (getGroupSpecialConfig(sourceGroup.id, false)?.features || {})
     : (appSettings?.specialEffects || {});
-  for (const key of ['clearQueue','shuffleQueue','removeGift','speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo']) {
+  for (const key of ['clearQueue','shuffleQueue','removeGift', ...SPEED_EFFECT_KEYS]) {
     const seCfg = sourceFeatures[key];
     if (key === 'shuffleQueue' && !canShuffle) continue;
     if (key === 'removeGift' && !specialCfgHasGiftIdentity(seCfg, 'target')) continue;
@@ -960,7 +1063,7 @@ function executeQueuedSpecialAction(q) {
     runSpecialFeatureAction(action, fakeGiftEventFromSpecialCfg(q.specialActionCfg, 'HP MEDIA'), q.specialActionCfg, findGroupById(q.specialActionGroupId));
   } else if (action === 'shuffleQueue') queueShuffleQueued();
   else if (action === 'clearQueue') clearAllQueue();
-  else if (['speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].includes(action)) triggerSpeedEffect(action);
+  else if (SPEED_EFFECT_KEYS.includes(action)) triggerSpeedEffect(action);
   appendLog(`[se:blindBag] chạy ngẫu nhiên: ${q?.effect_name || action}`);
 }
 
@@ -1002,7 +1105,7 @@ function runSpecialFeatureAction(key, ev, cfg, sourceGroup = null) {
   }
   if (key === 'removeGift') return triggerRemoveGiftSpecial(ev, cfg);
   if (key === 'blindBag') return triggerBlindBagSpecial(ev, cfg, sourceGroup);
-  if (['speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].includes(key)) {
+  if (SPEED_EFFECT_KEYS.includes(key)) {
     triggerSpeedEffect(key, cfg);
     return true;
   }
@@ -1082,8 +1185,10 @@ function addRemoveGiftTargetTestItem() {
     alert('Quà B đang là hiệu ứng NỀN nên không nằm trong HÀNH ĐỘNG để xoá. Hãy chọn quà B dạng HÀNH ĐỘNG tuần tự.');
     return;
   }
-  if (!hasEffectMedia(item) || !item.overlayId) {
-    alert('Quà B chưa có file hiệu ứng hoặc overlay, không thể đưa vào HÀNH ĐỘNG để test.');
+  if (!canPlayEffectItem(item)) {
+    alert(effectItemNeedsOverlay(item)
+      ? 'Quà B là video nên cần chọn overlay để đưa vào HÀNH ĐỘNG test.'
+      : 'Quà B chưa có file hiệu ứng, không thể đưa vào HÀNH ĐỘNG để test.');
     return;
   }
   const fakeEv = {
@@ -1138,7 +1243,7 @@ async function runSpecialTest(key) {
     triggerBlindBagSpecial(fakeGiftEventFromSpecialCfg(cfg, 'Túi mù HP MEDIA'), cfg);
     return;
   }
-  if (['speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].includes(key)) {
+  if (SPEED_EFFECT_KEYS.includes(key)) {
     triggerSpeedEffect(key);
     appendLog(`[se:${key}] HP MEDIA chạy thử không qua LIVE`);
   }
@@ -1274,6 +1379,7 @@ function queueStopById(id) {
   if (q.overlayId && window.bigo.overlayStopEffect) {
     window.bigo.overlayStopEffect(q.overlayId).catch(() => {});
   }
+  stopDirectAudioEffect(q.id);
   q.status = 'queued';
   q.stoppedAt = Date.now();
   syncBgmAfterQueueChange();
@@ -1521,16 +1627,37 @@ function fileUrlFromPath(filePath) {
   return 'file:///' + String(filePath || '').replace(/\\/g, '/').replace(/^\/+/, '');
 }
 function mediaIconFor(file) {
-  return /\.(mp3|wav|ogg|m4a|flac)(\?|#|$)/i.test(String(file || '')) ? '🎵' : '🎬';
+  return isAudioEffectFile(file) ? '🎵' : '🎬';
 }
 function effectNameFromMediaFile(file) {
   return displayEffectName(fileDisplayLabel(file)).replace(/^📁\s*/, '') || 'Hiệu ứng';
 }
 function isAudioEffectFile(mediaFile) {
-  return /\.(mp3|wav|ogg)(\?|#|$)/i.test(String(mediaFile || ''));
+  return /\.(mp3|wav|ogg|m4a|flac)(\?|#|$)/i.test(String(mediaFile || ''));
+}
+function mediaFilesNeedOverlay(files) {
+  const list = normalizeMediaFiles(files);
+  return list.some(file => !isAudioEffectFile(file));
+}
+function effectItemNeedsOverlay(item) {
+  return mediaFilesNeedOverlay(normalizeMediaFiles(item));
+}
+function canPlayEffectItem(item) {
+  return hasEffectMedia(item) && (!effectItemNeedsOverlay(item) || !!item?.overlayId);
 }
 function autoEnablePauseBgmForAudio(mediaFile) {
   if (els.dlgPauseBgm && isAudioEffectFile(mediaFile)) els.dlgPauseBgm.checked = true;
+}
+
+function syncDialogOverlayForMediaFiles(files) {
+  if (!els.dlgOverlay) return;
+  const list = normalizeMediaFiles(files);
+  if (!list.length) return;
+  if (mediaFilesNeedOverlay(list)) {
+    if (!els.dlgOverlay.value && mapping.overlays?.[0]) els.dlgOverlay.value = mapping.overlays[0].id;
+  } else {
+    els.dlgOverlay.value = '';
+  }
 }
 
 function normalizeObsHotkeyConfig(cfg) {
@@ -1795,10 +1922,40 @@ function renderConfigExportGroups() {
 }
 
 async function playBackgroundEffect(item, ev, playTimes) {
-  if (!item || !item.overlayId || !hasEffectMedia(item) || !window.bigo.overlayPlay) return;
+  if (!item || !canPlayEffectItem(item)) return;
   const total = Math.max(1, Math.min(1000, parseInt(playTimes, 10) || 1));
   const name = item.alias || ev?.gift_name || item.matchKeys?.[0] || '?';
   const icon = ev?.gift_icon || ev?.gift_icon_url || getGiftIcon(item) || '';
+  if (!item.overlayId) {
+    for (let i = 0; i < total; i++) {
+      const mediaFile = chooseEffectMedia(item);
+      if (!mediaFile) continue;
+      if (window.bigo.effectsExists) {
+        let exists = true;
+        try { exists = await window.bigo.effectsExists(mediaFile); } catch { exists = false; }
+        if (!exists) { appendLog(`[bg] thiếu file: ${fileDisplayLabel(mediaFile)}`); continue; }
+      }
+      const q = {
+        id: 'bg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        overlayId: '',
+        itemId: item.id || null,
+        gift_name: name,
+        effect_name: effectNameFromMediaFile(mediaFile) || name,
+        gift_icon: icon,
+        mediaFile,
+        status: 'playing',
+        step: i + 1,
+        total,
+        isBackground: true,
+      };
+      backgroundItems.push(q);
+      playDirectBackgroundAudioItem(q);
+    }
+    refreshBackgroundUi();
+    appendLog(`[bg] ${name}: phát MP3 nền x${total}`);
+    return;
+  }
+  if (!window.bigo.overlayPlay) return;
   const hasPlayingOnOverlay = backgroundItems.some(q => q.overlayId === item.overlayId && q.status === 'playing');
   for (let i = 0; i < total; i++) {
     const mediaFile = chooseEffectMedia(item);
@@ -2811,7 +2968,7 @@ function getDialogMediaFiles() {
   return normalizeMediaFiles(window._dlgMediaFiles || []);
 }
 
-function setDialogMediaFiles(files, { autosave = true } = {}) {
+function setDialogMediaFiles(files, { autosave = true, adjustOverlay = autosave } = {}) {
   window._dlgMediaFiles = normalizeMediaFiles(files);
   const primary = window._dlgMediaFiles[0] || '';
   if (els.dlgFile) {
@@ -2827,6 +2984,7 @@ function setDialogMediaFiles(files, { autosave = true } = {}) {
   }
   renderDialogMediaList();
   if (primary) autoEnablePauseBgmForAudio(primary);
+  if (adjustOverlay) syncDialogOverlayForMediaFiles(window._dlgMediaFiles);
   if (autosave) autoSaveOpenGiftFields();
 }
 
@@ -3861,7 +4019,7 @@ async function groupAction(act, gid, value, itemId) {
     const found = findItemById(itemId);
     if (!found) return;
     if (act === 'play') {
-      if (!hasEffectMedia(found.item) || !found.item.overlayId) { alert('Quà chưa có file hoặc overlay'); return; }
+      if (!canPlayEffectItem(found.item)) { alert(effectItemNeedsOverlay(found.item) ? 'Video cần chọn overlay' : 'Quà chưa có file hiệu ứng'); return; }
       // Lấy số lượng từ input cùng row
       const countInput = document.querySelector(`.play-count[data-iid="${itemId}"]`);
       const playTimes = Math.max(1, Math.min(1000, parseInt(countInput?.value || '1', 10) || 1));
@@ -4246,9 +4404,10 @@ async function openGiftDialog(gift = null, groupId = null) {
   const multiGift = document.getElementById('dlgMultiGift');
   if (multiGift) multiGift.checked = false;
   // refresh overlay options
-  els.dlgOverlay.innerHTML = mapping.overlays.length
-    ? mapping.overlays.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('')
-    : '<option value="">(chưa có overlay)</option>';
+  els.dlgOverlay.innerHTML = [
+    '<option value="">Không cần overlay (MP3)</option>',
+    ...mapping.overlays.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`),
+  ].join('') || '<option value="">(chưa có overlay)</option>';
   els.dlgOverlay.value = gift?.overlayId || mapping.overlays[0]?.id || '';
   const mediaFiles = normalizeMediaFiles(gift || {});
   setDialogMediaFiles(mediaFiles, { autosave: false });
@@ -4386,8 +4545,13 @@ els.btnTestGift.onclick = async () => {
   if (allItems.length === 0) { alert('Chưa có quà nào'); return; }
   const g = allItems[0];
   const mediaFile = chooseEffectMedia(g);
-  if (!mediaFile || !g.overlayId) { alert('Quà đầu tiên chưa có file hoặc overlay'); return; }
-  await window.bigo.overlayPlay({ overlayId: g.overlayId, ...resolveMediaPayload(mediaFile) });
+  if (!mediaFile || !canPlayEffectItem(g)) { alert(effectItemNeedsOverlay(g) ? 'Quà đầu tiên là video nên cần overlay' : 'Quà đầu tiên chưa có file hiệu ứng'); return; }
+  if (g.overlayId) await window.bigo.overlayPlay({ overlayId: g.overlayId, ...resolveMediaPayload(mediaFile) });
+  else {
+    const audio = new Audio(await resolveMediaUrlForMetadata(mediaFile));
+    audio.volume = Math.max(0, Math.min(1, (appSettings.fxVolume || 100) / 100));
+    audio.play().catch(() => {});
+  }
 };
 
 // =================== Overlay Table ===================
@@ -4941,7 +5105,7 @@ function findGiftByEvent(ev) {
       if (normalizeGameplayIconUrl(getGameplayItemIcon(item)) === evIcon) score = Math.max(score, 100);
     }
     if (!score) return 0;
-    if (hasEffectMedia(item) && item.overlayId) score += 10000;
+    if (canPlayEffectItem(item)) score += 10000;
     else if (hasEffectMedia(item)) score += 1000;
     if (item._group?.isCommon || item._group?.enabled !== false) score += 100;
     return score;
@@ -4977,8 +5141,8 @@ function logGiftQueueSkip(ev, matched) {
     appendLog(`[gift skip] ${name}: hiệu ứng "${matched.alias || matched.matchKeys?.[0] || '?'}" chưa có file media`);
     return;
   }
-  if (!matched.overlayId) {
-    appendLog(`[gift skip] ${name}: hiệu ứng "${matched.alias || matched.matchKeys?.[0] || '?'}" chưa chọn overlay`);
+  if (effectItemNeedsOverlay(matched) && !matched.overlayId) {
+    appendLog(`[gift skip] ${name}: hiệu ứng video "${matched.alias || matched.matchKeys?.[0] || '?'}" chưa chọn overlay`);
   }
 }
 
@@ -5560,7 +5724,7 @@ function renderParsed(ev) {
       // Gameplay overlay chỉ nhận bản sao event, không tác động queue/effect pipeline.
       forwardGameplayGiftEvent(ev);
     }
-    if (ev.type === 'gift' && matched && hasEffectMedia(matched) && matched.overlayId) {
+    if (ev.type === 'gift' && matched && canPlayEffectItem(matched)) {
       // Mỗi quà/combo tương ứng 1 hàng hành động. Ví dụ Bell x10 → 10 hàng.
       // BGM pause/resume chạy theo item đang phát trong playQueueItem().
       // Pre-effect: phát ÂM THANH/VIDEO trước MỘT LẦN (không lặp theo combo)
@@ -5680,12 +5844,11 @@ let appSettings = {
     shuffleQueue:    { enabled: false, typeid: null, giftName: '', iconUrl: '' },
     removeGift:      { enabled: false, typeid: null, giftName: '', iconUrl: '', targetTypeid: null, targetGiftName: '', targetIconUrl: '', removeCount: 1 },
     blindBag:        { enabled: false, typeid: null, giftName: '', iconUrl: '' },
-    // 4 speed riêng — tách audio (mp3/wav) vs video (mp4/webm) độc lập.
-    // Video không nên tăng giảm tốc nhiều (cảm giác khó chịu) → user setup factor riêng.
+    // Speed: MP3/audio effect riêng, hoặc chung cho MP3 + video + BGM.
     speedUpAudio:    { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 1.25, duration: 10 },
     speedDownAudio:  { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 0.75, duration: 10 },
-    speedUpVideo:    { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 1.20, duration: 8 },
-    speedDownVideo:  { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 0.80, duration: 8 },
+    speedUpAll:      { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 1.20, duration: 8 },
+    speedDownAll:    { enabled: false, typeid: null, giftName: '', iconUrl: '', factor: 0.80, duration: 8 },
     // TÁP TIM: KPI hearts. Khi đạt target → phát media (mp3/mp4).
     heartGoal:       { enabled: false, target: 100, mediaFile: '', overlayId: '', currentCount: 0 },
   },
@@ -5817,6 +5980,16 @@ async function initAppSettings(s) {
   appSettings.scoreVote = { ...appSettings.scoreVote, ...(s.scoreVote || {}) };
   appSettings.members = Array.isArray(s.members) ? s.members : [];
   appSettings.groupSpecialEffects = s.groupSpecialEffects && typeof s.groupSpecialEffects === 'object' ? s.groupSpecialEffects : {};
+  let migratedGroupSpeedKeys = false;
+  for (const groupCfg of Object.values(appSettings.groupSpecialEffects)) {
+    const features = groupCfg?.features;
+    if (!features || typeof features !== 'object') continue;
+    if (features.speedUpVideo && !features.speedUpAll) { features.speedUpAll = { ...features.speedUpVideo }; migratedGroupSpeedKeys = true; }
+    if (features.speedDownVideo && !features.speedDownAll) { features.speedDownAll = { ...features.speedDownVideo }; migratedGroupSpeedKeys = true; }
+    if (features.speedUpVideo) { delete features.speedUpVideo; migratedGroupSpeedKeys = true; }
+    if (features.speedDownVideo) { delete features.speedDownVideo; migratedGroupSpeedKeys = true; }
+  }
+  if (migratedGroupSpeedKeys) await saveAppSettings({ groupSpecialEffects: appSettings.groupSpecialEffects });
   // Migrate old clearGift → specialEffects.clearQueue (backward compat)
   if (s.clearGift && !s.specialEffects?.clearQueue) {
     appSettings.specialEffects.clearQueue = {
@@ -5827,16 +6000,20 @@ async function initAppSettings(s) {
     };
   }
   if (s.specialEffects) {
-    // Migrate speedUp/speedDown cu → speedUpAudio + speedUpVideo (cùng factor).
-    if (s.specialEffects.speedUp && !s.specialEffects.speedUpAudio) {
-      appSettings.specialEffects.speedUpAudio = { ...appSettings.specialEffects.speedUpAudio, ...s.specialEffects.speedUp };
-      appSettings.specialEffects.speedUpVideo = { ...appSettings.specialEffects.speedUpVideo, ...s.specialEffects.speedUp };
+    // Migrate speed keys cũ về 2 nhóm hiện tại: MP3 riêng và Chung.
+    if (s.specialEffects.speedUp && !s.specialEffects.speedUpAll) {
+      appSettings.specialEffects.speedUpAll = { ...appSettings.specialEffects.speedUpAll, ...s.specialEffects.speedUp };
     }
-    if (s.specialEffects.speedDown && !s.specialEffects.speedDownAudio) {
-      appSettings.specialEffects.speedDownAudio = { ...appSettings.specialEffects.speedDownAudio, ...s.specialEffects.speedDown };
-      appSettings.specialEffects.speedDownVideo = { ...appSettings.specialEffects.speedDownVideo, ...s.specialEffects.speedDown };
+    if (s.specialEffects.speedDown && !s.specialEffects.speedDownAll) {
+      appSettings.specialEffects.speedDownAll = { ...appSettings.specialEffects.speedDownAll, ...s.specialEffects.speedDown };
     }
-    for (const k of ['clearQueue','shuffleQueue','removeGift','blindBag','speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo','heartGoal']) {
+    if (s.specialEffects.speedUpVideo && !s.specialEffects.speedUpAll) {
+      appSettings.specialEffects.speedUpAll = { ...appSettings.specialEffects.speedUpAll, ...s.specialEffects.speedUpVideo };
+    }
+    if (s.specialEffects.speedDownVideo && !s.specialEffects.speedDownAll) {
+      appSettings.specialEffects.speedDownAll = { ...appSettings.specialEffects.speedDownAll, ...s.specialEffects.speedDownVideo };
+    }
+    for (const k of ['clearQueue','shuffleQueue','removeGift','blindBag', ...SPEED_EFFECT_KEYS, 'heartGoal']) {
       if (s.specialEffects[k]) {
         appSettings.specialEffects[k] = { ...appSettings.specialEffects[k], ...s.specialEffects[k] };
       }
@@ -5852,6 +6029,7 @@ async function initAppSettings(s) {
   // Apply BGM
   if (els.bgmAudio) {
     els.bgmAudio.volume = (appSettings.bgm.volume || 80) / 100;
+    applyBgmPlaybackRate();
     if (appSettings.bgm.file) els.bgmAudio.src = appSettings.bgm.file;
     if (appSettings.bgm.fileName) els.bgmFileLabel.value = appSettings.bgm.fileName;
   }
@@ -5934,8 +6112,8 @@ const SE_LABELS = {
   blindBag:        { id: 'seBlindBagLabel',        enabled: 'seBlindBagEnabled',        factor: null,                     duration: null },
   speedUpAudio:    { id: 'seSpeedUpAudioLabel',    enabled: 'seSpeedUpAudioEnabled',    factor: 'seSpeedUpAudioFactor',   duration: 'seSpeedUpAudioDuration' },
   speedDownAudio:  { id: 'seSpeedDownAudioLabel',  enabled: 'seSpeedDownAudioEnabled',  factor: 'seSpeedDownAudioFactor', duration: 'seSpeedDownAudioDuration' },
-  speedUpVideo:    { id: 'seSpeedUpVideoLabel',    enabled: 'seSpeedUpVideoEnabled',    factor: 'seSpeedUpVideoFactor',   duration: 'seSpeedUpVideoDuration' },
-  speedDownVideo:  { id: 'seSpeedDownVideoLabel',  enabled: 'seSpeedDownVideoEnabled',  factor: 'seSpeedDownVideoFactor', duration: 'seSpeedDownVideoDuration' },
+  speedUpAll:      { id: 'seSpeedUpAllLabel',      enabled: 'seSpeedUpAllEnabled',      factor: 'seSpeedUpAllFactor',     duration: 'seSpeedUpAllDuration' },
+  speedDownAll:    { id: 'seSpeedDownAllLabel',    enabled: 'seSpeedDownAllEnabled',    factor: 'seSpeedDownAllFactor',   duration: 'seSpeedDownAllDuration' },
 };
 
 function applySpecialEffectsUi() {
@@ -5990,10 +6168,10 @@ const SE_TITLES = {
   removeGiftTrigger: 'Quà A kích hoạt xoá',
   removeGiftTarget: 'Quà B bị xoá',
   blindBag: 'Túi mù ngẫu nhiên',
-  speedUpAudio: 'Tăng tốc nhạc',
-  speedDownAudio: 'Giảm tốc nhạc',
-  speedUpVideo: 'Tăng tốc video',
-  speedDownVideo: 'Giảm tốc video',
+  speedUpAudio: 'Tăng tốc MP3 riêng',
+  speedDownAudio: 'Giảm tốc MP3 riêng',
+  speedUpAll: 'Tăng tốc chung MP3 + video + BGM',
+  speedDownAll: 'Giảm tốc chung MP3 + video + BGM',
 };
 
 const SE_GROUP_FEATURES = [
@@ -6001,10 +6179,10 @@ const SE_GROUP_FEATURES = [
   ['shuffleQueue', '🎲 Xáo trộn HÀNH ĐỘNG'],
   ['removeGift', '🎯 Quà A xoá quà B'],
   ['blindBag', '🎁 Túi mù ngẫu nhiên'],
-  ['speedUpAudio', '🎵⏩ Tăng tốc nhạc'],
-  ['speedDownAudio', '🎵⏪ Giảm tốc nhạc'],
-  ['speedUpVideo', '🎬⏩ Tăng tốc video'],
-  ['speedDownVideo', '🎬⏪ Giảm tốc video'],
+  ['speedUpAudio', '🎵⏩ Tăng tốc MP3 riêng'],
+  ['speedDownAudio', '🎵⏪ Giảm tốc MP3 riêng'],
+  ['speedUpAll', '⚡⏩ Tăng tốc chung MP3 + video + BGM'],
+  ['speedDownAll', '⚡⏪ Giảm tốc chung MP3 + video + BGM'],
 ];
 
 const SE_GROUP_KEYS = SE_GROUP_FEATURES.map(([key]) => key);
@@ -6012,7 +6190,7 @@ const SE_GROUP_KEYS = SE_GROUP_FEATURES.map(([key]) => key);
 function defaultGroupSpecialFeature(key) {
   const base = appSettings.specialEffects?.[key] || {};
   const next = { enabled: true, typeid: null, giftName: '', iconUrl: '' };
-  if (['speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].includes(key)) {
+  if (SPEED_EFFECT_KEYS.includes(key)) {
     next.factor = base.factor;
     next.duration = base.duration;
   }
@@ -6122,7 +6300,7 @@ function renderGroupSpecialEffectsUi() {
 function renderGroupSpecialFeature(group, key, cfg = {}) {
   const title = (SE_GROUP_FEATURES.find(([k]) => k === key) || [key, key])[1];
   const trigger = specialGiftLabelHtml(cfg);
-  const speedControls = ['speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].includes(key)
+  const speedControls = SPEED_EFFECT_KEYS.includes(key)
     ? `<label>× <input type="number" data-seg-factor="${escapeHtml(group.id)}:${key}" step="0.05" min="0.25" max="3" value="${escapeHtml(cfg.factor ?? appSettings.specialEffects[key]?.factor ?? 1)}" style="width:64px"></label>
        <label>⏱ <input type="number" data-seg-duration="${escapeHtml(group.id)}:${key}" min="1" max="600" value="${escapeHtml(cfg.duration ?? appSettings.specialEffects[key]?.duration ?? 10)}" style="width:64px">s</label>`
     : '';
@@ -6276,7 +6454,7 @@ document.querySelectorAll('.se-unpick').forEach(btn => {
     applySpecialEffectsUi();
   };
 });
-['clearQueue','shuffleQueue','removeGift','blindBag','speedUpAudio','speedDownAudio','speedUpVideo','speedDownVideo'].forEach(key => {
+['clearQueue','shuffleQueue','removeGift','blindBag', ...SPEED_EFFECT_KEYS].forEach(key => {
   const enabledEl = document.getElementById(SE_LABELS[key].enabled);
   if (enabledEl) enabledEl.addEventListener('change', async () => {
     appSettings.specialEffects[key].enabled = !!enabledEl.checked;
@@ -6678,47 +6856,72 @@ if (btnSeRemoveGiftAddTargetTest) btnSeRemoveGiftAddTargetTest.onclick = addRemo
 const btnResetBgmSpeed = document.getElementById('btnResetBgmSpeed');
 if (btnResetBgmSpeed) {
   btnResetBgmSpeed.onclick = () => {
-    for (const axis of ['audio', 'video']) {
+    for (const axis of ['audio', 'all']) {
       const state = _speedAxisState[axis];
+      if (!state) continue;
       if (state.timer) clearTimeout(state.timer);
       state.timer = null;
       state.endsAt = 0;
       state.pending = null;
     }
-    applyEffectSpeed(1.0);
+    applyAudioSpeed(1.0);
+    applyAllMediaSpeed(1.0);
   };
 }
 
-// Effect speed control — tác động vào HIỆU ỨNG (mp3/mp4/webm) trên overlay.
-// Tách 2 axis: audioRate (mp3/wav) + videoRate (mp4/webm) độc lập.
+// Speed control:
+// - MP3 riêng: chỉ audio effect mp3/wav/ogg trên overlay.
+// - Chung: audio effect + video effect + nhạc nền BGM.
+let _audioOnlySpeed = 1.0;
+let _allMediaSpeed = 1.0;
 let _currentAudioSpeed = 1.0;
 let _currentVideoSpeed = 1.0;
+let _currentBgmSpeed = 1.0;
+
+function clampSpeedRate(rate) {
+  return Math.max(0.25, Math.min(3, parseFloat(rate) || 1));
+}
+
+function applyBgmPlaybackRate(rate = _currentBgmSpeed) {
+  if (!els.bgmAudio) return;
+  try { els.bgmAudio.playbackRate = clampSpeedRate(rate); } catch {}
+}
+
+function syncPlaybackSpeeds() {
+  _currentAudioSpeed = _allMediaSpeed !== 1 ? _allMediaSpeed : _audioOnlySpeed;
+  _currentVideoSpeed = _allMediaSpeed;
+  _currentBgmSpeed = _allMediaSpeed;
+  applyBgmPlaybackRate(_currentBgmSpeed);
+  for (const audio of directAudioEffects.values()) {
+    try { audio.playbackRate = _currentAudioSpeed; } catch {}
+  }
+  for (const audio of directBackgroundAudioEffects.values()) {
+    try { audio.playbackRate = _currentAudioSpeed; } catch {}
+  }
+  if (window.bigo.overlaySetSpeed) {
+    window.bigo.overlaySetSpeed({ audioRate: _currentAudioSpeed, videoRate: _currentVideoSpeed }).catch(() => {});
+  }
+  updateSpeedDisplay();
+}
 
 function applyAudioSpeed(rate) {
-  const r = Math.max(0.25, Math.min(3, parseFloat(rate) || 1));
-  _currentAudioSpeed = r;
-  if (window.bigo.overlaySetSpeed) window.bigo.overlaySetSpeed({ audioRate: r }).catch(() => {});
-  updateSpeedDisplay();
+  _audioOnlySpeed = clampSpeedRate(rate);
+  syncPlaybackSpeeds();
 }
-function applyVideoSpeed(rate) {
-  const r = Math.max(0.25, Math.min(3, parseFloat(rate) || 1));
-  _currentVideoSpeed = r;
-  if (window.bigo.overlaySetSpeed) window.bigo.overlaySetSpeed({ videoRate: r }).catch(() => {});
-  updateSpeedDisplay();
+function applyAllMediaSpeed(rate) {
+  _allMediaSpeed = clampSpeedRate(rate);
+  syncPlaybackSpeeds();
 }
-function applyAllSpeed(rate) { applyAudioSpeed(rate); applyVideoSpeed(rate); }
-// Backward compat alias
+// Backward compat aliases
+function applyVideoSpeed(rate) { applyAllMediaSpeed(rate); }
+function applyAllSpeed(rate) { applyAllMediaSpeed(rate); }
 function applyEffectSpeed(rate) { applyAllSpeed(rate); }
 
 function updateSpeedDisplay() {
   const disp = document.getElementById('bgmSpeedDisplay');
   if (!disp) return;
   const fmtRate = (r) => r.toFixed(2).replace(/\.?0+$/, '');
-  if (_currentAudioSpeed === _currentVideoSpeed) {
-    disp.textContent = `Tốc độ: ×${fmtRate(_currentAudioSpeed)} (cả audio + video)`;
-  } else {
-    disp.textContent = `🎵 Audio: ×${fmtRate(_currentAudioSpeed)} · 🎬 Video: ×${fmtRate(_currentVideoSpeed)}`;
-  }
+  disp.textContent = `MP3 riêng: ×${fmtRate(_audioOnlySpeed)} · Chung MP3/video/BGM: ×${fmtRate(_allMediaSpeed)}`;
 }
 
 // Trigger speed effect: apply factor + auto-revert về 1.0 sau duration giây.
@@ -6729,21 +6932,20 @@ function updateSpeedDisplay() {
 // thay đổi liền" → effect dứt khoát theo duration đã cài.
 const _speedAxisState = {
   audio: { timer: null, endsAt: 0, pending: null },
-  video: { timer: null, endsAt: 0, pending: null },
+  all: { timer: null, endsAt: 0, pending: null },
 };
 
 function triggerSpeedEffect(key, cfgOverride = null) {
-  const axis = SPEED_AXIS[key] || 'both';
-  const axes = axis === 'both' ? ['audio', 'video'] : [axis];
-  for (const oneAxis of axes) triggerSpeedAxis(oneAxis, key, cfgOverride);
+  const axis = SPEED_AXIS[key] || 'all';
+  triggerSpeedAxis(axis, key, cfgOverride);
 }
 
-// Map key → axis ('audio' / 'video' / 'both') để biết apply lên đâu.
+// Map key → axis: audio = MP3 riêng, all = MP3 + video + BGM.
 const SPEED_AXIS = {
   speedUpAudio: 'audio', speedDownAudio: 'audio',
-  speedUpVideo: 'video', speedDownVideo: 'video',
+  speedUpAll: 'all', speedDownAll: 'all',
   // legacy keys (đã migrate, vẫn handle nếu còn)
-  speedUp: 'both', speedDown: 'both',
+  speedUpVideo: 'all', speedDownVideo: 'all', speedUp: 'all', speedDown: 'all',
 };
 
 function triggerSpeedAxis(axis, key, cfgOverride = null) {
@@ -6768,13 +6970,13 @@ function _applyAndScheduleSpeedAxis(axis, key, cfgOverride = null) {
   const duration = Math.max(1, parseInt(cfg.duration, 10) || 10);
   // Apply theo axis
   if (axis === 'audio') applyAudioSpeed(factor);
-  else if (axis === 'video') applyVideoSpeed(factor);
+  else if (axis === 'all') applyAllMediaSpeed(factor);
   const state = _speedAxisState[axis];
   state.endsAt = Date.now() + duration * 1000;
   state.timer = setTimeout(() => {
     // Revert cùng axis về 1.0
     if (axis === 'audio') applyAudioSpeed(1.0);
-    else if (axis === 'video') applyVideoSpeed(1.0);
+    else if (axis === 'all') applyAllMediaSpeed(1.0);
     appendLog(`[se] ${key} (${axis}) kết thúc (${duration}s) → revert ×1.0`);
     state.timer = null;
     state.endsAt = 0;
@@ -6799,6 +7001,7 @@ if (els.btnPickBgm) {
     appSettings.bgm.file = r.fileUrl;
     appSettings.bgm.fileName = r.fileName;
     els.bgmAudio.src = r.fileUrl;
+    applyBgmPlaybackRate();
     els.bgmFileLabel.value = r.fileName;
     await saveAppSettings({ bgm: { file: r.fileUrl, fileName: r.fileName } });
   };
@@ -6806,6 +7009,7 @@ if (els.btnPickBgm) {
 if (els.btnPlayBgm) {
   els.btnPlayBgm.onclick = () => {
     if (!els.bgmAudio.src) { alert('Chưa chọn file nhạc nền'); return; }
+    applyBgmPlaybackRate();
     els.bgmAudio.play().catch(e => alert('Không phát được: ' + e.message));
   };
 }
@@ -6856,6 +7060,12 @@ if (els.fxVol) {
     const v = parseInt(els.fxVol.value, 10);
     els.fxVolVal.textContent = v;
     appSettings.fxVolume = v;
+    for (const audio of directAudioEffects.values()) {
+      try { audio.volume = Math.max(0, Math.min(1, v / 100)); } catch {}
+    }
+    for (const audio of directBackgroundAudioEffects.values()) {
+      try { audio.volume = Math.max(0, Math.min(1, v / 100)); } catch {}
+    }
   });
   els.fxVol.addEventListener('change', () => saveAppSettings({ fxVolume: appSettings.fxVolume }));
 }
@@ -9166,6 +9376,7 @@ function applyActiveBgm() {
   const wasPlaying = !els.bgmAudio.paused && current;
   if (target) {
     els.bgmAudio.src = target;
+    applyBgmPlaybackRate();
     if (wasPlaying) els.bgmAudio.play().catch(() => {});
   } else {
     els.bgmAudio.pause();

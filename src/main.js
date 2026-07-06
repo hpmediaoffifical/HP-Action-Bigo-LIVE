@@ -136,6 +136,7 @@ let listener = null;
 let parsedEventSeq = 0;
 let overlayManager = null;
 let obsOverlayServer = null;
+let currentOverlaySpeed = { audioRate: 1, videoRate: 1 };
 let queuePopup = null;
 let heartOverlay = null;
 let chatsPopup = null;
@@ -728,6 +729,11 @@ app.whenReady().then(async () => {
       // Thấy log này trong DevTools (Ctrl+Shift+I tab Console) = đã hoạt động.
       if (win && !win.isDestroyed()) {
         try { win.webContents.send('bigo:log', `[overlay-bounds] ${ov.name || overlayId}: x=${b.x} y=${b.y} w=${b.width} h=${b.height}`); } catch {}
+      }
+    },
+    onWindowReady: (_overlayId, ov) => {
+      if (ov?.win && !ov.win.isDestroyed()) {
+        try { ov.win.webContents.send('overlay:set-speed', currentOverlaySpeed); } catch {}
       }
     },
   });
@@ -1979,15 +1985,16 @@ ipcMain.handle('overlay:set-speed', (_e, opts) => {
   } else {
     return { ok: false, error: 'invalid opts' };
   }
+  currentOverlaySpeed = { ...currentOverlaySpeed, ...payload };
   if (overlayManager) {
     for (const ov of overlayManager.overlays.values()) {
       if (ov.win && !ov.win.isDestroyed()) {
-        try { ov.win.webContents.send('overlay:set-speed', payload); } catch {}
+        try { ov.win.webContents.send('overlay:set-speed', currentOverlaySpeed); } catch {}
       }
     }
   }
-  if (obsOverlayServer) obsOverlayServer.setSpeed(payload);
-  return { ok: true, ...payload };
+  if (obsOverlayServer) obsOverlayServer.setSpeed(currentOverlaySpeed);
+  return { ok: true, ...currentOverlaySpeed };
 });
 
 ipcMain.handle('hotkey:send', (_e, { hotkey } = {}) => sendGlobalHotkey(hotkey));

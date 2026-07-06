@@ -43,7 +43,7 @@
       "id": "g_mox9je2347fw",
       "name": "Peo",
       "type": "gift",
-      "enabled": true,
+      "enabled": false,
       "collapsed": false,
       "bigoId": "aaaaa",
       "items": [
@@ -54,11 +54,11 @@
             "Flower"
           ],
           "alias": "💓Heart Rose",
-          "mediaFile": "02. Bướm Ảo.webm",
+          "mediaFile": "file:///D:/NPC/Lynn/10. Nét bút.webm",
           "mediaFiles": [
-            "02. Bướm Ảo.webm"
+            "file:///D:/NPC/Lynn/10. Nét bút.webm"
           ],
-          "overlayId": "ov_mowzeyw8m6as",
+          "overlayId": "ov_default",
           "pauseBgm": false,
           "preEffect": false,
           "background": false,
@@ -75,7 +75,7 @@
           "mediaFiles": [
             "file:///G:/NPC 2026/NATRA/Webm/06. boom khong no 2 (1).webm"
           ],
-          "overlayId": "ov_mp8krs9oy0ph",
+          "overlayId": "ov_default",
           "pauseBgm": false,
           "preEffect": false,
           "background": true,
@@ -100,14 +100,15 @@
             "7340"
           ],
           "alias": "Flower",
-          "mediaFile": "Tơ nhện.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false,
-          "preEffect": false,
-          "priority": 0,
+          "mediaFile": "file:///D:/NPC/Lynn/Mp3/Duyên của trời.mp3",
           "mediaFiles": [
-            "Tơ nhện.webm"
-          ]
+            "file:///D:/NPC/Lynn/Mp3/Duyên của trời.mp3"
+          ],
+          "overlayId": "",
+          "pauseBgm": true,
+          "preEffect": false,
+          "background": false,
+          "priority": 0
         },
         {
           "id": "i_moxc5oh9rk0x",
@@ -118,14 +119,12 @@
             "Bell-测试68372/60190"
           ],
           "alias": "CHUÔNG XA NGÃ",
-          "mediaFile": "10. Trói Dây Leo 1.webm",
+          "mediaFile": "",
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": true,
           "preEffect": false,
           "priority": 0,
-          "mediaFiles": [
-            "10. Trói Dây Leo 1.webm"
-          ]
+          "mediaFiles": []
         },
         {
           "id": "i_moxdzuao0rkl",
@@ -297,46 +296,27 @@
       ],
       "bgmFile": null,
       "bgmFileName": ""
-    },
-    {
-      "id": "g_mox9jh2358um",
-      "name": "Ada",
-      "type": "gift",
-      "enabled": false,
-      "collapsed": false,
-      "bigoId": "",
-      "items": [
-        {
-          "id": "i_mqczeaq7iueo",
-          "matchKeys": [
-            "501505",
-            "Golden hourglass"
-          ],
-          "alias": "Golden hourglass",
-          "mediaFile": "",
-          "mediaFiles": [],
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": false,
-          "preEffect": false,
-          "background": false,
-          "priority": 0
-        }
-      ]
     }
   ],
   "overlays": [
     {
       "id": "ov_default",
       "name": "Overlay 1",
-      "bgColor": "#00FF00",
+      "bgColor": "#00ff00",
       "opacity": 1,
       "bounds": {
-        "x": null,
-        "y": null,
-        "width": 540,
-        "height": 960
+        "x": 441,
+        "y": 632,
+        "width": 1080,
+        "height": 1920
       },
-      "alwaysOnTop": true
+      "alwaysOnTop": true,
+      "clickThrough": false,
+      "target": "obs",
+      "autoHide": false,
+      "lockRatio": true,
+      "autoOpen": false,
+      "autoFocus": false
     }
   ]
 }
