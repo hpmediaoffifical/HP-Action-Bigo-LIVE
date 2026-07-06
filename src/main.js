@@ -853,15 +853,58 @@ ipcMain.handle('effects:list', () => {
 });
 
 // Kiểm tra file effect tồn tại — nhận basename (assets/effects) hoặc file:// URL hoặc absolute path.
+function normalizeMediaRef(raw) {
+  let s = String(raw || '').trim();
+  if (!s) return '';
+  const q = s.indexOf('?');
+  if (q >= 0) s = s.slice(0, q);
+  const h = s.indexOf('#');
+  if (h >= 0) s = s.slice(0, h);
+  if (/^file:\/\//i.test(s)) {
+    try {
+      s = new URL(s).pathname;
+    } catch {
+      return '';
+    }
+    s = s.replace(/^\/(?=[A-Za-z]:)/, '');
+  }
+  try { s = decodeURIComponent(s); } catch {}
+  return s;
+}
+function mediaCandidatePaths(raw) {
+  const cleaned = normalizeMediaRef(raw);
+  if (!cleaned) return [];
+  const set = new Set();
+  const add = (p) => {
+    if (!p) return;
+    const s = String(p);
+    set.add(s);
+    set.add(s.replace(/\\/g, '/'));
+  };
+  const isAbs = path.isAbsolute(cleaned) || /^[A-Za-z]:[\\/]/.test(cleaned);
+  if (isAbs) {
+    add(cleaned);
+  } else {
+    add(path.join(EFFECTS_DIR, cleaned));
+    if (cleaned.includes('/') || cleaned.includes('\\')) {
+      add(cleaned);
+    }
+  }
+  const base = path.basename(cleaned);
+  if (base && base !== cleaned) {
+    add(path.join(EFFECTS_DIR, base));
+  }
+  return Array.from(set);
+}
+
 ipcMain.handle('effects:exists', (_e, mediaFile) => {
   if (!mediaFile || typeof mediaFile !== 'string') return false;
-  let p = mediaFile;
-  if (/^file:\/\//i.test(p)) {
-    try { p = decodeURIComponent(p.replace(/^file:\/\/\/?/i, '')).replace(/\//g, path.sep); } catch { return false; }
-  } else if (!path.isAbsolute(p)) {
-    p = path.join(EFFECTS_DIR, p);
+  for (const p of mediaCandidatePaths(mediaFile)) {
+    try {
+      if (fs.existsSync(p)) return true;
+    } catch {}
   }
-  try { return fs.existsSync(p); } catch { return false; }
+  return false;
 });
 
 // Pick BGM file - giữ nguyên ở vị trí gốc, trả về file:// URL
@@ -1753,13 +1796,17 @@ function fileUrl(absPath) {
   return 'file:///' + absPath.replace(/\\/g, '/').replace(/^\/+/, '');
 }
 function pathFromFileUrl(url) {
-  const s = String(url || '');
-  if (!s.startsWith('file://')) return s;
-  try { return decodeURIComponent(new URL(s).pathname).replace(/^\/(?=[A-Za-z]:)/, ''); } catch { return s.replace(/^file:\/\//, ''); }
+  return normalizeMediaRef(url);
 }
 function resolveEffectPath({ file, fileUrl: rawUrl }) {
-  if (rawUrl) return pathFromFileUrl(rawUrl);
-  if (file) return path.join(EFFECTS_DIR, file);
+  if (rawUrl) {
+    const parsed = pathFromFileUrl(rawUrl);
+    if (parsed) return parsed;
+  }
+  const cleaned = normalizeMediaRef(file);
+  if (!cleaned) return null;
+  if (path.isAbsolute(cleaned) || /^[A-Za-z]:[\\/]/.test(cleaned)) return cleaned;
+  return path.join(EFFECTS_DIR, cleaned);
   return null;
 }
 

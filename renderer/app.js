@@ -344,8 +344,15 @@ async function playQueueItem(q) {
   if (q.pauseBgm) pauseBgmForEffect();
   if (window.bigo.effectsExists) {
     let exists = true;
-    try { exists = await window.bigo.effectsExists(q.mediaFile); } catch { exists = false; }
-    if (!exists) { await handleMissingQueueMedia(q); return; }
+    const mediaFile = q.mediaFile || '';
+    const mediaKey = mediaComparablePieces(mediaFile).full;
+    appendLog(`[queue] play ${q.id}: item=${q.itemId || '-'} media=${mediaKey || mediaFile || '-'} overlay=${q.overlayId || '-'}`);
+    try { exists = await window.bigo.effectsExists(mediaFile); } catch { exists = false; }
+    if (!exists) {
+      appendLog(`[queue] missing media: ${mediaKey || mediaFile || '-'}`);
+      await handleMissingQueueMedia(q);
+      return;
+    }
   }
   const payload = resolveMediaPayload(q.mediaFile);
   const r = await window.bigo.overlayPlay({ overlayId: q.overlayId, ...payload }).catch(e => ({ ok: false, error: e.message }));
@@ -354,11 +361,12 @@ async function playQueueItem(q) {
 
 async function handleMissingQueueMedia(q) {
   const file = q?.mediaFile || '';
+  const mediaKey = normalizeMediaComparable(file);
   const label = fileDisplayLabel(file);
   if (q?.itemId) {
     const found = findItemById(q.itemId);
     if (found) {
-      const remaining = normalizeMediaFiles(found.item).filter(x => x !== file);
+      const remaining = filterMediaFilesByMissing(normalizeMediaFiles(found.item), file);
       found.item.mediaFiles = remaining;
       found.item.mediaFile = remaining[0] || '';
     }
@@ -368,8 +376,8 @@ async function handleMissingQueueMedia(q) {
   await persistMapping().catch(() => {});
   renderGiftTable();
   renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
-  if (!missingMediaWarned.has(file)) {
-    missingMediaWarned.add(file);
+  if (!missingMediaWarned.has(mediaKey)) {
+    missingMediaWarned.add(mediaKey);
     setTimeout(() => alert(`Thiếu dữ liệu nhạc/video:\n${label}\n\nApp đã xoá tên file bị thiếu khỏi cấu hình. Hãy chọn lại file hiệu ứng.`), 100);
   }
   if (!queuePaused && !queueItems.some(x => x.status === 'playing')) {
@@ -1449,6 +1457,54 @@ function normalizeMediaFiles(itemOrFiles) {
     files.push(file);
   }
   return files;
+}
+function stripMediaQueryAndHash(value) {
+  let s = String(value || '').trim();
+  const qIndex = s.indexOf('?');
+  if (qIndex >= 0) s = s.slice(0, qIndex);
+  const hIndex = s.indexOf('#');
+  if (hIndex >= 0) s = s.slice(0, hIndex);
+  return s;
+}
+function normalizeMediaComparable(value) {
+  let s = stripMediaQueryAndHash(value);
+  if (!s) return '';
+  if (/^file:\/\//i.test(s)) {
+    try { s = new URL(s).pathname; } catch { }
+  }
+  try { s = decodeURIComponent(s); } catch { }
+  return String(s)
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+    .replace(/^\/(?=[A-Za-z]:)/, '')
+    .replace(/\/{2,}/g, '/');
+}
+function mediaComparablePieces(value) {
+  const normalized = normalizeMediaComparable(value);
+  if (!normalized) return { full: '', base: '', raw: '' };
+  return {
+    full: normalized.toLowerCase(),
+    base: normalized.split('/').pop() || normalized,
+    raw: String(value || '').trim(),
+  };
+}
+function isMediaPathEqual(a, b) {
+  const A = mediaComparablePieces(a);
+  const B = mediaComparablePieces(b);
+  if (!A.full || !B.full) return false;
+  if (A.full === B.full) return true;
+  if (A.base && B.base) {
+    const isAPath = /[\\/]/.test(A.raw);
+    const isBPath = /[\\/]/.test(B.raw);
+    if (!isAPath || !isBPath) {
+      return A.base.toLowerCase() === B.base.toLowerCase();
+    }
+  }
+  return false;
+}
+function filterMediaFilesByMissing(files, missingFile) {
+  if (!Array.isArray(files) || !files.length) return [];
+  return files.filter(file => !isMediaPathEqual(file, missingFile));
 }
 function hasEffectMedia(item) {
   return normalizeMediaFiles(item).length > 0;
