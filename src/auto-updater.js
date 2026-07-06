@@ -13,12 +13,15 @@
 // Dev mode (electron .) sẽ KHÔNG check vì app.isPackaged = false — đó là hành vi mong muốn,
 // chỉ build NSIS mới có updater hoạt động thật.
 
-const { app, dialog, BrowserWindow, ipcMain } = require('electron');
+const { app, dialog, BrowserWindow, ipcMain, shell } = require('electron');
+
+const RELEASE_PAGE_URL = 'https://github.com/hpmediaoffifical/H-P-A-c-t-i-o-n-B-i-g-o-L-I-V-E/releases/latest';
 
 const UPDATE_FEED = {
-  provider: 'github',
-  owner: 'hpmediaoffifical',
-  repo: 'H-P-A-c-t-i-o-n-B-i-g-o-L-I-V-E',
+  // Generic feed fetches latest.yml directly from GitHub Releases and avoids
+  // the GitHub API path, which is more prone to timeout on some networks.
+  provider: 'generic',
+  url: 'https://github.com/hpmediaoffifical/H-P-A-c-t-i-o-n-B-i-g-o-L-I-V-E/releases/latest/download/',
 };
 
 let autoUpdater = null;
@@ -80,6 +83,13 @@ function log(msg) {
 
 function formatUpdaterError(err) {
   const raw = err?.message || String(err || 'Unknown error');
+  if (/ERR_CONNECTION_TIMED_OUT|ETIMEDOUT|timed?\s*out|ENOTFOUND|ECONNRESET|EAI_AGAIN/i.test(raw)) {
+    return [
+      'Không kết nối được tới máy chủ cập nhật GitHub (kết nối bị timeout).',
+      'Hãy kiểm tra mạng/VPN/DNS hoặc tải bản mới thủ công tại:',
+      RELEASE_PAGE_URL,
+    ].join('\n');
+  }
   if (/latest\.yml/i.test(raw)) {
     return 'Không tìm thấy latest.yml trên GitHub Release mới nhất. Hãy publish lại bằng npm run release để upload đủ latest.yml, file Setup .exe và .blockmap.';
   }
@@ -87,6 +97,21 @@ function formatUpdaterError(err) {
     return 'Không tìm thấy tài nguyên cập nhật trên GitHub Release. Kiểm tra release mới nhất đã upload đủ latest.yml, file Setup .exe, .blockmap và app đang trỏ đúng repo.';
   }
   return raw.split('\n')[0];
+}
+
+async function showUpdateErrorDialog(title, message, detail) {
+  const choice = await showAppDialog({
+    type: 'error',
+    title,
+    message,
+    detail,
+    buttons: ['Đóng', 'Mở trang tải thủ công'],
+    defaultId: 1,
+    cancelId: 0,
+  }).catch(() => ({ response: 0 }));
+  if (choice.response === 1) {
+    shell.openExternal(RELEASE_PAGE_URL).catch(() => {});
+  }
 }
 
 function sendStatus(payload) {
@@ -119,13 +144,7 @@ function bindEvents(au) {
     sendStatus({ state: 'error', message });
     if (isCheckingManually) {
       isCheckingManually = false;
-      showAppDialog({
-        type: 'error',
-        title: 'Kiểm tra cập nhật',
-        message: 'Không kiểm tra được cập nhật',
-        detail: message,
-        buttons: ['Đóng'],
-      }).catch(() => {});
+      showUpdateErrorDialog('Kiểm tra cập nhật', 'Không kiểm tra được cập nhật', message);
     }
   });
 
@@ -234,13 +253,7 @@ function startDownload() {
     downloadInProgress = false;
     log(`Tải lỗi: ${message}`);
     sendStatus({ state: 'error', message });
-    showAppDialog({
-      type: 'error',
-      title: 'Lỗi tải cập nhật',
-      message: 'Không tải được bản cập nhật',
-      detail: message,
-      buttons: ['Đóng'],
-    }).catch(() => {});
+    showUpdateErrorDialog('Lỗi tải cập nhật', 'Không tải được bản cập nhật', message);
   });
 }
 
