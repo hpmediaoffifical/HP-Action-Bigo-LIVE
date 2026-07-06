@@ -1519,7 +1519,7 @@ const els = {
   // Gift modal
   giftDialog: $('giftDialog'), giftDialogTitle: $('giftDialogTitle'),
   dlgMatchKeys: $('dlgMatchKeys'), dlgAlias: $('dlgAlias'),
-  dlgGroup: $('dlgGroup'), dlgFile: $('dlgFile'), dlgOverlay: $('dlgOverlay'),
+  dlgGroup: $('dlgGroup'), dlgFile: $('dlgFile'), dlgOverlay: $('dlgOverlay'), dlgOverlayField: $('dlgOverlayField'),
   dlgPriority: $('dlgPriority'),
   dlgGiftSave: $('dlgGiftSave'), groupList: $('groupList'),
   dlgPickFile: $('dlgPickFile'), dlgOpenFolder: $('dlgOpenFolder'), dlgMediaDrop: $('dlgMediaDrop'), dlgMediaList: $('dlgMediaList'),
@@ -1652,11 +1652,16 @@ function autoEnablePauseBgmForAudio(mediaFile) {
 function syncDialogOverlayForMediaFiles(files) {
   if (!els.dlgOverlay) return;
   const list = normalizeMediaFiles(files);
-  if (!list.length) return;
+  if (!list.length) {
+    if (els.dlgOverlayField) els.dlgOverlayField.hidden = false;
+    return;
+  }
   if (mediaFilesNeedOverlay(list)) {
+    if (els.dlgOverlayField) els.dlgOverlayField.hidden = false;
     if (!els.dlgOverlay.value && mapping.overlays?.[0]) els.dlgOverlay.value = mapping.overlays[0].id;
   } else {
     els.dlgOverlay.value = '';
+    if (els.dlgOverlayField) els.dlgOverlayField.hidden = true;
   }
 }
 
@@ -4410,7 +4415,7 @@ async function openGiftDialog(gift = null, groupId = null) {
   ].join('') || '<option value="">(chưa có overlay)</option>';
   els.dlgOverlay.value = gift?.overlayId || mapping.overlays[0]?.id || '';
   const mediaFiles = normalizeMediaFiles(gift || {});
-  setDialogMediaFiles(mediaFiles, { autosave: false });
+  setDialogMediaFiles(mediaFiles, { autosave: false, adjustOverlay: true });
   if (els.dlgPauseBgm) els.dlgPauseBgm.checked = !!gift?.pauseBgm;
   // preEffect opt-in: chỉ tick khi user đã explicit set true. undefined/false → unchecked.
   if (els.dlgPreFx) els.dlgPreFx.checked = gift?.preEffect === true;
