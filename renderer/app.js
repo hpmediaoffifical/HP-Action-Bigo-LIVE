@@ -214,9 +214,10 @@ function updateConnectStats() {
 }
 
 // =================== Effect Queue State ===================
-const queueItems = []; // { id, ts, user, avatar, gift_id, gift_name, gift_icon, count, diamond, status }
+const queueItems = []; // Cửa sổ hoạt động: item đang phát + một lượng nhỏ đang chờ hiển thị/điều khiển.
+const queueBacklogItems = []; // Phần còn lại nằm ngoài danh sách để tránh DOM/IPC phình lớn khi combo nhiều quà.
 const backgroundItems = []; // hiệu ứng NỀN: phát song song, chỉ để hiển thị trạng thái.
-const QUEUE_MAX = 5000; // Cho phép hold 5000 items in-memory; render UI giới hạn theo maxListItems.
+const QUEUE_MAX = 50000; // Giới hạn an toàn tổng item in-memory; không dùng để render trực tiếp.
 let queuePaused = false;
 const missingMediaWarned = new Set();
 const directAudioEffects = new Map(); // queueId -> Audio, dùng khi MP3 không cần overlay.
@@ -304,15 +305,14 @@ function pushPlayBatch(item, ev, playTimes) {
   // N > 0 = chèn vào hàng chờ N. Quà đang phát nằm trên cùng và KHÔNG tính là hàng chờ.
   const priority = item?.priority || 0;
   if (priority > 0 && queueItems.length > 0) {
-    insertBatchByQueuePriority(batch, priority);
+    appendBatchToQueueWindow(batch, priority);
     appendLog(`[queue] ${baseName}: priority=${priority} → chèn vào hàng chờ ${priority}`);
   } else {
-    queueItems.push(...batch);
+    appendBatchToQueueWindow(batch, 0);
     if (priority > 0) {
       appendLog(`[queue] ${baseName}: priority=${priority} nhưng queue rỗng → append cuối`);
     }
   }
-  while (queueItems.length > QUEUE_MAX) queueItems.shift();
 
   // Đảm bảo chỉ có 1 entry 'playing' tại 1 thời điểm. Nếu chưa có ai playing → mark [0]
   if (shouldAutoStart && queueItems.length > 0) {
@@ -472,6 +472,7 @@ async function handleMissingQueueMedia(q) {
   }
   const idx = queueItems.findIndex(x => x.id === q.id);
   if (idx !== -1) queueItems.splice(idx, 1);
+  drainQueueBacklog(1);
   await persistMapping().catch(() => {});
   renderGiftTable();
   renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
@@ -517,6 +518,7 @@ if (window.bigo.onOverlayEffectEnded) {
     if (playingIdx !== -1) {
       // Xoá ngay để tránh memory bloat
       queueItems.splice(playingIdx, 1);
+      drainQueueBacklog(1);
       // Mark next queued as playing
       if (queueItems.length > 0 && !queueItems.some(q => q.status === 'playing')) {
         markNextQueueItemPlaying();
@@ -582,7 +584,7 @@ function getQueueGiftKey(q) {
 
 function getQueueGroups() {
   const groups = new Map();
-  for (const q of getQueueDisplayList()) {
+  for (const q of [...getQueueDisplayList(), ...queueBacklogItems]) {
     const key = getQueueGiftKey(q);
     let g = groups.get(key);
     if (!g) {
@@ -666,7 +668,7 @@ function renderMiniQueue() {
   const bgList = getCompactBackgroundDisplayList();
   const bgTotal = backgroundItems.length;
   const list = getQueueDisplayList();
-  if (bgList.length === 0 && list.length === 0) {
+  if (bgList.length === 0 && list.length === 0 && queueBacklogItems.length === 0) {
     el.innerHTML = '<div style="color:#555;text-align:center;padding:14px;font-size:11px">Chưa có hiệu ứng</div>';
     return;
   }
@@ -682,6 +684,9 @@ function renderMiniQueue() {
   if (visible.length) html += `${(seqPlaying.length || bgList.length) ? '<div class="queue-section-title">ĐANG CHỜ PHÁT TIẾP THEO</div>' : ''}${visible.map(q => renderQueueRowHtml(q, { rowClass: 'mini-queue-row' })).join('')}`;
   if (hidden > 0) {
     html += `<div class="mini-queue-more" title="${hidden} hiệu ứng nữa đang chờ phát">+ ${hidden} đang chờ phát…</div>`;
+  }
+  if (queueBacklogItems.length > 0) {
+    html += `<div class="mini-queue-more" title="${queueBacklogItems.length} hiệu ứng được ghi nhớ ngoài danh sách và sẽ tự nạp lần lượt">Ghi nhớ ngoài danh sách: + ${queueBacklogItems.length.toLocaleString('en-US')} hiệu ứng</div>`;
   }
   el.innerHTML = html;
   el.querySelectorAll('[data-qid]').forEach(btn => {
@@ -710,6 +715,7 @@ async function removeQueueItemById(id) {
   const removed = queueItems[idx];
   if (!(await confirmDeleteOneQueueItem(removed))) return;
   queueItems.splice(idx, 1);
+  drainQueueBacklog(1);
   // QUAN TRỌNG: Nếu xoá item đang playing → STOP effect ở overlay window (tránh
   // hiệu ứng chạy ẩn dù đã xoá khỏi DSHT). Overlay tự fire 'queue-empty' để
   // resume BGM nếu cần.
@@ -741,9 +747,10 @@ function clearAllQueue() {
   }
   stopAllDirectAudioEffects();
   // Decrement counter
-  sessionStats.effects = Math.max(0, sessionStats.effects - queueItems.length);
+  sessionStats.effects = Math.max(0, sessionStats.effects - getTotalQueueCount());
   updateConnectStats();
   queueItems.length = 0;
+  queueBacklogItems.length = 0;
   backgroundItems.length = 0;
   syncBgmAfterQueueChange();
   renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats();
@@ -755,7 +762,18 @@ function clearAllQueue() {
 function forwardQueueSnapshot() {
   if (!window.bigo.popupQueueSnapshot) return;
   const list = [...getBackgroundDisplayList(), ...getQueueDisplayList()];
-  window.bigo.popupQueueSnapshot(list).catch(() => {});
+  const all = [...queueItems, ...queueBacklogItems];
+  window.bigo.popupQueueSnapshot({
+    items: list,
+    meta: {
+      activeCount: queueItems.length,
+      backlogCount: queueBacklogItems.length,
+      totalCount: getTotalQueueCount(),
+      totalGifts: all.reduce((s, q) => s + (q.count || 0), 0),
+      totalDiamond: all.reduce((s, q) => s + (q.diamond || 0), 0),
+      totalUsers: new Set(all.map(q => q.user).filter(Boolean)).size,
+    },
+  }).catch(() => {});
 }
 
 // Default avatar URL cho admin NHPHUNG → logo HP. Cho mọi user khác trả về raw URL.
@@ -929,6 +947,10 @@ function removeQueueGiftBySpecialTarget(cfg, maxRemove) {
     if (ids.length >= limit) break;
     if (queueItemMatchesSpecialTarget(q, cfg)) ids.push(q.id);
   }
+  for (const q of queueBacklogItems) {
+    if (ids.length >= limit) break;
+    if (queueItemMatchesSpecialTarget(q, cfg)) ids.push(q.id);
+  }
   for (const q of queueItems.filter(x => x.status === 'playing')) {
     if (ids.length >= limit) break;
     if (queueItemMatchesSpecialTarget(q, cfg)) ids.push(q.id);
@@ -946,6 +968,10 @@ function removeQueueGiftBySpecialTarget(cfg, maxRemove) {
     }
     queueItems.splice(i, 1);
   }
+  for (let i = queueBacklogItems.length - 1; i >= 0; i--) {
+    if (idSet.has(queueBacklogItems[i].id)) queueBacklogItems.splice(i, 1);
+  }
+  drainQueueBacklog();
   sessionStats.effects = Math.max(0, sessionStats.effects - ids.length);
   if (stoppedPlaying && queueItems.length > 0 && !queueItems.some(q => q.status === 'playing')) markNextQueueItemPlaying(550);
   syncBgmAfterQueueChange();
@@ -1034,8 +1060,7 @@ function pushSpecialActionQueue(action, sourceEv, triggerCfg = appSettings?.spec
     playTimes: 1,
   };
   const shouldAutoStart = !queuePaused && !queueItems.some(x => x.status === 'playing');
-  queueItems.push(q);
-  while (queueItems.length > QUEUE_MAX) queueItems.shift();
+  appendBatchToQueueWindow([q], 0);
   sessionStats.effects += 1;
   updateConnectStats();
   if (shouldAutoStart) {
@@ -1050,6 +1075,7 @@ function completeQueueItemById(id) {
   const idx = queueItems.findIndex(q => q.id === id);
   if (idx === -1) return;
   queueItems.splice(idx, 1);
+  drainQueueBacklog(1);
   sessionStats.effects = Math.max(0, sessionStats.effects - 1);
   if (!queuePaused && queueItems.length > 0 && !queueItems.some(q => q.status === 'playing')) markNextQueueItemPlaying();
   syncBgmAfterQueueChange();
@@ -1278,7 +1304,7 @@ function renderQueue() {
   const bgList = getCompactBackgroundDisplayList();
   const bgTotal = backgroundItems.length;
   const list = getQueueDisplayList();
-  if (!bgList.length && !list.length) {
+  if (!bgList.length && !list.length && queueBacklogItems.length === 0) {
     els.effectQueue.innerHTML = '<div style="color:#555;text-align:center;padding:16px">Chưa có hiệu ứng nào trong danh sách</div>';
     updateQueueControlButtons();
     return;
@@ -1293,6 +1319,9 @@ function renderQueue() {
   if (visible.length) html += `${(seqPlaying.length || bgList.length) ? '<div class="queue-section-title">ĐANG CHỜ PHÁT TIẾP THEO</div>' : ''}${visible.map(q => renderQueueRowHtml(q, { rowClass: 'queue-row' })).join('')}`;
   if (hidden > 0) {
     html += `<div class="mini-queue-more">+ ${hidden} hiệu ứng nữa đang chờ phát…</div>`;
+  }
+  if (queueBacklogItems.length > 0) {
+    html += `<div class="mini-queue-more" title="Số này vẫn được lưu và sẽ tự nạp vào danh sách sau mỗi hiệu ứng kết thúc">Ghi nhớ ngoài danh sách: + ${queueBacklogItems.length.toLocaleString('en-US')} hiệu ứng</div>`;
   }
   els.effectQueue.innerHTML = html;
   els.effectQueue.querySelectorAll('[data-qid]').forEach(btn => {
@@ -1428,14 +1457,16 @@ function queueToggleCurrent() {
 
 function queueShuffleQueued() {
   const playing = queueItems.filter(q => q.status === 'playing');
-  const queued = queueItems.filter(q => q.status === 'queued');
+  const queued = [...queueItems.filter(q => q.status === 'queued'), ...queueBacklogItems];
   if (queued.length < 2) return;
   for (let i = queued.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [queued[i], queued[j]] = [queued[j], queued[i]];
   }
   queueItems.length = 0;
+  queueBacklogItems.length = 0;
   queueItems.push(...playing, ...queued);
+  compactQueueWindowToLimit();
   renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
 }
 
@@ -1447,19 +1478,28 @@ function queuePromoteGiftGroup(giftKey) {
     if (q.status === 'queued' && getQueueGiftKey(q) === giftKey) promote.push(q);
     else rest.push(q);
   }
+  const backlogRest = [];
+  for (const q of queueBacklogItems) {
+    if (getQueueGiftKey(q) === giftKey) promote.push(q);
+    else backlogRest.push(q);
+  }
   if (!promote.length) return;
   const playingIdx = rest.findIndex(q => q.status === 'playing');
   const insertAt = playingIdx >= 0 ? playingIdx + 1 : 0;
   rest.splice(insertAt, 0, ...promote);
   queueItems.length = 0;
+  queueBacklogItems.length = 0;
   queueItems.push(...rest);
+  queueBacklogItems.push(...backlogRest);
+  compactQueueWindowToLimit();
   renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
 }
 
 function updateQueueStats() {
-  const totalGifts = queueItems.reduce((s, q) => s + (q.count || 0), 0);
-  const totalDiamond = queueItems.reduce((s, q) => s + (q.diamond || 0), 0);
-  const users = new Set(queueItems.map(q => q.user)).size;
+  const all = [...queueItems, ...queueBacklogItems];
+  const totalGifts = all.reduce((s, q) => s + (q.count || 0), 0);
+  const totalDiamond = all.reduce((s, q) => s + (q.diamond || 0), 0);
+  const users = new Set(all.map(q => q.user)).size;
   els.qStatGifts.textContent = totalGifts;
   els.qStatDiamond.textContent = totalDiamond;
   els.qStatUsers.textContent = users;
@@ -1665,6 +1705,57 @@ function syncDialogOverlayForMediaFiles(files) {
   }
 }
 
+function getQueueWindowLimit() {
+  return Math.max(5, Math.min(1000, parseInt(appSettings?.maxListItems, 10) || 50));
+}
+
+function getTotalQueueCount() {
+  return queueItems.length + queueBacklogItems.length;
+}
+
+function trimQueueMemoryLimit() {
+  while (getTotalQueueCount() > QUEUE_MAX && queueBacklogItems.length) queueBacklogItems.pop();
+  while (getTotalQueueCount() > QUEUE_MAX && queueItems.length) queueItems.pop();
+}
+
+function drainQueueBacklog(maxDrain = Infinity) {
+  const limit = getQueueWindowLimit();
+  let drained = 0;
+  while (queueItems.length < limit && queueBacklogItems.length && drained < maxDrain) {
+    queueItems.push(queueBacklogItems.shift());
+    drained++;
+  }
+  return drained;
+}
+
+function appendBatchToQueueWindow(batch, priority = 0) {
+  if (!Array.isArray(batch) || !batch.length) return;
+  const limit = getQueueWindowLimit();
+  if (priority > 0 && queueItems.length > 0) {
+    insertBatchByQueuePriority(batch, priority);
+    if (queueItems.length > limit) {
+      const overflow = queueItems.splice(limit);
+      queueBacklogItems.unshift(...overflow);
+    }
+  } else {
+    drainQueueBacklog();
+    const capacity = Math.max(0, limit - queueItems.length);
+    if (capacity > 0) queueItems.push(...batch.slice(0, capacity));
+    if (batch.length > capacity) queueBacklogItems.push(...batch.slice(capacity));
+  }
+  trimQueueMemoryLimit();
+}
+
+function compactQueueWindowToLimit() {
+  const limit = getQueueWindowLimit();
+  if (queueItems.length > limit) {
+    const overflow = queueItems.splice(limit);
+    queueBacklogItems.unshift(...overflow);
+  } else {
+    drainQueueBacklog();
+  }
+}
+
 function normalizeObsHotkeyConfig(cfg) {
   const hotkey = String(cfg?.hotkey || '').trim();
   const delaySeconds = Math.max(0, Math.min(3600, parseFloat(cfg?.delaySeconds) || 0));
@@ -1834,13 +1925,13 @@ function appConfirm({ title = 'Xác nhận thao tác', message = '', detail = ''
 }
 
 async function confirmClearQueue() {
-  if (queueItems.length === 0) {
+  if (getTotalQueueCount() === 0) {
     appendLog('[queue] HÀNH ĐỘNG đã trống');
     return false;
   }
   return appConfirm({
     title: 'Xoá toàn bộ HÀNH ĐỘNG?',
-    message: `${queueItems.length.toLocaleString('en-US')} hành động đang chờ sẽ bị xoá.`,
+    message: `${getTotalQueueCount().toLocaleString('en-US')} hành động đang chờ/ghi nhớ sẽ bị xoá.`,
     detail: 'Thao tác này không thể hoàn tác. Hành động đang phát cũng sẽ dừng ngay.',
     okText: 'Xoá tất cả',
     cancelText: 'Giữ lại',
@@ -4938,6 +5029,7 @@ function closePkDuoPickerOnPointer(e) {
 // =================== Received gifts (right panel) ===================
 const receivedGifts = [];
 const RECEIVED_MAX = 200;
+let receivedGiftsRefreshScheduled = false;
 
 function giftTotalCountFromEvent(ev) {
   return ev?.total_count != null ? ev.total_count : ((ev?.gift_count || 1) * (ev?.combo || 1));
@@ -4968,11 +5060,22 @@ function addReceivedGift(ev) {
     total,
   });
   if (receivedGifts.length > RECEIVED_MAX) receivedGifts.length = RECEIVED_MAX;
-  renderReceivedGifts();
-  forwardReceivedGiftsSnapshot();
+  scheduleReceivedGiftsRefresh();
   rankingHandleGift(ev);
   pkDuoHandleGift(ev);
   scoreHandleGift(ev);
+}
+
+function scheduleReceivedGiftsRefresh() {
+  if (receivedGiftsRefreshScheduled) return;
+  receivedGiftsRefreshScheduled = true;
+  const flush = () => {
+    receivedGiftsRefreshScheduled = false;
+    renderReceivedGifts();
+    forwardReceivedGiftsSnapshot();
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(flush);
+  else setTimeout(flush, 16);
 }
 
 function renderReceivedGifts() {
@@ -5860,7 +5963,7 @@ let appSettings = {
   groupSpecialEffects: {},
   members: [],
   fxVolume: 100,
-  maxListItems: 200,
+  maxListItems: 50,
   obsHotkey: { enabled: false, hotkey: 'Ctrl+1', delaySeconds: 0 },
 };
 
@@ -6025,7 +6128,7 @@ async function initAppSettings(s) {
     }
   }
   appSettings.fxVolume = s.fxVolume != null ? s.fxVolume : 100;
-  appSettings.maxListItems = s.maxListItems || 200;
+  appSettings.maxListItems = Math.max(5, Math.min(1000, parseInt(s.maxListItems, 10) || 50));
   appSettings.obsHotkey = normalizeObsHotkeyConfig(s.obsHotkey || appSettings.obsHotkey);
   // Apply special effects UI
   applySpecialEffectsUi();
@@ -7076,7 +7179,11 @@ if (els.fxVol) {
 }
 if (els.maxListItems) {
   els.maxListItems.addEventListener('change', () => {
-    appSettings.maxListItems = parseInt(els.maxListItems.value, 10) || 200;
+    appSettings.maxListItems = Math.max(5, Math.min(1000, parseInt(els.maxListItems.value, 10) || 50));
+    els.maxListItems.value = appSettings.maxListItems;
+    compactQueueWindowToLimit();
+    if (!queuePaused && queueItems.length > 0 && !queueItems.some(q => q.status === 'playing')) markNextQueueItemPlaying();
+    renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats(); forwardQueueSnapshot();
     saveAppSettings({ maxListItems: appSettings.maxListItems });
   });
 }

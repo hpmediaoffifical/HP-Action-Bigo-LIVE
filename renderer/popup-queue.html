@@ -94,7 +94,7 @@
 <body>
   <h1>
     📋 HÀNH ĐỘNG
-    <span class="pop-stats">🎁<b id="popQGifts">0</b> · <span class="bean-icon small"></span><b id="popQDiamond">0</b> · 👤<b id="popQUsers">0</b></span>
+    <span class="pop-stats">🎁<b id="popQGifts">0</b> · <span class="bean-icon small"></span><b id="popQDiamond">0</b> · 👤<b id="popQUsers">0</b> · ngoài<b id="popQBacklog">0</b></span>
   </h1>
   <div class="pop-controls">
     <button id="popQToggle" class="tiny" title="Phát/Tạm dừng hiệu ứng">▶/⏸</button>
@@ -125,7 +125,8 @@
     }
     // Snapshot model: app gửi full array, popup chỉ render theo thứ tự nhận.
     let snapshot = [];
-    const stats = { gifts: 0, diamond: 0, users: new Set() };
+    let queueMeta = { activeCount: 0, backlogCount: 0, totalCount: 0 };
+    const stats = { gifts: 0, diamond: 0, users: new Set(), userCount: null };
 
     function buildQueueGiftKey(q) {
       if (q?.gift_key) return q.gift_key;
@@ -245,6 +246,9 @@
         if (it.status === 'playing') { playingCount++; return renderRow(it, 0); }
         return renderRow(it, i - playingCount + 1);
       }).join('');
+      if (queueMeta.backlogCount > 0) {
+        html += `<div class="mini-queue-more" title="Phần này vẫn được app ghi nhớ và tự nạp sau mỗi hiệu ứng">Ghi nhớ ngoài danh sách: + ${Number(queueMeta.backlogCount).toLocaleString('en-US')} hiệu ứng</div>`;
+      }
       q.innerHTML = html || '<div style="color:#555;text-align:center;padding:20px">Chưa có hiệu ứng nào</div>';
       // Wire delete buttons
       q.querySelectorAll('[data-del]').forEach(btn => {
@@ -317,7 +321,8 @@
     function updateStats() {
       document.getElementById('popQGifts').textContent = stats.gifts;
       document.getElementById('popQDiamond').textContent = stats.diamond;
-      document.getElementById('popQUsers').textContent = stats.users.size;
+      document.getElementById('popQUsers').textContent = stats.userCount != null ? stats.userCount : stats.users.size;
+      document.getElementById('popQBacklog').textContent = queueMeta.backlogCount || 0;
       const playing = snapshot.some(q => !q.isBackground && q.status === 'playing');
       const btn = document.getElementById('popQToggle');
       if (btn) {
@@ -327,16 +332,25 @@
     }
 
     // Snapshot từ app: full array thay thế cũ → re-render.
-    ipcRenderer.on('popup-queue:snapshot', (_e, items) => {
-      snapshot = Array.isArray(items) ? items : [];
+    ipcRenderer.on('popup-queue:snapshot', (_e, payload) => {
+      if (Array.isArray(payload)) {
+        snapshot = payload;
+        queueMeta = { activeCount: payload.length, backlogCount: 0, totalCount: payload.length };
+      } else {
+        snapshot = Array.isArray(payload?.items) ? payload.items : [];
+        queueMeta = payload?.meta && typeof payload.meta === 'object' ? payload.meta : { activeCount: snapshot.length, backlogCount: 0, totalCount: snapshot.length };
+      }
       // Recompute stats từ snapshot
-      stats.gifts = 0; stats.diamond = 0; stats.users.clear();
+      stats.gifts = 0; stats.diamond = 0; stats.users.clear(); stats.userCount = null;
       for (const q of snapshot) {
         if (q.isBackground) continue;
         stats.gifts += q.count || 0;
         stats.diamond += q.diamond || 0;
         if (q.user) stats.users.add(q.user);
       }
+      if (Number.isFinite(Number(queueMeta.totalGifts))) stats.gifts = Number(queueMeta.totalGifts);
+      if (Number.isFinite(Number(queueMeta.totalDiamond))) stats.diamond = Number(queueMeta.totalDiamond);
+      if (Number.isFinite(Number(queueMeta.totalUsers))) stats.userCount = Number(queueMeta.totalUsers);
       renderAll();
       updateStats();
     });
@@ -346,7 +360,7 @@
       if (idx === -1) snapshot.push(item);
       else snapshot[idx] = item;
       // Recompute stats
-      stats.gifts = 0; stats.diamond = 0; stats.users.clear();
+      stats.gifts = 0; stats.diamond = 0; stats.users.clear(); stats.userCount = null;
       for (const q of snapshot) {
         if (q.isBackground) continue;
         stats.gifts += q.count || 0;
@@ -358,7 +372,8 @@
     });
     ipcRenderer.on('popup-queue:reset', () => {
       snapshot = [];
-      stats.gifts = 0; stats.diamond = 0; stats.users.clear();
+      queueMeta = { activeCount: 0, backlogCount: 0, totalCount: 0 };
+      stats.gifts = 0; stats.diamond = 0; stats.users.clear(); stats.userCount = null;
       renderAll(); updateStats();
     });
     document.getElementById('popQClear').onclick = () => {

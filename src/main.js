@@ -137,6 +137,7 @@ let parsedEventSeq = 0;
 let overlayManager = null;
 let obsOverlayServer = null;
 let currentOverlaySpeed = { audioRate: 1, videoRate: 1 };
+let hotkeySendChain = Promise.resolve();
 let queuePopup = null;
 let heartOverlay = null;
 let chatsPopup = null;
@@ -195,7 +196,7 @@ function sendGlobalHotkey(hotkey) {
   if (!keys) return Promise.resolve({ ok: false, error: 'Phím tắt không hợp lệ' });
   const nums = keys.map(n => parseInt(n, 10)).filter(n => Number.isInteger(n) && n > 0 && n <= 255);
   if (!nums.length) return Promise.resolve({ ok: false, error: 'Phím tắt không hợp lệ' });
-  const ps = `$ErrorActionPreference='Stop'; Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);' -Name Keyboard -Namespace Win32; $keys=@(${nums.join(',')}); foreach($k in $keys){[Win32.Keyboard]::keybd_event([byte]$k,0,0,[UIntPtr]::Zero)}; Start-Sleep -Milliseconds 45; [array]::Reverse($keys); foreach($k in $keys){[Win32.Keyboard]::keybd_event([byte]$k,0,2,[UIntPtr]::Zero)}`;
+  const ps = `$ErrorActionPreference='Stop'; Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);' -Name Keyboard -Namespace Win32; $keys=@(${nums.join(',')}); foreach($k in $keys){[Win32.Keyboard]::keybd_event([byte]$k,0,0,[UIntPtr]::Zero); Start-Sleep -Milliseconds 12}; Start-Sleep -Milliseconds 90; [array]::Reverse($keys); foreach($k in $keys){[Win32.Keyboard]::keybd_event([byte]$k,0,2,[UIntPtr]::Zero); Start-Sleep -Milliseconds 12}; Start-Sleep -Milliseconds 35`;
   const encoded = Buffer.from(ps, 'utf16le').toString('base64');
   return new Promise((resolve) => {
     execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true, timeout: 5000 }, (err) => {
@@ -203,6 +204,12 @@ function sendGlobalHotkey(hotkey) {
       else resolve({ ok: true });
     });
   });
+}
+
+function enqueueGlobalHotkey(hotkey) {
+  const run = () => sendGlobalHotkey(hotkey);
+  hotkeySendChain = hotkeySendChain.catch(() => {}).then(run);
+  return hotkeySendChain;
 }
 
 // =================== Mapping schema v2 ===================
@@ -1997,7 +2004,7 @@ ipcMain.handle('overlay:set-speed', (_e, opts) => {
   return { ok: true, ...currentOverlaySpeed };
 });
 
-ipcMain.handle('hotkey:send', (_e, { hotkey } = {}) => sendGlobalHotkey(hotkey));
+ipcMain.handle('hotkey:send', (_e, { hotkey } = {}) => enqueueGlobalHotkey(hotkey));
 
 // Stop hiệu ứng đang playing trên overlay (user xoá item khỏi DSHT)
 ipcMain.handle('overlay:stop-effect', (_e, overlayId) => {
