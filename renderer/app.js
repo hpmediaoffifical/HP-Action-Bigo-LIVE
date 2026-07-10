@@ -160,7 +160,12 @@ function getEnabledCommentItems() {
 function findGroupById(gid) {
   return (mapping.groups || []).find(g => g.id === gid);
 }
-function findItemById(itemId) {
+function findItemById(itemId, groupId = null) {
+  if (groupId) {
+    const group = findGroupById(groupId);
+    const item = (group?.items || []).find(i => i.id === itemId);
+    if (item) return { item, group };
+  }
   for (const grp of (mapping.groups || [])) {
     const item = (grp.items || []).find(i => i.id === itemId);
     if (item) return { item, group: grp };
@@ -1156,6 +1161,7 @@ function checkGroupSpecialEffectsTriggers(ev) {
 }
 
 function checkLegacySpecialEffectsTriggers(ev) {
+  if (hasGroupSpecialEffectsState()) return false;
   const common = getCommonGroup();
   const commonFeatures = getGroupSpecialConfig(common.id, false)?.features || {};
   let triggered = false;
@@ -3126,7 +3132,9 @@ els.dlgPickFile.onclick = async () => {
       els.dlgFile.appendChild(opt);
     }
   }
-  addDialogMediaFiles(r.files.map(f => f.fileUrl));
+  const pickedUrls = r.files.map(f => f.fileUrl).filter(Boolean);
+  const existing = getDialogMediaFiles().filter(file => !pickedUrls.includes(file));
+  setDialogMediaFiles([...pickedUrls, ...existing]);
   els.dlgFile.value = picked.fileUrl;
   autoEnablePauseBgmForAudio(picked.fileUrl || picked.fileName);
   appendLog(`đã chọn ${r.files.length} file (giữ ở vị trí gốc, không copy vào assets/effects)`);
@@ -3141,7 +3149,7 @@ async function persistMapping() {
 async function autoSaveOpenGiftFields() {
   const itemId = els.giftDialog?.dataset?.editingId;
   if (!itemId) return;
-  const found = findItemById(itemId);
+  const found = findItemById(itemId, els.giftDialog?.dataset?.editingGroupId || null);
   if (!found) return;
   const mediaFiles = getDialogMediaFiles();
   found.item.mediaFiles = mediaFiles;
@@ -3232,7 +3240,7 @@ function renderGroupsInto(container, opts) {
     if (el.tagName === 'INPUT' && el.type === 'checkbox') {
       el.onchange = () => groupAction(act, el.dataset.gid, el.checked);
     } else {
-      el.onclick = () => groupAction(act, el.dataset.gid, undefined, el.dataset.iid);
+      el.onclick = () => groupAction(act, el.dataset.gid || el.closest('[data-gid]')?.dataset.gid, undefined, el.dataset.iid);
     }
   });
   // Chip mã ID quà: bấm để sao chép, không lan ra click của dòng
@@ -4008,9 +4016,9 @@ function renderGroupCard(grp, overlayMap) {
       <div class="grow-actions">
         <span class="gift-state-badges action-badges">${actionBadges}</span>
         <input type="number" class="play-count" min="1" max="50" value="1" data-iid="${item.id}" title="Số lượng phát" onclick="event.stopPropagation()" />
-        <button class="tiny" data-act="play" data-iid="${item.id}" title="Phát N lần">▶</button>
-        <button class="tiny" data-act="edit-item" data-iid="${item.id}">✏️</button>
-        <button class="tiny danger" data-act="del-item" data-iid="${item.id}">🗑</button>
+        <button class="tiny" data-act="play" data-gid="${grp.id}" data-iid="${item.id}" title="Phát N lần">▶</button>
+        <button class="tiny" data-act="edit-item" data-gid="${grp.id}" data-iid="${item.id}">✏️</button>
+        <button class="tiny danger" data-act="del-item" data-gid="${grp.id}" data-iid="${item.id}">🗑</button>
       </div>
     </div>`;
   };
@@ -4112,7 +4120,7 @@ async function groupAction(act, gid, value, itemId) {
   }
   // Item-level actions
   if (act === 'play' || act === 'edit-item' || act === 'del-item') {
-    const found = findItemById(itemId);
+    const found = findItemById(itemId, gid);
     if (!found) return;
     if (act === 'play') {
       if (!canPlayEffectItem(found.item)) { alert(effectItemNeedsOverlay(found.item) ? 'Video cần chọn overlay' : 'Quà chưa có file hiệu ứng'); return; }
@@ -4475,12 +4483,16 @@ async function openGiftDialog(gift = null, groupId = null) {
   els.dlgAlias.value = gift?.alias || '';
   // Group: tên nhóm hiện tại của gift / groupId pass vào / fallback Mặc định
   let groupName = '';
+  let resolvedGroupId = groupId || '';
   if (groupId) {
     const grp = findGroupById(groupId);
     if (grp) groupName = grp.name;
   } else if (gift) {
     const found = findItemById(gift.id);
-    if (found) groupName = found.group.name;
+    if (found) {
+      groupName = found.group.name;
+      resolvedGroupId = found.group.id;
+    }
   }
   // Populate select Nhóm với tất cả groups
   const allGroups = mapping.groups || [];
@@ -4494,7 +4506,7 @@ async function openGiftDialog(gift = null, groupId = null) {
   els.dlgGroup.value = groupName || allGroups[0]?.name || 'Mặc định';
   // Priority field
   if (els.dlgPriority) els.dlgPriority.value = gift?.priority || 0;
-  els.giftDialog.dataset.editingGroupId = groupId || '';
+  els.giftDialog.dataset.editingGroupId = resolvedGroupId;
   els.dlgMasterFilter.value = '';
   els.dlgMasterSort.value = 'kc-asc';
   const multiGift = document.getElementById('dlgMultiGift');
@@ -4583,7 +4595,7 @@ els.dlgGiftSave.onclick = async (e) => {
   const targetGroup = findOrCreateGroupCI(targetGroupName, 'gift');
   if (itemId) {
     // Edit: tìm item trong group hiện tại; nếu group đổi, move
-    const found = findItemById(itemId);
+    const found = findItemById(itemId, els.giftDialog?.dataset?.editingGroupId || null);
     if (found) {
       if (found.group.id === targetGroup.id) {
         const idx = found.group.items.findIndex(i => i.id === itemId);
@@ -6342,7 +6354,13 @@ function hasMeaningfulLegacySpecialConfig(key, cfg) {
   return false;
 }
 
+function hasGroupSpecialEffectsState() {
+  const groupEffects = appSettings?.groupSpecialEffects;
+  return !!(groupEffects && typeof groupEffects === 'object' && Object.keys(groupEffects).length > 0);
+}
+
 function migrateLegacySpecialEffectsToCommonGroup() {
+  if (hasGroupSpecialEffectsState()) return false;
   const common = getCommonGroup();
   const commonCfg = getGroupSpecialConfig(common.id);
   let changed = false;

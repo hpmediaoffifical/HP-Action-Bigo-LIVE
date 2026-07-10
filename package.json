@@ -1,12 +1,15 @@
 {
   "name": "bigo-action",
-  "version": "0.3.29",
+  "version": "0.3.31",
   "description": "Bigo Live gift effect player — nhận quà từ phòng live qua Bigo Open API rồi phát mp3/mp4/webm hiệu ứng",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "check:hpkey": "node scripts/check-hpkey-config.js",
+    "predist": "npm run check:hpkey",
     "dist": "electron-builder --win nsis --publish never",
+    "prerelease": "npm run check:hpkey",
     "release": "electron-builder --win nsis --publish always"
   },
   "author": "Phụng",
