@@ -947,9 +947,24 @@ ipcMain.handle('license:verify', async (_e, { key, action }) => {
       _hpkeyWatching = true;
       // Check key real-time: cam key tren admin -> dong app trong <= RECHECK_SECONDS
       try {
+        const RECHECK = require('../hpkey/config').RECHECK_SECONDS || 60;
+        // Chống văng oan: server chỉ trả ok:false 1 lần (lỗi 500/timeout/mạng chập chờn)
+        // KHÔNG đóng app ngay. Chỉ đóng khi bị từ chối 2 lần LIÊN TIẾP (admin thật sự
+        // khóa/thu hồi/hết hạn). Mất mạng đã được core bỏ qua (_offline) từ trước.
+        let _revokeStrikes = 0;
+        let _lastRevokeAt = 0;
         require('../hpkey/core').startWatch({
           getKey: () => _hpkeyCurrentKey,
           onRevoked: (reason) => {
+            const now = Date.now();
+            // Nếu lần từ chối trước cách quá lâu → đã có lần verify OK xen giữa → reset streak.
+            if (now - _lastRevokeAt > RECHECK * 1000 * 2.5) _revokeStrikes = 0;
+            _lastRevokeAt = now;
+            _revokeStrikes++;
+            if (_revokeStrikes < 2) {
+              console.warn('[hpkey] revoke strike', _revokeStrikes, '- bỏ qua tạm:', reason);
+              return;
+            }
             try {
               dialog.showErrorBox('Bản quyền bị thu hồi',
                 'KEY của bạn đã bị khóa/thu hồi hoặc hết hạn (' + reason + ').\n' +

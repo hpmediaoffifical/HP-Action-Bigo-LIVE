@@ -2545,6 +2545,25 @@ function waitForLicenseGateUnlock() {
   });
 }
 
+// Mở app bằng license ĐÃ LƯU (offline grace): dùng khi re-verify lúc khởi động
+// thất bại vì MẤT MẠNG / server không phản hồi (KHÔNG phải server từ chối key).
+// Chỉ mở nếu đã từng verify thành công (có cache) và license còn hạn — tránh văng
+// oan user hợp lệ khi rớt mạng. Server từ chối rõ ràng (khóa/thu hồi/hết hạn) vẫn chặn.
+function openWithCachedLicense() {
+  try {
+    const cached = localStorage.getItem('hp_license_info');
+    if (!cached) return false;
+    const info = JSON.parse(cached);
+    if (!isLicenseUsable(info).ok) return false; // cache đã hết hạn/không khả dụng → chặn
+    renderLicenseStatus(info);
+    updateHeaderLicense(info);
+    checkLicenseReminder(info);
+    setLicenseGateMessage('Không kết nối được máy chủ bản quyền — mở tạm bằng KEY đã lưu (offline).', 'ok');
+    document.body.classList.add('license-ok');
+    return true;
+  } catch { return false; }
+}
+
 async function unlockLicenseGate(info, key, machineId) {
   try {
     localStorage.setItem('hp_license_key', key);
@@ -2559,6 +2578,29 @@ async function unlockLicenseGate(info, key, machineId) {
   checkLicenseReminder(info);
   setLicenseGateMessage('KEY hợp lệ. Đang mở ứng dụng...', 'ok');
   document.body.classList.add('license-ok');
+}
+
+// Gỡ KEY khỏi máy này để nhập KEY khác: xoá toàn bộ cache license + về màn nhập KEY.
+function removeLicenseKey() {
+  try {
+    localStorage.removeItem('hp_license_key');
+    localStorage.removeItem('hp_license_info');
+    localStorage.removeItem('hp_license_verified_at');
+    localStorage.removeItem('hp_license_machine_id');
+    localStorage.removeItem('hp_license_fail_count');
+    localStorage.removeItem('hp_license_lock_until');
+  } catch {}
+  const infoInput = document.getElementById('licenseKey');
+  if (infoInput) infoInput.value = '';
+  const gateInput = document.getElementById('licenseGateKey');
+  if (gateInput) { gateInput.value = ''; gateInput.disabled = false; }
+  const gateBtn = document.getElementById('licenseGateSubmit');
+  if (gateBtn) gateBtn.disabled = false;
+  renderLicenseStatus(null);
+  updateHeaderLicense({});
+  setLicenseGateMessage('Đã gỡ KEY khỏi máy này. Nhập KEY bản quyền mới để tiếp tục.', '');
+  document.body.classList.remove('license-ok'); // hiện lại màn nhập KEY
+  if (gateInput) gateInput.focus();
 }
 
 async function submitLicenseGateKey(key, action = 'activate') {
@@ -2626,6 +2668,10 @@ async function ensureLicenseGate() {
   }
   const ok = await submitLicenseGateKey(cachedKey, 'verify');
   if (ok) return true;
+  // Chống văng: re-verify thất bại do MẤT MẠNG (không phải server từ chối key)
+  // → mở app bằng license đã lưu nếu còn hạn. Watcher real-time sẽ verify lại khi có mạng.
+  const err = verifyLicense.lastError;
+  if (err && err.offline && openWithCachedLicense()) return true;
   return waitForLicenseGateUnlock();
 }
 
@@ -2748,6 +2794,20 @@ async function ensureLicenseGate() {
       activateBtn.disabled = true;
       try { await verifyLicense(keyInput?.value.trim() || '', 'activate'); }
       finally { activateBtn.disabled = false; }
+    };
+  }
+  const removeBtn = document.getElementById('btnRemoveLicense');
+  if (removeBtn) {
+    removeBtn.onclick = async () => {
+      const ok = await appConfirm({
+        title: 'Gỡ KEY khỏi máy này?',
+        message: 'Gỡ KEY hiện tại để nhập KEY khác?',
+        detail: 'App sẽ quay về màn nhập KEY. KEY cũ vẫn còn hiệu lực trên hệ thống, có thể nhập lại bất cứ lúc nào.',
+        okText: 'Gỡ KEY',
+        cancelText: 'Huỷ',
+        danger: true,
+      });
+      if (ok) removeLicenseKey();
     };
   }
 
