@@ -100,6 +100,10 @@
     <button id="popQToggle" class="tiny" title="Phát/Tạm dừng hiệu ứng">▶/⏸</button>
     <button id="popQShuffle" class="tiny" title="Trộn ngẫu nhiên danh sách đang chờ">🎲</button>
     <button id="popQSettingsBtn" class="tiny" title="Cài đặt kích thước popup">⚙</button>
+    <span class="queue-bulk-delete" title="Xoá số lượng hiệu ứng đang chờ, luôn giữ hiệu ứng đang phát hoặc hàng đầu khi tạm dừng" style="display:inline-flex;gap:4px;align-items:center">
+      <input id="popQBulkCount" type="number" min="1" max="10000" step="1" value="1" style="width:56px" aria-label="Số lượng hiệu ứng chờ cần xoá" />
+      <button id="popQBulkDelete" class="tiny danger" title="Xoá số lượng hiệu ứng đang chờ">🗑 Xoá</button>
+    </span>
     <button id="popQClear" class="tiny danger" title="Xoá tất cả hiệu ứng đang chờ">🗑 Xoá tất cả</button>
   </div>
   <div id="popQSettings" class="pop-settings">
@@ -382,6 +386,11 @@
     };
     document.getElementById('popQShuffle').onclick = () => {
       ipcRenderer.send('popup-queue:action', { type: 'shuffle' });
+    };
+    document.getElementById('popQBulkDelete').onclick = () => {
+      const n = Math.max(1, parseInt(document.getElementById('popQBulkCount').value, 10) || 1);
+      // App (cửa sổ chính) sẽ hỏi xác nhận rồi xoá n hàng chờ từ trên xuống.
+      ipcRenderer.send('popup-queue:action', { type: 'bulk-delete', count: n });
     };
     document.getElementById('popQToggle').onclick = () => ipcRenderer.send('popup-queue:action', { type: 'toggle-current' });
     document.getElementById('popQSettingsBtn').onclick = () => document.getElementById('popQSettings').classList.toggle('open');

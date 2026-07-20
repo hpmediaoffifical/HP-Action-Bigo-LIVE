@@ -18,7 +18,9 @@
       max-height: calc(100vh - 100px); overflow-y: auto;
       font-size: var(--chat-font, 13px);
     }
-    .chat-row { padding: 5px 8px; border-bottom: 1px solid #1c1f28; display: flex; gap: 6px; align-items: baseline; }
+    .chat-row { padding: 5px 8px; border-bottom: 1px solid #1c1f28; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+    .pop-controls select { background:#0f1117; color:#e6e8ee; border:1px solid #2a2f3d; border-radius:5px; padding:2px 4px; }
+    .pop-controls label { display:flex; align-items:center; gap:4px; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -29,6 +31,17 @@
   <div class="pop-controls">
     <button id="popChatSettingsBtn" class="tiny" title="Cài đặt kích thước popup">⚙</button>
     <button id="popChatClear" class="tiny danger" title="Xoá hiển thị">🗑 Xoá</button>
+    <label title="Dịch nội dung chat"><input type="checkbox" id="popChatTranslateOn"> 🌐 Dịch sang</label>
+    <select id="popChatTranslateTo" title="Ngôn ngữ dịch">
+      <option value="auto-vi">Tự nhận diện → Tiếng Việt</option>
+      <option value="vi">Tiếng Việt</option>
+      <option value="en">English</option>
+      <option value="zh-CN">中文</option>
+      <option value="th">ไทย</option>
+      <option value="ko">한국어</option>
+      <option value="ja">日本語</option>
+      <option value="id">Indonesia</option>
+    </select>
   </div>
   <div id="popChatSettings" class="pop-settings">
     <label>Cỡ chữ <span id="popChatFontVal" style="color:#ffd166">13</span>px
@@ -71,12 +84,62 @@
     applyFont();
     document.getElementById('popChatSettingsBtn').onclick = () => document.getElementById('popChatSettings').classList.toggle('open');
 
+    // ---- Dịch chat (giống cửa sổ mini): dịch qua main process 'translate:text' ----
+    const translateOnEl = document.getElementById('popChatTranslateOn');
+    const translateToEl = document.getElementById('popChatTranslateTo');
+    try {
+      translateOnEl.checked = localStorage.getItem('popupChatTranslateOn') === '1';
+      const savedTo = localStorage.getItem('popupChatTranslateTo');
+      if (savedTo) translateToEl.value = savedTo;
+    } catch {}
+    translateOnEl.addEventListener('change', () => {
+      try { localStorage.setItem('popupChatTranslateOn', translateOnEl.checked ? '1' : '0'); } catch {}
+      if (translateOnEl.checked) retranslateVisible();
+    });
+    translateToEl.addEventListener('change', () => {
+      try { localStorage.setItem('popupChatTranslateTo', translateToEl.value); } catch {}
+      if (translateOnEl.checked) retranslateVisible();
+    });
+    function translateTarget() {
+      const v = translateToEl.value;
+      return v === 'auto-vi' ? 'vi' : v;
+    }
+    async function translateRow(div, text) {
+      if (!translateOnEl.checked || !text) return;
+      const wantTo = translateTarget();
+      try {
+        const r = await ipcRenderer.invoke('translate:text', { text, from: 'auto', to: wantTo });
+        const translated = String(r && r.text || '').trim();
+        if (!translated || translated === text) return;
+        if (!div.isConnected) return;
+        // Bỏ qua nếu user đã đổi target trong lúc chờ (tránh lệch ngôn ngữ)
+        if (translateTarget() !== wantTo || !translateOnEl.checked) return;
+        let t = div.querySelector('.chat-translated');
+        if (!t) {
+          t = document.createElement('span');
+          t.className = 'chat-translated';
+          t.style.cssText = 'color:#7cc6ff; font-style:italic; margin-left:4px';
+          div.appendChild(t);
+        }
+        t.textContent = '➜ ' + translated;
+      } catch {}
+    }
+    // Dịch lại toàn bộ dòng đang hiển thị (khi bật dịch / đổi ngôn ngữ)
+    function retranslateVisible() {
+      cont.querySelectorAll('.chat-row').forEach(div => {
+        div.querySelectorAll('.chat-translated').forEach(el => el.remove());
+        const src = div.dataset.src || '';
+        if (src) translateRow(div, src);
+      });
+    }
+
     let totalRows = 0;
 
     function appendChat(ev) {
       // ev = { user, level, content, user_avatar_url }
       const div = document.createElement('div');
       div.className = 'chat-row';
+      div.dataset.src = ev.content || '';
       const avUrl = ev.user_avatar_url || '';
       const av = avUrl ? `<img class="avatar" src="${escapeHtml(avUrl)}" loading="lazy" style="width:20px;height:20px" />` : '';
       const tier = levelTier(ev.level);
@@ -87,6 +150,7 @@
       cont.scrollTop = cont.scrollHeight;
       totalRows++;
       countEl.textContent = `${totalRows} dòng`;
+      translateRow(div, ev.content);
     }
 
     ipcRenderer.on('popup-chats:event', (_e, ev) => appendChat(ev));

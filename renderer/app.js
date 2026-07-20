@@ -2008,8 +2008,9 @@ if (window.bigo.onQueueClearAll) window.bigo.onQueueClearAll(async () => {
   if (await confirmClearQueue()) clearAllQueue();
 });
 if (window.bigo.onQueueAction) {
-  window.bigo.onQueueAction(({ type, id, giftKey }) => {
+  window.bigo.onQueueAction(({ type, id, giftKey, count }) => {
     if (type === 'shuffle') { queueShuffleQueued(); return; }
+    if (type === 'bulk-delete') { deleteQueuedItemsFromTop(count); return; }
     if (type === 'promote-group') { queuePromoteGiftGroup(giftKey); return; }
     if (type === 'play-current') { queuePlayCurrent(); return; }
     if (type === 'stop-current') { queueStopCurrent(); return; }
