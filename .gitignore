@@ -6,6 +6,7 @@ assets/effects/*
 !assets/effects/.gitkeep
 dist/
 release/
+release-*/
 *.log
 .DS_Store
 Thumbs.db

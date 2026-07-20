@@ -7,6 +7,7 @@ const { BigoClient } = require('./bigo-client');
 const { BigoWebListener } = require('./web-embed');
 const { OverlayManager } = require('./overlay-manager');
 const { ObsOverlayServer } = require('./obs-overlay-server');
+const { ObsWebSocketClient } = require('./obs-websocket-client');
 const autoUpdater = require('./auto-updater');
 
 const ROOT = path.join(__dirname, '..');
@@ -128,14 +129,22 @@ if (process.platform === 'win32') {
 }
 
 let win;
-const MAIN_DEFAULT_SIZE = { width: 1180, height: 780 };
-const MAIN_MIN_SIZE = { width: 960, height: 640 };
+const MAIN_DEFAULT_SIZE = { width: 1040, height: 700 };
+const MAIN_MIN_SIZE = { width: 900, height: 600 };
 const MAIN_MAX_INITIAL_SIZE = { width: 1240, height: 840 };
+// Preset kích thước cửa sổ (gọn / vừa / rộng) — dùng cho nút đổi nhanh trên sidebar
+const MAIN_SIZE_PRESETS = {
+  compact: { width: 1040, height: 700, label: 'Gọn' },
+  medium: { width: 1180, height: 780, label: 'Vừa' },
+  wide: { width: 1360, height: 860, label: 'Rộng' },
+};
 let client = null;
 let listener = null;
 let parsedEventSeq = 0;
 let overlayManager = null;
 let obsOverlayServer = null;
+let obsBrowserRefreshPromise = null;
+let lastObsBrowserRefreshAt = 0;
 let currentOverlaySpeed = { audioRate: 1, videoRate: 1 };
 let hotkeySendChain = Promise.resolve();
 let queuePopup = null;
@@ -556,8 +565,57 @@ function ensureObsOverlaySettings() {
   if (!s.obsOverlay) s.obsOverlay = {};
   if (!s.obsOverlay.port) s.obsOverlay.port = 18181;
   if (!s.obsOverlay.token) s.obsOverlay.token = crypto.randomBytes(18).toString('hex');
+  if (!s.obsOverlay.webSocketPort) s.obsOverlay.webSocketPort = 4456;
+  if (s.obsOverlay.webSocketPassword == null) s.obsOverlay.webSocketPassword = '';
+  if (s.obsOverlay.autoRefreshBrowserSources == null) s.obsOverlay.autoRefreshBrowserSources = true;
   saveSettings(s);
   return s.obsOverlay;
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function refreshObsBrowserSources(reason, { cooldownMs = 10000 } = {}) {
+  const obsCfg = ensureObsOverlaySettings();
+  if (!obsCfg.autoRefreshBrowserSources) return { ok: false, skipped: 'disabled' };
+  if (obsBrowserRefreshPromise) return obsBrowserRefreshPromise;
+  if (Date.now() - lastObsBrowserRefreshAt < cooldownMs) return { ok: false, skipped: 'cooldown' };
+
+  lastObsBrowserRefreshAt = Date.now();
+  const client = new ObsWebSocketClient({
+    port: obsCfg.webSocketPort,
+    password: obsCfg.webSocketPassword,
+    overlayPort: obsCfg.port,
+  });
+  obsBrowserRefreshPromise = client.refreshAppBrowserSources()
+    .then((result) => {
+      const detail = result.matched
+        ? `đã làm mới ${result.refreshed}/${result.matched} Browser Source HP Action`
+        : 'không tìm thấy Browser Source HP Action nào';
+      if (win && !win.isDestroyed()) {
+        try { win.webContents.send('bigo:log', `[obs-websocket] ${reason}: ${detail}`); } catch {}
+      }
+      return result;
+    })
+    .catch((e) => {
+      const error = e?.message || String(e);
+      if (win && !win.isDestroyed()) {
+        try { win.webContents.send('bigo:log', `[obs-websocket] ${reason}: không kết nối được OBS tại 127.0.0.1:${obsCfg.webSocketPort} (${error})`); } catch {}
+      }
+      return { ok: false, error };
+    })
+    .finally(() => { obsBrowserRefreshPromise = null; });
+  return obsBrowserRefreshPromise;
+}
+
+async function waitForObsOverlayClient(overlayId, timeoutMs = 1200) {
+  const endAt = Date.now() + timeoutMs;
+  while (Date.now() < endAt) {
+    if (obsOverlayServer?.hasClients(overlayId)) return true;
+    await wait(100);
+  }
+  return obsOverlayServer?.hasClients(overlayId) || false;
 }
 function saveWindowBounds(key, bounds) {
   const s = loadSettings();
@@ -675,6 +733,12 @@ function createWindow() {
   });
   win.setMinimumSize(MAIN_MIN_SIZE.width, MAIN_MIN_SIZE.height);
   win.setMenuBarVisibility(false);
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !input.control || input.alt || input.shift || String(input.key).toLowerCase() !== 'r') return;
+    // Prevent Chromium's normal reload and refresh only HP Action effect overlays in OBS.
+    event.preventDefault();
+    refreshObsBrowserSources('làm mới thủ công (Ctrl+R)', { cooldownMs: 0 }).catch(() => {});
+  });
   win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
   win.webContents.once('did-finish-load', () => focusMainWindow());
   // Confirm khi đóng app — tránh user bấm nhầm X làm mất session
@@ -709,6 +773,30 @@ ipcMain.handle('app:window-size-lock', (_e, locked) => {
   win.setResizable(!shouldLock);
   win.setMaximizable(!shouldLock);
   return { ok: true, locked: shouldLock };
+});
+
+// Đổi nhanh kích thước cửa sổ theo preset (gọn / vừa / rộng) — canh giữa màn hình đang chứa cửa sổ.
+ipcMain.handle('app:window-set-preset', (_e, preset) => {
+  if (!win || win.isDestroyed()) return { ok: false, error: 'Main window not ready' };
+  const size = MAIN_SIZE_PRESETS[preset] || MAIN_SIZE_PRESETS.compact;
+  try {
+    // Mở khoá resize tạm nếu đang khoá, để setBounds có hiệu lực
+    win.setResizable(true);
+    win.setMaximizable(true);
+    if (win.isMaximized()) win.unmaximize();
+    const cur = win.getBounds();
+    const display = screen.getDisplayMatching(cur);
+    const wa = display.workArea;
+    const w = Math.min(size.width, wa.width);
+    const h = Math.min(size.height, wa.height);
+    const x = Math.round(wa.x + (wa.width - w) / 2);
+    const y = Math.round(wa.y + (wa.height - h) / 2);
+    win.setBounds({ x, y, width: w, height: h });
+    saveWindowBounds('main', win.getBounds());
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+  return { ok: true, preset, size };
 });
 
 // Single-instance lock: nếu đã có instance đang chạy, focus vào nó và quit instance mới.
@@ -780,6 +868,9 @@ app.whenReady().then(async () => {
     }
     focusMainWindow();
   }, 1200);
+  // OBS Browser Source can retain a dead SSE connection after OBS or this app restarts.
+  // Refresh only HP Action sources after the local overlay server is ready.
+  setTimeout(() => { refreshObsBrowserSources('khởi động ứng dụng').catch(() => {}); }, 1800);
   // Background: load master → auto-download icons nếu thiếu
   (async () => {
     const r = await ensureGiftMaster().catch(e => ({ ok: false, error: e.message }));
@@ -1478,9 +1569,11 @@ ipcMain.handle('gifts:scan-new', async () => {
   if (!r.ok) return { ok: false, error: r.error || 'Không tải được danh sách quà BIGO — kiểm tra mạng.' };
   const known = loadKnownGiftIds();
   const fresh = [];
+  const seen = new Set(); // dedupe: mỗi ID quà chỉ lấy 1 lần (BIGO đôi khi trả trùng typeid)
   for (const g of (giftMaster.gifts || [])) {
     const id = Number(g.typeid);
-    if (!Number.isFinite(id) || known.has(id)) continue;
+    if (!Number.isFinite(id) || known.has(id) || seen.has(id)) continue;
+    seen.add(id);
     fresh.push({ id, name: g.name || '', img_url: g.img_url || '', priceKC: giftPriceKC(g), region: giftNotes.get(id) || 'VN' });
   }
   fresh.sort((a, b) => a.id - b.id);
@@ -2018,7 +2111,7 @@ ipcMain.handle('overlay:stop-effect', (_e, overlayId) => {
   return { ok: true };
 });
 
-ipcMain.handle('overlay:play', (_e, { overlayId, file, fileUrl: rawUrl }) => {
+ipcMain.handle('overlay:play', async (_e, { overlayId, file, fileUrl: rawUrl }) => {
   const cfg = mapping.overlays.find(o => o.id === overlayId);
   if (!cfg) return { ok: false };
   // 2 modes:
@@ -2033,7 +2126,13 @@ ipcMain.handle('overlay:play', (_e, { overlayId, file, fileUrl: rawUrl }) => {
   if (target === 'native') {
     overlayManager.play(cfg, fileUrl(fullPath));
   } else if (target === 'obs') {
-    const sentToObs = obsOverlayServer ? obsOverlayServer.play(overlayId, fullPath) : false;
+    let sentToObs = obsOverlayServer ? obsOverlayServer.play(overlayId, fullPath) : false;
+    if (!sentToObs) {
+      const refreshed = await refreshObsBrowserSources('phục hồi Browser Source khi có quà');
+      if (refreshed.ok && refreshed.matched > 0 && await waitForObsOverlayClient(overlayId)) {
+        sentToObs = obsOverlayServer ? obsOverlayServer.play(overlayId, fullPath) : false;
+      }
+    }
     if (!sentToObs && win && !win.isDestroyed()) {
       try { win.webContents.send('bigo:log', `[obs-overlay] ${cfg.name || overlayId}: chưa có OBS Browser Source kết nối, bỏ qua 1 hiệu ứng`); } catch {}
       // Toast cảnh báo dễ thấy hơn log panel. Renderer tự throttle để không spam.

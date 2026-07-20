@@ -740,6 +740,53 @@ async function removeQueueItemById(id) {
   forwardQueueSnapshot();
 }
 
+function getBulkQueueDeleteCandidates() {
+  // Khi tạm dừng, item đầu tuy là "queued" nhưng chính là hiệu ứng vừa dừng.
+  // Giữ lại nó để thao tác vẫn luôn bắt đầu từ hàng thứ hai như trên giao diện.
+  const pausedCurrentId = queuePaused
+    ? queueItems.find(q => q.status === 'queued')?.id
+    : '';
+  const visibleQueued = queueItems.filter(q => q.status === 'queued' && q.id !== pausedCurrentId);
+  return [...visibleQueued, ...queueBacklogItems];
+}
+
+async function deleteQueuedItemsFromTop(requestedCount) {
+  const count = Math.floor(Number(requestedCount));
+  if (!Number.isFinite(count) || count < 1) return 0;
+  const candidates = getBulkQueueDeleteCandidates();
+  const deleted = candidates.slice(0, count);
+  if (!deleted.length) return 0;
+
+  const preserveNote = queuePaused
+    ? 'Hàng đầu đang tạm dừng sẽ được giữ lại.'
+    : 'Hiệu ứng đang phát sẽ được giữ nguyên.';
+  const confirmed = await appConfirm({
+    title: `Xoá ${deleted.length.toLocaleString('en-US')} hiệu ứng đang chờ?`,
+    message: 'Danh sách sẽ được xoá lần lượt từ trên xuống.',
+    detail: `${preserveNote} Thao tác này không thể hoàn tác.`,
+    okText: `Xoá ${deleted.length.toLocaleString('en-US')} hàng`,
+    cancelText: 'Giữ lại',
+    danger: true,
+  });
+  if (!confirmed) return 0;
+
+  const ids = new Set(deleted.map(q => q.id));
+  for (const list of [queueItems, queueBacklogItems]) {
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (ids.has(list[i].id)) list.splice(i, 1);
+    }
+  }
+  // Nạp các hàng chưa xoá từ backlog vào cửa sổ hiển thị, không làm thay đổi thứ tự.
+  drainQueueBacklog();
+  if (!queuePaused && !queueItems.some(q => q.status === 'playing')) markNextQueueItemPlaying();
+  syncBgmAfterQueueChange();
+  sessionStats.effects = Math.max(0, sessionStats.effects - deleted.length);
+  updateConnectStats();
+  renderQueue(); renderMiniQueue(); renderQueueCards(); updateQueueStats();
+  forwardQueueSnapshot();
+  return deleted.length;
+}
+
 function clearAllQueue() {
   // DEFENSIVE: Stop TẤT CẢ overlays trong mapping (không chỉ playing items).
   // Lý do: race condition — IPC overlay:play có thể IN-FLIGHT từ event handler
@@ -2180,6 +2227,38 @@ if (els.btnResetStats) {
   });
 })();
 
+// Nút đổi nhanh kích thước cửa sổ — cycle Gọn → Vừa → Rộng, canh giữa màn hình.
+(function wireWindowPreset() {
+  const btn = document.getElementById('sidebarWindowPreset');
+  if (!btn) return;
+  const KEY = 'hp_window_preset';
+  const presets = [
+    { key: 'compact', label: 'Gọn', size: '1040×700' },
+    { key: 'medium', label: 'Vừa', size: '1180×780' },
+    { key: 'wide', label: 'Rộng', size: '1360×860' },
+  ];
+  let idx = 0;
+  try { const saved = localStorage.getItem(KEY); const i = presets.findIndex(p => p.key === saved); if (i >= 0) idx = i; } catch {}
+  const refreshTitle = () => {
+    const p = presets[idx];
+    btn.title = `Kích thước: ${p.label} (${p.size}) — bấm để đổi sang ${presets[(idx + 1) % presets.length].label}`;
+  };
+  refreshTitle();
+  btn.addEventListener('click', async () => {
+    idx = (idx + 1) % presets.length;
+    const p = presets[idx];
+    try { localStorage.setItem(KEY, p.key); } catch {}
+    // Đổi kích thước sẽ mở khoá resize → đồng bộ lại nút khoá về trạng thái mở
+    try {
+      const lockBtn = document.getElementById('sidebarLockSettings');
+      if (lockBtn?.classList.contains('locked')) { lockBtn.click(); }
+    } catch {}
+    if (window.bigo?.windowSetPreset) await window.bigo.windowSetPreset(p.key).catch(() => {});
+    refreshTitle();
+    try { showToast({ key: 'window-preset', title: `📐 Cửa sổ: ${p.label}`, body: p.size, ttl: 2500, throttle: 0 }); } catch {}
+  });
+})();
+
 // Phiên bản hiện tại + license key (tab ℹ️) — wire với Google Apps Script.
 let _machineId = null;
 async function ensureMachineId() {
@@ -2812,18 +2891,12 @@ async function init() {
 }
 
 function initRightPanelControls() {
+  // Panel phải giờ có bề rộng cố định theo grid (300–380px), KHÔNG resize ngang nữa
+  // để tránh làm méo cột danh sách. Dọn giá trị bề rộng cũ đã lưu nếu có.
   const right = document.querySelector('.embed-right');
   if (right) {
-    const savedWidth = parseInt(localStorage.getItem('rps_w_right') || '', 10);
-    if (savedWidth >= 330) right.style.width = savedWidth + 'px';
-    let widthTimer = null;
-    const ro = new ResizeObserver(() => {
-      clearTimeout(widthTimer);
-      widthTimer = setTimeout(() => {
-        localStorage.setItem('rps_w_right', String(Math.round(right.getBoundingClientRect().width)));
-      }, 300);
-    });
-    ro.observe(right);
+    right.style.width = '';
+    try { localStorage.removeItem('rps_w_right'); } catch {}
   }
   // Collapse buttons
   document.querySelectorAll('.rps-collapse').forEach(btn => {
@@ -2863,6 +2936,10 @@ function initRightPanelControls() {
 async function refreshIconCacheStatus() {
   const s = await window.bigo.giftsIconsStatus();
   els.iconCacheStatus.textContent = `Kho icon: ${s.count}/${s.total || '?'} đã tải · ${s.dir}`;
+  // Nhãn nút hiện SỐ THẬT của master (thay số cứng cũ), tự cập nhật sau mỗi lần tải/refresh.
+  if (els.btnDownloadIcons && s.total) {
+    els.btnDownloadIcons.textContent = `📥 Tải icon master (${Number(s.total).toLocaleString('vi-VN')} quà)`;
+  }
 }
 
 // Listen progress từ cả nút Tải lẫn auto-download lúc khởi động
@@ -2884,10 +2961,24 @@ els.btnDownloadIcons.onclick = async () => {
   els.iconProgress.style.display = 'inline-block';
   els.iconProgress.value = 0;
   els.iconProgress.max = 100;
-  // Progress đã được listen ở init() → không cần đăng ký lại
+  // 1) Force cập nhật danh sách quà MỚI NHẤT từ BIGO (getOnlineGifts) — lấy được quà mới BIGO vừa thêm.
+  els.iconCacheStatus.textContent = 'Đang cập nhật danh sách quà mới nhất từ BIGO...';
+  try {
+    const rr = await window.bigo.giftsMasterRefresh();
+    if (rr?.ok) {
+      masterFullList = null; // buộc renderer nạp lại master mới
+      els.iconCacheStatus.textContent = `Danh sách quà: ${Number(rr.count || 0).toLocaleString('vi-VN')} quà${rr.cached ? ' (bản lưu — không tải mới được, kiểm tra mạng)' : ' (mới nhất từ BIGO)'}. Đang tải icon...`;
+    }
+  } catch (e) { /* vẫn tiếp tục tải icon với master đang có */ }
+  // 2) Tải icon còn thiếu cho toàn bộ master (progress đã listen ở init()).
   const r = await window.bigo.giftsDownloadIcons();
   els.btnDownloadIcons.disabled = false;
-  els.iconCacheStatus.textContent = `Hoàn tất: ${r.ok} mới · ${r.skip} bỏ qua · ${r.fail} lỗi · tổng ${r.total}`;
+  els.iconCacheStatus.textContent = `Hoàn tất: ${r.ok} mới · ${r.skip} bỏ qua · ${r.fail} lỗi · tổng ${r.total} quà`;
+  await refreshIconCacheStatus(); // cập nhật nhãn nút + số thật
+  // Nạp lại master (đã bị set null ở bước refresh) để getGiftIcon có localIcon mới,
+  // nếu không renderGiftTable chạy với masterFullList=null → icon danh sách quà bị mất.
+  masterFullList = await window.bigo.giftsMasterList();
+  renderGiftTable();
 };
 
 // =================== Quét quà mới của BIGO → Google Sheet ===================
@@ -3182,6 +3273,18 @@ function getGiftIcon(g) {
   return '';
 }
 
+// Số đậu (diamonds) của quà trong danh sách, tra từ master theo typeid. null nếu không rõ.
+function getItemDiamonds(g) {
+  if (!masterFullList) return null;
+  for (const k of (g?.matchKeys || [])) {
+    const id = parseInt(k, 10);
+    if (isNaN(id)) continue;
+    const m = masterFullList.find(x => x.typeid === id);
+    if (m && m.diamonds != null && Number.isFinite(Number(m.diamonds))) return Number(m.diamonds);
+  }
+  return null;
+}
+
 // State cho subtab type filter (per container)
 const subtypeByContainer = new WeakMap();
 
@@ -3254,6 +3357,16 @@ function renderGroupsInto(container, opts) {
         setTimeout(() => { el.textContent = `#${id}`; }, 1000);
       }).catch(() => {});
     };
+  });
+  // Bấm đúp (double-click) vào hàng quà = mở sửa nhanh (không cần bấm nút bút).
+  // Dùng double-click thay 1 lần để tránh mở nhầm. Bỏ qua khi bấm vào control
+  // tương tác: nút, input, icon (icon-pick), chip ID.
+  container.querySelectorAll('.group-item').forEach(row => {
+    row.addEventListener('dblclick', (e) => {
+      if (e.target.closest('button, input, [data-act], [data-copy-id]')) return;
+      const found = findItemById(row.dataset.iid, row.dataset.gid);
+      if (found) openGiftDialog(found.item, found.group.id);
+    });
   });
   // Drag-drop reorder items trong group
   wireDragDrop(container);
@@ -3979,9 +4092,10 @@ function renderGroupCard(grp, overlayMap) {
     const collapsed = !!grp.collapsed;
   const renderGroupItem = (item) => {
     const iconUrl = getGiftIcon(item);
+    // Bấm vào icon = mở dialog sửa quà, master picker tự nhảy tới quà cùng tầm đậu để đổi nhanh.
     const iconCell = iconUrl
-      ? `<img src="${escapeHtml(iconUrl)}" class="grow-icon" loading="lazy" />`
-      : '<div class="grow-icon-empty"></div>';
+      ? `<img src="${escapeHtml(iconUrl)}" class="grow-icon" data-act="icon-pick" data-gid="${grp.id}" data-iid="${item.id}" title="Bấm để đổi nhanh sang quà khác cùng tầm đậu" loading="lazy" />`
+      : `<div class="grow-icon-empty" data-act="icon-pick" data-gid="${grp.id}" data-iid="${item.id}" title="Bấm để chọn quà"></div>`;
     const displayName = item.alias || (item.matchKeys || [])[0] || '?';
     // Mã ID quà BIGO = matchKey dạng số (vd "5877"). Hiện mờ cạnh tên để nhận biết quà, không ảnh hưởng logic phát.
     const giftId = (item.matchKeys || []).map(k => String(k).trim()).find(k => /^\d+$/.test(k)) || '';
@@ -4007,14 +4121,19 @@ function renderGroupCard(grp, overlayMap) {
     const fileLine = mediaFiles.length
       ? `<div class="grow-sub"><code><span class="media-kind-icon">${escapeHtml(mediaTypeIcon)}</span>${escapeHtml(fileDisplay)}</code>${item.background ? '<span class="bg-sub-note">Phát song song trên overlay riêng, không vào Hành động</span>' : ''}</div>`
       : `<div class="grow-sub"><span style="color:#ff6b6b">— chưa có file hiệu ứng —</span></div>`;
-    return `<div class="group-item ${item.background ? 'background-item' : ''}" data-iid="${item.id}" data-gid="${grp.id}">
+    // Icon loại file hiện inline cạnh tên (thay cho dòng file phụ đã ẩn ở chế độ gọn)
+    const inlineMediaIcon = mediaFiles.length
+      ? `<span class="media-kind-icon" title="${escapeHtml(fileDisplay)}">${escapeHtml(mediaTypeIcon)}</span>`
+      : '';
+    // Tooltip cả dòng: tên + mã ID + tên file — xem nhanh mà không tốn 1 dòng riêng
+    const rowTitle = escapeHtml(`${displayName}${giftId ? ' · #' + giftId : ''} — ${mediaFiles.length ? fileDisplay : 'chưa có file hiệu ứng'}`);
+    return `<div class="group-item compact ${item.background ? 'background-item' : ''} ${!mediaFiles.length ? 'no-file' : ''}" data-iid="${item.id}" data-gid="${grp.id}" title="${rowTitle}">
       ${iconCell}
       <div class="grow-meta">
-        <div class="grow-name"><b>${escapeHtml(displayName)}</b>${idBadge}</div>
+        <div class="grow-name">${inlineMediaIcon}<b>${escapeHtml(displayName)}</b>${idBadge}<span class="gift-state-badges action-badges inline-badges">${actionBadges}</span></div>
         ${fileLine}
       </div>
       <div class="grow-actions">
-        <span class="gift-state-badges action-badges">${actionBadges}</span>
         <input type="number" class="play-count" min="1" max="50" value="1" data-iid="${item.id}" title="Số lượng phát" onclick="event.stopPropagation()" />
         <button class="tiny" data-act="play" data-gid="${grp.id}" data-iid="${item.id}" title="Phát N lần">▶</button>
         <button class="tiny" data-act="edit-item" data-gid="${grp.id}" data-iid="${item.id}">✏️</button>
@@ -4116,6 +4235,12 @@ async function groupAction(act, gid, value, itemId) {
   }
   if (act === 'add-item') {
     openGiftDialog(null, gid);
+    return;
+  }
+  if (act === 'icon-pick') {
+    // Bấm icon quà → mở dialog sửa + nhảy master picker tới quà cùng tầm đậu.
+    const found = findItemById(itemId, gid);
+    if (found) openGiftDialog(found.item, found.group.id, { focusDiamonds: getItemDiamonds(found.item) });
     return;
   }
   // Item-level actions
@@ -4385,11 +4510,41 @@ function ensureMasterImgObserver() {
   return masterRenderState.imgObserver;
 }
 
+// Mốc đậu (KC) chọn nhanh — lọc ~3000 quà theo giá tức thì.
+const DAU_PRESETS = [10, 20, 50, 100, 200, 500, 1000, 3000, 5000, 10000, 20000, 30000, 50000];
+let dlgMasterDau = null; // null = tất cả; number = lọc đúng mốc đậu
+let spMasterDau = null;
+
+// Vẽ dải chip: chỉ hiện mốc THẬT SỰ có quà trong danh sách (kèm số lượng), + chip "Tất cả".
+function renderDauChips(container, activeVal, onPick) {
+  if (!container) return;
+  if (!masterFullList) { container.innerHTML = ''; return; }
+  const countByDau = new Map();
+  for (const g of masterFullList) {
+    const d = Number(g.diamonds);
+    if (Number.isFinite(d)) countByDau.set(d, (countByDau.get(d) || 0) + 1);
+  }
+  const fmt = (v) => v.toLocaleString('vi-VN');
+  const total = masterFullList.length;
+  let html = `<button type="button" class="dau-chip ${activeVal == null ? 'active' : ''}" data-dau="all">Tất cả <i>${fmt(total)}</i></button>`;
+  html += DAU_PRESETS.filter(v => countByDau.has(v))
+    .map(v => `<button type="button" class="dau-chip ${activeVal === v ? 'active' : ''}" data-dau="${v}">${fmt(v)} <i>${countByDau.get(v)}</i></button>`)
+    .join('');
+  container.innerHTML = html;
+  container.querySelectorAll('.dau-chip').forEach(btn => {
+    btn.onclick = () => {
+      const raw = btn.dataset.dau;
+      onPick(raw === 'all' ? null : Number(raw));
+    };
+  });
+}
+
 function renderMasterTable() {
   if (!masterFullList) {
     els.dlgMasterCount.textContent = 'đang tải...';
     return;
   }
+  renderDauChips(document.getElementById('dlgMasterDauChips'), dlgMasterDau, (v) => { dlgMasterDau = v; renderMasterTable(); });
   if (els.dlgMasterTotal) els.dlgMasterTotal.textContent = `Số lượng: ${masterFullList.length.toLocaleString('en-US')} quà`;
   const filter = els.dlgMasterFilter.value.toLowerCase().trim();
   const sortKey = els.dlgMasterSort.value;
@@ -4398,6 +4553,7 @@ function renderMasterTable() {
   let arr = masterFullList.slice();
   if (favOnly) arr = arr.filter(g => giftFavorites.has(g.typeid));
   if (vnOnly) arr = arr.filter(isVnGift);
+  if (dlgMasterDau != null) arr = arr.filter(g => Number(g.diamonds) === dlgMasterDau);
   if (filter) {
     arr = arr.filter(g => {
       const n = String(g.name || '').toLowerCase();
@@ -4421,6 +4577,38 @@ function renderMasterTable() {
   masterRenderState.renderedCount = 0;
   appendMasterChunk();
   setupMasterScrollHandler();
+}
+
+// Nhảy master picker tới quà gần số đậu targetDia nhất (đổi nhanh sang quà cùng tầm giá).
+// Master đang sort kc-asc nên các quà cùng giá nằm sát nhau; nạp đủ chunk rồi cuộn tới hàng đó.
+function jumpMasterToDiamonds(targetDia) {
+  const target = Number(targetDia);
+  if (!Number.isFinite(target)) return;
+  const arr = masterRenderState.arr;
+  if (!arr || !arr.length) return;
+  let bestIdx = -1, bestDelta = Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const d = Number(arr[i].diamonds);
+    if (!Number.isFinite(d)) continue;
+    const delta = Math.abs(d - target);
+    if (delta < bestDelta) { bestDelta = delta; bestIdx = i; }
+  }
+  if (bestIdx < 0) return;
+  // Nạp progressive tới khi hàng đích đã render (chunk 200 hàng/lần), có guard tránh vòng vô hạn.
+  let guard = 0;
+  while (masterRenderState.renderedCount <= bestIdx && masterRenderState.renderedCount < arr.length && guard++ < 100) {
+    appendMasterChunk();
+  }
+  const targetG = arr[bestIdx];
+  const row = els.dlgMasterTableBody.querySelector(`tr[data-typeid="${targetG.typeid}"]`);
+  const wrap = els.dlgMasterTableBody.closest('.master-table-wrap');
+  if (row && wrap) {
+    const wrapRect = wrap.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    wrap.scrollTop += (rowRect.top - wrapRect.top) - wrap.clientHeight / 2 + rowRect.height / 2;
+    row.classList.add('master-row-focus');
+    setTimeout(() => { try { row.classList.remove('master-row-focus'); } catch {} }, 2500);
+  }
 }
 
 let masterRenderTimer = null;
@@ -4477,7 +4665,7 @@ if (els.dlgMediaDrop) {
   });
 }
 
-async function openGiftDialog(gift = null, groupId = null) {
+async function openGiftDialog(gift = null, groupId = null, opts = {}) {
   els.giftDialogTitle.textContent = gift ? 'Sửa quà' : 'Thêm quà';
   els.dlgMatchKeys.value = gift ? gift.matchKeys.join(', ') : '';
   els.dlgAlias.value = gift?.alias || '';
@@ -4509,6 +4697,7 @@ async function openGiftDialog(gift = null, groupId = null) {
   els.giftDialog.dataset.editingGroupId = resolvedGroupId;
   els.dlgMasterFilter.value = '';
   els.dlgMasterSort.value = 'kc-asc';
+  dlgMasterDau = null;
   const multiGift = document.getElementById('dlgMultiGift');
   if (multiGift) multiGift.checked = false;
   // refresh overlay options
@@ -4530,6 +4719,8 @@ async function openGiftDialog(gift = null, groupId = null) {
   ensureMasterLoaded().then(() => {
     renderMasterTable();
     checkIconCacheAndAutoDownload();
+    // Đổi nhanh: cuộn tới quà cùng tầm đậu thay vì hiển thị từ đầu.
+    if (opts && opts.focusDiamonds != null) jumpMasterToDiamonds(opts.focusDiamonds);
   }).catch(e => appendLog(`[master] ${e.message || e}`));
 }
 
@@ -4841,15 +5032,15 @@ function setConnectedUi(yes) {
   isConnected = yes;
   if (els.embedBigoId) {
     els.embedBigoId.disabled = !!yes;
-    els.embedBigoId.title = yes ? 'Đã kết nối. Bấm HỦY KẾT NỐI để nhập BIGO ID khác.' : '';
+    els.embedBigoId.title = yes ? 'Đang LIVE. Bấm NGƯNG LIVE để nhập BIGO ID khác.' : '';
   }
   if (yes) {
-    els.btnConnect.textContent = 'HỦY KẾT NỐI';
+    els.btnConnect.textContent = '⏹ NGƯNG LIVE';
     els.btnConnect.classList.remove('primary');
     els.btnConnect.classList.add('danger');
     els.btnEmbedShow.disabled = false;
   } else {
-    els.btnConnect.textContent = 'KẾT NỐI';
+    els.btnConnect.textContent = '▶ PHÁT LIVE';
     els.btnConnect.classList.add('primary');
     els.btnConnect.classList.remove('danger');
     els.btnEmbedShow.disabled = true;
@@ -4864,7 +5055,7 @@ async function disconnect() {
   els.status.classList.remove('on');
   els.status.classList.remove('connected');
   setConnectedUi(false);
-  setLiveInfo('Đã hủy kết nối. Nhập BIGO ID khác và bấm KẾT NỐI.', '');
+  setLiveInfo('Đã ngưng LIVE. Nhập BIGO ID khác và bấm PHÁT LIVE.', '');
   resetEmbedUi();
 }
 
@@ -4956,6 +5147,11 @@ if (els.btnPopupQueue) els.btnPopupQueue.onclick = () => window.bigo.popupOpenQu
 const btnClearMiniQueue = document.getElementById('btnClearMiniQueue');
 if (btnClearMiniQueue) btnClearMiniQueue.onclick = async () => {
   if (await confirmClearQueue()) clearAllQueue();
+};
+const bulkQueueDeleteCount = document.getElementById('bulkQueueDeleteCount');
+const btnBulkQueueDelete = document.getElementById('btnBulkQueueDelete');
+if (btnBulkQueueDelete && bulkQueueDeleteCount) btnBulkQueueDelete.onclick = async () => {
+  await deleteQueuedItemsFromTop(bulkQueueDeleteCount.value);
 };
 const btnShuffleMiniQueue = document.getElementById('btnShuffleMiniQueue');
 if (btnShuffleMiniQueue) btnShuffleMiniQueue.onclick = () => queueShuffleQueued();
@@ -5579,30 +5775,37 @@ async function handleChatVoice(ev, div) {
   let toRead = serviceContent;
   let readLang = '';
 
-  const needDetect = chatVoice.langPriority.length > 0;
+  // Các bộ lọc nguồn và "bỏ qua ngôn ngữ đích" đều cần nhận diện trước khi TTS.
+  // Nếu không nhận diện được thì bỏ qua để không đọc nhầm ngôn ngữ đã bị chặn.
+  const needDetect = chatVoice.langPriority.length > 0 || chatVoice.skipSelf;
   if (chatVoice.translateOn || needDetect) {
     try {
       const translateTo = getTranslateTarget();
       const r = await window.bigo.translateText({ text: serviceContent, from: 'auto', to: translateTo });
-      if (r && r.ok) {
+      if (!r || !r.ok) {
+        if (needDetect) return;
+      } else {
         const detected = (r.detected || '').toLowerCase();
-        // Ưu tiên ngôn ngữ nguồn: không thuộc list → bỏ qua cả dịch lẫn đọc.
-        if (needDetect && !langInPriority(detected)) return;
+        // Chỉ các ngôn ngữ được chọn mới được dịch hoặc đọc.
+        if (chatVoice.langPriority.length > 0 && !langInPriority(detected)) return;
+        // Bình luận đã là ngôn ngữ đích thì không đưa vào Google TTS.
+        if (chatVoice.skipSelf && sameLang(detected, translateTo)) return;
         if (chatVoice.translateOn && r.text) {
           const translated = r.text.trim();
-          const isSelf = chatVoice.skipSelf && sameLang(detected, translateTo);
-          if (translated && normEv(translated) !== normEv(serviceContent) && !isSelf && div && div.isConnected) {
+          if (translated && normEv(translated) !== normEv(serviceContent) && div && div.isConnected) {
             const t = document.createElement('span');
             t.className = 'chat-translated';
             t.style.cssText = 'color:#7cc6ff; font-style:italic; margin-left:4px';
             t.textContent = '➜ ' + translated;
             div.appendChild(t);
           }
-          toRead = (translated && !isSelf) ? translated : serviceContent;
+          toRead = translated || serviceContent;
           readLang = TTS_LANG_MAP[translateTo] || translateTo;
         }
       }
-    } catch {}
+    } catch {
+      if (needDetect) return;
+    }
   }
 
   if (chatVoice.ttsOn && canRead) {
@@ -6278,6 +6481,7 @@ function openSpecialPicker(targetKey) {
   const sort = document.getElementById('spMasterSort');
   if (filter) filter.value = '';
   if (sort) sort.value = 'kc-asc';
+  spMasterDau = null;
   renderSpecialPickerTable();
   dlg.showModal();
 }
@@ -6467,7 +6671,9 @@ function renderSpecialPickerTable() {
     return;
   }
   if (total) total.textContent = masterFullList.length;
+  renderDauChips(document.getElementById('spMasterDauChips'), spMasterDau, (v) => { spMasterDau = v; renderSpecialPickerTable(); });
   let arr = masterFullList.slice();
+  if (spMasterDau != null) arr = arr.filter(g => Number(g.diamonds) === spMasterDau);
   if (filter) {
     const fnum = parseInt(filter, 10);
     arr = arr.filter(g => {

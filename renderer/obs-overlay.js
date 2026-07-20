@@ -84,6 +84,10 @@ player.addEventListener('error', errored);
 audio.addEventListener('error', errored);
 
 const events = new EventSource(`/events/${encodeURIComponent(overlayId)}?token=${encodeURIComponent(token)}`);
+events.addEventListener('open', () => post('connected'));
+// OBS can keep an SSE TCP socket open while its Browser Source renderer is frozen.
+// This heartbeat lets the app distinguish that state from a usable overlay.
+setInterval(() => post('heartbeat'), 5000);
 events.addEventListener('play', (e) => {
   if (Date.now() < blockPlaysUntil) return;
   const data = JSON.parse(e.data || '{}');

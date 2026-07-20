@@ -43,7 +43,7 @@
       "id": "g_mox9je2347fw",
       "name": "Peo",
       "type": "gift",
-      "enabled": false,
+      "enabled": true,
       "collapsed": false,
       "bigoId": "aaaaa",
       "items": [
@@ -54,12 +54,12 @@
             "Flower"
           ],
           "alias": "💓Heart Rose",
-          "mediaFile": "file:///D:/NPC/Lynn/10. Nét bút.webm",
+          "mediaFile": "file:///D:/NPC/Lynn/Mp3/Người đứng sau hạnh phúc.mp3",
           "mediaFiles": [
-            "file:///D:/NPC/Lynn/10. Nét bút.webm"
+            "file:///D:/NPC/Lynn/Mp3/Người đứng sau hạnh phúc.mp3"
           ],
-          "overlayId": "ov_default",
-          "pauseBgm": false,
+          "overlayId": "",
+          "pauseBgm": true,
           "preEffect": false,
           "background": false,
           "priority": 0
@@ -133,10 +133,8 @@
             "Duck Box"
           ],
           "alias": "Duck Box",
-          "mediaFile": "Do For Love 29s.mp3",
-          "mediaFiles": [
-            "Do For Love 29s.mp3"
-          ],
+          "mediaFile": "",
+          "mediaFiles": [],
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": true,
           "preEffect": true,
@@ -149,10 +147,8 @@
             "Ashkin DINO"
           ],
           "alias": "Galaxy Ring",
-          "mediaFile": "01. Kim Mộc Thủy Hỏa Thổ.webm",
-          "mediaFiles": [
-            "01. Kim Mộc Thủy Hỏa Thổ.webm"
-          ],
+          "mediaFile": "",
+          "mediaFiles": [],
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": true,
           "preEffect": false,
@@ -165,14 +161,12 @@
             "Gold"
           ],
           "alias": "Gold",
-          "mediaFile": "11. Tức Giận.webm",
+          "mediaFile": "",
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": true,
           "preEffect": false,
           "priority": 2,
-          "mediaFiles": [
-            "11. Tức Giận.webm"
-          ]
+          "mediaFiles": []
         },
         {
           "id": "i_moxfttwodyvs",
@@ -198,14 +192,12 @@
             "7511"
           ],
           "alias": "Heart Lock",
-          "mediaFile": "Tơ nhện.webm",
+          "mediaFile": "",
           "overlayId": "ov_mowzeyw8m6as",
           "pauseBgm": false,
           "preEffect": true,
           "priority": 0,
-          "mediaFiles": [
-            "Tơ nhện.webm"
-          ]
+          "mediaFiles": []
         },
         {
           "id": "i_moyckldem98z",
@@ -226,18 +218,19 @@
         {
           "id": "i_moyjykqqw23n",
           "matchKeys": [
-            "501505",
-            "Golden hourglass"
+            "500822",
+            "💐Castle Rendezvous"
           ],
           "alias": "Golden hourglass",
           "mediaFile": "03. Chớp Mắt.webm",
-          "overlayId": "ov_mowzeyw8m6as",
-          "pauseBgm": true,
-          "preEffect": false,
-          "priority": 0,
           "mediaFiles": [
             "03. Chớp Mắt.webm"
-          ]
+          ],
+          "overlayId": "ov_default",
+          "pauseBgm": true,
+          "preEffect": false,
+          "background": false,
+          "priority": 0
         },
         {
           "id": "g_mox4yljml3od",

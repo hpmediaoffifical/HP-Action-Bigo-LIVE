@@ -39,6 +39,7 @@
       <div class="sidebar-spacer"></div>
       <div class="sidebar-utils" aria-label="Tiện ích nhanh">
         <button class="sidebar-tab" id="sidebarBgmToggle" title="Nhạc nền" aria-label="Nhạc nền">♫</button>
+        <button class="sidebar-tab" id="sidebarWindowPreset" title="Đổi nhanh kích thước cửa sổ (Gọn / Vừa / Rộng)" aria-label="Kích thước cửa sổ">📐</button>
         <button class="sidebar-tab" id="sidebarLockSettings" title="Khóa kích thước cửa sổ" aria-label="Khóa kích thước cửa sổ">🔓</button>
       </div>
     </aside>
@@ -49,22 +50,13 @@
       <img class="header-logo" src="../logo-hp.png" alt="HP" />
       <h1>Action <span class="header-brand-sub">BIGO LIVE</span></h1>
     </div>
-    <span class="header-separator" aria-hidden="true"></span>
-    <div class="connect-row header-connect">
-      <span class="status-dot" id="status" title="Chưa kết nối">disconnected</span>
-      <label class="bigo-id-label" for="embedBigoId">BIGO ID:</label>
-      <input id="embedBigoId" placeholder="vd: 1066691535" class="connect-input" />
-      <button id="btnConnect" class="primary">KẾT NỐI</button>
-      <button id="btnEmbedShow" disabled>👁 VIEW</button>
-      <span id="liveInfo" class="live-info-inline" style="display:none"></span>
-      <div class="connect-stats">
-        <span title="Số người xem LIVE hiện tại">👁️ <b id="csViewers">0</b></span>
-        <span title="Số lần đã phát hiệu ứng (kể cả phát thử)">🎵 <b id="csEffects">0</b></span>
-        <span title="Tổng đậu BIGO đã nhận từ live"><span class="bean-icon inline"></span><b id="csDiamond">0</b></span>
-        <span title="Số user khác nhau đã tặng quà">👤 <b id="csUsers">0</b></span>
-        <span title="Tổng số quà đã nhận từ live">🎁 <b id="csGifts">0</b></span>
-        <button id="btnResetStats" class="tiny cs-reset" title="Reset bộ đếm về 0">↺ Reset</button>
-      </div>
+    <div class="connect-stats header-stats" aria-label="Thống kê phiên LIVE">
+      <span title="Số người xem LIVE hiện tại">👁️ <b id="csViewers">0</b></span>
+      <span title="Số lần đã phát hiệu ứng (kể cả phát thử)">🎵 <b id="csEffects">0</b></span>
+      <span title="Tổng đậu BIGO đã nhận từ live"><span class="bean-icon inline"></span><b id="csDiamond">0</b></span>
+      <span title="Số user khác nhau đã tặng quà">👤 <b id="csUsers">0</b></span>
+      <span title="Tổng số quà đã nhận từ live">🎁 <b id="csGifts">0</b></span>
+      <button id="btnResetStats" class="tiny cs-reset" title="Reset bộ đếm về 0">↺</button>
     </div>
     <div id="headerLiveInfo" class="header-live-info" hidden></div>
     <div class="header-license" id="headerLicense" hidden>
@@ -92,10 +84,14 @@
           <div class="panel right-panel-section" data-rps="queue">
             <div class="panel-head">
               <h2>📋 HÀNH ĐỘNG</h2>
-              <div style="display:flex; gap:4px">
+              <div class="queue-panel-actions">
                 <button id="btnShuffleMiniQueue" class="tiny" title="Xúc xắc: trộn ngẫu nhiên danh sách đang chờ">🎲</button>
                 <button id="btnToggleMiniQueue" class="tiny" title="Phát/Tạm dừng hiệu ứng">▶/⏸</button>
                 <button id="btnQueueCardSettings" class="tiny" title="Cài đặt kích thước card quà">⚙</button>
+                <div class="queue-bulk-delete" title="Xoá số lượng hiệu ứng đang chờ, luôn giữ hiệu ứng đang phát hoặc hàng đầu khi tạm dừng">
+                  <input id="bulkQueueDeleteCount" type="number" min="1" max="10000" step="1" value="1" aria-label="Số lượng hiệu ứng chờ cần xoá">
+                  <button id="btnBulkQueueDelete" class="tiny danger" title="Xoá số lượng hiệu ứng đang chờ">🗑 Xoá</button>
+                </div>
                 <button id="btnClearMiniQueue" class="tiny danger" title="Xoá toàn bộ DSHT (sẽ hỏi xác nhận)">🗑 Xoá tất cả</button>
                 <button id="btnPopupQueueRight" class="tiny" title="Mở popup riêng">📤</button>
                 <button class="tiny rps-collapse" data-rps-target="queue" title="Thu gọn / mở">▼</button>
@@ -197,7 +193,7 @@
         </div>
         <div class="icon-cache-bar">
           <span id="iconCacheStatus">Kho icon: chưa kiểm tra</span>
-          <button id="btnDownloadIcons" class="tiny">📥 Tải icon master (2410 quà)</button>
+          <button id="btnDownloadIcons" class="tiny" title="Cập nhật danh sách quà mới nhất từ BIGO rồi tải icon còn thiếu">📥 Tải icon master</button>
           <progress id="iconProgress" value="0" max="100" style="display:none"></progress>
         </div>
         <div class="table-wrap">
@@ -952,6 +948,18 @@
     </section>
 
   </main>
+
+  <!-- =================== FOOTER: KẾT NỐI LIVE + THỐNG KÊ (thanh cố định đáy) =================== -->
+  <footer class="app-footer" aria-label="Kết nối LIVE">
+    <div class="footer-connect">
+      <span class="status-dot" id="status" title="Chưa kết nối">disconnected</span>
+      <label class="bigo-id-label" for="embedBigoId">BIGO ID</label>
+      <input id="embedBigoId" placeholder="ID phòng LIVE" class="connect-input" />
+      <button id="btnConnect" class="primary">▶ PHÁT LIVE</button>
+      <button id="btnEmbedShow" disabled title="Mở cửa sổ xem LIVE">👁 VIEW</button>
+      <span id="liveInfo" class="live-info-inline" style="display:none"></span>
+    </div>
+  </footer>
     </div>
   </div>
   <!-- BGM audio element (hidden) -->
@@ -985,6 +993,10 @@
         <label class="checkbox-row" style="font-size:12px">
           <input type="checkbox" id="spMasterFavOnly" /> ⭐ Chỉ yêu thích
         </label>
+      </div>
+      <div class="dau-chips-row">
+        <span class="dau-chips-label">💰 Lọc nhanh theo đậu:</span>
+        <div id="spMasterDauChips" class="dau-chips"></div>
       </div>
       <div class="master-table-wrap">
         <table class="master-table">
@@ -1036,6 +1048,10 @@
         <label class="checkbox-row" style="font-size:12px" title="Khi tắt, chọn quà mới sẽ thay thế toàn bộ mã/tên quà cũ trong Match keys">
           <input type="checkbox" id="dlgMultiGift" /> Chọn nhiều quà cho 1 hiệu ứng
         </label>
+      </div>
+      <div class="dau-chips-row">
+        <span class="dau-chips-label">💰 Lọc nhanh theo đậu:</span>
+        <div id="dlgMasterDauChips" class="dau-chips"></div>
       </div>
       <div class="master-table-wrap">
         <div id="dlgIconCacheBanner" class="icon-cache-banner" hidden></div>
@@ -1202,29 +1218,29 @@
 
   <!-- =================== DIALOG: Cài đặt Dịch & Đọc nâng cao =================== -->
   <dialog id="voiceSettingsDialog" class="modal">
-    <form method="dialog" style="min-width:520px; max-width:600px">
-      <h3 style="margin:0 0 10px">⚙️ Cài đặt Dịch &amp; Đọc</h3>
+    <form method="dialog" class="voice-settings-form">
+      <h3>⚙️ Cài đặt Dịch &amp; Đọc</h3>
 
-      <fieldset style="border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:10px 12px; margin-bottom:12px">
-        <legend style="padding:0 6px; font-weight:600">🔊 Đọc thành tiếng</legend>
-        <div style="display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13px">
+      <fieldset class="voice-settings-section">
+        <legend>🔊 Đọc thành tiếng</legend>
+        <div class="voice-settings-checks">
           <label><input type="checkbox" id="chatTtsOn"> Bật đọc to bình luận</label>
           <label title="Đọc kèm tên người gửi"><input type="checkbox" id="chatReadName"> Đọc kèm tên người gửi</label>
         </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; font-size:13px; margin-top:10px">
-          <label style="display:flex; flex-direction:column; gap:3px">Giọng đọc
+        <div class="voice-settings-grid voice-settings-top-gap">
+          <label>Giọng đọc
             <select id="chatTtsVoice"><option value="">🌟 Giọng Google (tự nhiên)</option></select>
           </label>
-          <label style="display:flex; flex-direction:column; gap:3px">Tốc độ đọc
+          <label>Tốc độ đọc
             <input type="range" id="chatTtsRate" min="0.5" max="2" step="0.1" value="1">
           </label>
         </div>
       </fieldset>
 
-      <fieldset style="border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:10px 12px; margin-bottom:12px">
-        <legend style="padding:0 6px; font-weight:600">🌐 Ưu tiên ngôn ngữ dịch</legend>
-        <p style="margin:2px 0 8px; font-size:12px; color:#8a8f9a">Chỉ dịch &amp; đọc bình luận thuộc các ngôn ngữ được tích. <b>Không tích gì = dịch tất cả.</b></p>
-        <div id="vsLangPriority" style="display:flex; flex-wrap:wrap; gap:6px 14px; font-size:13px">
+      <fieldset class="voice-settings-section">
+        <legend>🌐 Lọc ngôn ngữ</legend>
+        <p class="voice-settings-hint">Chỉ dịch &amp; đọc ngôn ngữ được tích. <b>Không tích gì = tất cả.</b></p>
+        <div id="vsLangPriority" class="voice-settings-checks voice-settings-languages">
           <label><input type="checkbox" value="en"> English</label>
           <label><input type="checkbox" value="zh-CN"> 中文 (Trung)</label>
           <label><input type="checkbox" value="th"> ไทย (Thái)</label>
@@ -1236,15 +1252,15 @@
           <label><input type="checkbox" value="hi"> हिन्दी (Ấn)</label>
           <label><input type="checkbox" value="es"> Español</label>
         </div>
-        <label style="display:flex; align-items:center; gap:6px; margin-top:10px; font-size:13px">
-          <input type="checkbox" id="vsSkipSelf"> Không dịch nếu bình luận đã đúng ngôn ngữ đích
+        <label class="voice-settings-skip">
+          <input type="checkbox" id="vsSkipSelf"> Bỏ qua cả dịch &amp; đọc nếu đã đúng ngôn ngữ đích
         </label>
       </fieldset>
 
-      <fieldset style="border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:10px 12px; margin-bottom:12px">
-        <legend style="padding:0 6px; font-weight:600">🔊 Ưu tiên đọc &amp; chống spam</legend>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; font-size:13px">
-          <label style="display:flex; flex-direction:column; gap:3px">Ưu tiên đọc cho
+      <fieldset class="voice-settings-section">
+        <legend>🔊 Ưu tiên đọc &amp; chống spam</legend>
+        <div class="voice-settings-grid">
+          <label>Ưu tiên đọc cho
             <select id="vsReadPriority">
               <option value="all">Tất cả bình luận</option>
               <option value="gifters">Chỉ người vừa tặng quà</option>
@@ -1252,7 +1268,7 @@
               <option value="giftersOrVip">Tặng quà hoặc có huy hiệu</option>
             </select>
           </label>
-          <label style="display:flex; flex-direction:column; gap:3px">Chống spam (nghỉ/người)
+          <label>Chống spam (nghỉ/người)
             <select id="vsCooldown">
               <option value="0">Không giới hạn</option>
               <option value="3">3 giây/người</option>
@@ -1262,34 +1278,34 @@
               <option value="10">10 giây/người</option>
             </select>
           </label>
-          <label style="display:flex; flex-direction:column; gap:3px">Âm lượng (<span id="vsVolumeV">100</span>%)
+          <label>Âm lượng (<span id="vsVolumeV">100</span>%)
             <input type="range" id="vsVolume" min="0" max="100" step="5" value="100">
           </label>
         </div>
-        <div style="display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:10px; font-size:13px">
+        <div class="voice-settings-checks voice-settings-top-gap">
           <label><input type="checkbox" id="vsSkipNumberOnly"> Bỏ bình luận chỉ toàn số/ký hiệu</label>
           <label><input type="checkbox" id="vsStripNumbers"> Không đọc dãy số dài (ID, số điện thoại)</label>
         </div>
       </fieldset>
 
-      <fieldset style="border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:10px 12px; margin-bottom:6px">
-        <legend style="padding:0 6px; font-weight:600">📖 Từ điển &amp; từ cấm</legend>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px">
-          <label style="display:flex; flex-direction:column; gap:3px">Thay thế (mỗi dòng: <code>gốc=&gt;thay</code>)
+      <fieldset class="voice-settings-section voice-settings-last-section">
+        <legend>📖 Từ điển &amp; từ cấm</legend>
+        <div class="voice-settings-grid">
+          <label>Thay thế (mỗi dòng: <code>gốc=&gt;thay</code>)
             <textarea id="vsGlossary" rows="4" spellcheck="false" placeholder="hp=>HP Media&#10;ny=>người yêu" style="resize:vertical"></textarea>
           </label>
-          <label style="display:flex; flex-direction:column; gap:3px">Từ cấm bổ sung (mỗi dòng 1 từ)
+          <label>Từ cấm bổ sung (mỗi dòng 1 từ)
             <textarea id="vsBanned" rows="4" spellcheck="false" placeholder="spam&#10;quảng cáo" style="resize:vertical"></textarea>
           </label>
         </div>
-        <div style="display:flex; align-items:center; gap:10px; margin-top:10px; font-size:12px">
+        <div class="voice-settings-sync">
           <button type="button" id="vsForbiddenSync" class="ghost mini">🔄 Đồng bộ từ cấm (Sheet)</button>
-          <span id="vsForbiddenStatus" style="color:#8a8f9a">…</span>
+          <span id="vsForbiddenStatus">…</span>
         </div>
-        <p style="margin:6px 0 0; font-size:11px; color:#8a8f9a">Tự lấy từ Google Sheet tab <b>COMMENT</b>, cột A. Bình luận chứa từ cấm sẽ bị bỏ qua (không dịch/đọc).</p>
+        <p class="voice-settings-note">Tự lấy từ Google Sheet tab <b>COMMENT</b>, cột A. Bình luận chứa từ cấm sẽ bị bỏ qua.</p>
       </fieldset>
 
-      <div class="modal-actions" style="margin-top:12px">
+      <div class="modal-actions voice-settings-actions">
         <button value="cancel">Đóng</button>
         <button class="primary" value="default" id="vsSave">Lưu</button>
       </div>

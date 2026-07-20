@@ -18,6 +18,7 @@ class ObsOverlayServer {
     this.onLog = onLog || (() => {});
     this.server = null;
     this.clients = new Map(); // overlayId -> Set(res)
+    this.clientLastSeen = new Map(); // overlayId -> timestamp from Browser Source heartbeat
     this.gameplayClients = new Set();
     this.rankingClients = new Set();
     this.scoreClients = new Set();
@@ -48,6 +49,7 @@ class ObsOverlayServer {
       for (const res of set) { try { res.end(); } catch {} }
     }
     this.clients.clear();
+    this.clientLastSeen.clear();
     for (const res of this.gameplayClients) { try { res.end(); } catch {} }
     this.gameplayClients.clear();
     for (const res of this.rankingClients) { try { res.end(); } catch {} }
@@ -125,7 +127,10 @@ class ObsOverlayServer {
   }
 
   hasClients(overlayId) {
-    return (this.clients.get(overlayId)?.size || 0) > 0;
+    const hasOpenStream = (this.clients.get(overlayId)?.size || 0) > 0;
+    // An SSE response can stay open after the OBS browser renderer has frozen.
+    // Require a recent client-side heartbeat before treating it as playable.
+    return hasOpenStream && Date.now() - (this.clientLastSeen.get(overlayId) || 0) < 15000;
   }
 
   play(overlayId, absPath) {
@@ -245,7 +250,10 @@ class ObsOverlayServer {
     res.write(`event: set-speed\ndata: ${JSON.stringify({ overlayId, ...(this.speed || { audioRate: 1, videoRate: 1 }) })}\n\n`);
     if (!this.clients.has(overlayId)) this.clients.set(overlayId, new Set());
     this.clients.get(overlayId).add(res);
-    req.on('close', () => this.clients.get(overlayId)?.delete(res));
+    req.on('close', () => {
+      this.clients.get(overlayId)?.delete(res);
+      if ((this.clients.get(overlayId)?.size || 0) === 0) this.clientLastSeen.delete(overlayId);
+    });
   }
 
   _serveGameplayEvents(req, res) {
@@ -339,6 +347,7 @@ class ObsOverlayServer {
     req.on('end', () => {
       let body = {};
       try { body = raw ? JSON.parse(raw) : {}; } catch {}
+      if (body.type === 'connected' || body.type === 'heartbeat') this.clientLastSeen.set(overlayId, Date.now());
       if (body.type === 'effect-ended' || body.type === 'effect-error') this.onEffectEnded({ overlayId, ...body });
       if (body.type === 'queue-empty') this.onQueueEmpty({ overlayId, ...body });
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
