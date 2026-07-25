@@ -1747,6 +1747,92 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .badge-status.done { background: #14161c; color: #555; }
 
 /* ============ Gameplay Overlay Settings ============ */
+.jar-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+  gap: 10px;
+}
+.jar-config-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #2a3140;
+  border-radius: 10px;
+  background: #121722;
+  color: #cfd4df;
+  font-size: 12px;
+}
+.jar-config-grid .jar-switch { flex-direction: row; align-items: center; justify-content: space-between; }
+.jar-config-grid input[type="checkbox"] { width: 40px; height: 20px; accent-color: #ff8a3d; }
+.jar-fx-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; padding: 10px 12px; border: 1px solid #2d3749; border-radius: 10px; background: #101520; }
+.jar-fx-label { font-size: 12px; font-weight: 900; color: #8ad6ff; }
+.jar-fx-btn { padding: 7px 12px; border: 1px solid #3a4a5f; border-radius: 999px; background: linear-gradient(135deg, rgba(255,138,61,.16), rgba(207,62,134,.12)); color: #ffe0c2; font-size: 12px; font-weight: 800; cursor: pointer; transition: transform .08s, background .15s; }
+.jar-fx-btn:hover { background: linear-gradient(135deg, rgba(255,138,61,.30), rgba(207,62,134,.22)); }
+.jar-fx-btn:active { transform: scale(.95); }
+.jar-trigger-box { margin: 0 0 14px; padding: 12px; border: 1px solid #2d3749; border-radius: 10px; background: #101520; }
+.jar-trigger-head { font-size: 13px; font-weight: 900; color: #ffd166; margin-bottom: 10px; display: flex; flex-direction: column; gap: 3px; }
+.jar-trigger-head .hint { color: #9fb0c8; font-weight: 600; }
+.jar-trigger-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.jar-info-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; font-weight: 600; color: #9fb0c8; font-size: 12px; }
+.jar-info-opts label { display: inline-flex; align-items: center; gap: 4px; color: #d5dae7; cursor: pointer; }
+.jar-info-opts input[type="checkbox"] { accent-color: #ff8a3d; }
+.jar-info-opts .primary { margin-left: auto; }
+.jar-obs-feedback.standalone { margin: 8px 0 14px; padding: 8px 12px; border: 1px solid #2d3749; border-radius: 8px; background: #101520; font-size: 12px; font-weight: 700; }
+.jar-trigger-row { display: flex; flex-direction: column; gap: 5px; background: #0b0f18; border: 1px solid #232c3d; border-radius: 8px; padding: 6px 7px; }
+.jt-top { display: flex; align-items: center; gap: 6px; }
+.jar-trigger-custom { background: #090d15; color: #cdd6e6; border: 1px solid #232c3d; border-radius: 6px; padding: 4px 8px; font-size: 11px; }
+.jar-trigger-custom:focus { outline: none; border-color: #ff8a3d; }
+.jar-trigger-name { flex: 0 0 106px; font-size: 12px; font-weight: 800; color: #d5dae7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jar-trigger-pick { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 7px; background: #090d15; color: #cdd6e6; border: 1px solid #2d3749; border-radius: 6px; padding: 4px 6px; cursor: pointer; text-align: left; }
+.jar-trigger-pick:hover { border-color: #ff8a3d; }
+.jar-trigger-pick img { width: 26px; height: 26px; border-radius: 5px; object-fit: contain; background: #05070c; flex: 0 0 26px; }
+.jar-trigger-pick .ph { width: 26px; height: 26px; border-radius: 5px; border: 1px dashed #2d3749; display: grid; place-items: center; flex: 0 0 26px; font-size: 15px; color: #6a7688; }
+.jar-trigger-pick .pick-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 700; }
+.jar-trigger-pick.has-gift .pick-name { color: #ffe07a; }
+.jar-trigger-pick .pick-caret { flex: 0 0 auto; color: #ffb347; font-size: 12px; }
+.jar-trigger-clear { flex: 0 0 auto; background: transparent; border: 0; color: #ff6b6b; font-size: 14px; cursor: pointer; padding: 2px 4px; }
+@media (max-width: 700px) { .jar-trigger-list { grid-template-columns: 1fr; } }
+/* Popup chọn quà nhanh (có icon) */
+.jar-picker { position: fixed; inset: 0; z-index: 1000; background: rgba(2,4,8,.6); display: grid; place-items: center; }
+.jar-picker.hidden { display: none; }
+.jar-picker-panel { width: min(520px, 92vw); max-height: 78vh; display: flex; flex-direction: column; background: #0e131d; border: 1px solid #2d3749; border-radius: 14px; padding: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.jar-picker-head { display: flex; align-items: center; justify-content: space-between; color: #ffd166; font-size: 14px; margin-bottom: 10px; }
+.jar-picker-head button { background: transparent; border: 0; color: #9fb0c8; font-size: 18px; cursor: pointer; }
+#jarPickerSearch { background: #070b12; color: #ffe07a; border: 1px solid #2d3749; border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-bottom: 10px; }
+.jar-picker-list { overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.jar-picker-item { display: flex; align-items: center; gap: 8px; background: #0b0f18; border: 1px solid #232c3d; border-radius: 8px; padding: 6px 8px; cursor: pointer; text-align: left; color: #cdd6e6; }
+.jar-picker-item:hover { border-color: #ff8a3d; background: #131a26; }
+.jar-picker-item img, .jar-picker-item .ph { width: 38px; height: 38px; border-radius: 6px; object-fit: contain; background: #05070c; flex: 0 0 38px; }
+.jar-picker-item .meta { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.jar-picker-item .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 700; }
+.jar-picker-item .sub { color: #ffb347; font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jar-picker-empty { grid-column: 1 / -1; color: #7f8ba0; text-align: center; padding: 20px; }
+@media (max-width: 560px) { .jar-picker-list { grid-template-columns: 1fr; } }
+.jar-obs-link { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; align-items: center; margin: 10px 0 14px; padding: 10px; border: 1px solid #2d3749; border-radius: 10px; background: #101520; color: #8ad6ff; font-size: 12px; font-weight: 800; }
+.jar-obs-link input { min-width: 0; font-family: Consolas, monospace; font-size: 11px; color: #ffe07a; background: #090d15; }
+.jar-obs-feedback { grid-column: 2; min-height: 16px; color: #91a0b8; font-weight: 500; }
+.jar-obs-feedback.ok { color: #73e3a5; }
+.jar-obs-feedback.error { color: #ff9a9a; }
+.jar-workspace { display: grid; grid-template-columns: minmax(260px, .72fr) minmax(400px, 1.28fr); gap: 14px; align-items: start; }
+.jar-live-preview, .jar-controls { border: 1px solid #2d3749; border-radius: 14px; background: #111722; overflow: hidden; }
+.jar-live-preview-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid #2a3242; color: #ffe07a; font-size: 13px; }
+.jar-live-preview-head span { color: #8a96aa; font: 11px Consolas, monospace; }
+.jar-preview-frame { position: relative; aspect-ratio: 9 / 16; overflow: hidden; touch-action: none; background-color: #111722; background-image: linear-gradient(45deg, #161e2c 25%, transparent 25%), linear-gradient(-45deg, #161e2c 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #161e2c 75%), linear-gradient(-45deg, transparent 75%, #161e2c 75%); background-size: 24px 24px; background-position: 0 0, 0 12px, 12px -12px, -12px 0; }
+.jar-preview-jar { position: absolute; transform: translate(-50%, -50%); cursor: grab; filter: drop-shadow(0 8px 10px rgba(0,0,0,.45)); user-select: none; }
+.jar-preview-jar:active, .jar-preview-jar.dragging { cursor: grabbing; }
+.jar-preview-jar.is-hidden { opacity: .22; filter: grayscale(1) drop-shadow(0 8px 10px rgba(0,0,0,.45)); }
+.jar-preview-jar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+.jar-preview-bottom { z-index: 1; }
+.jar-preview-glass { z-index: 3; }
+.jar-preview-drag-icon { position: absolute; z-index: 4; top: 50%; left: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: rgba(13,18,30,.66); border: 1px solid rgba(255,255,255,.55); color: #fff; font-size: 18px; opacity: .82; pointer-events: none; }
+.jar-preview-hint { position: absolute; z-index: 5; right: 8px; bottom: 8px; left: 8px; padding: 6px 8px; border-radius: 7px; background: rgba(8,12,21,.78); color: #dce8fb; font-size: 11px; text-align: center; pointer-events: none; }
+.jar-controls { padding: 12px; }
+.jar-controls-title { margin-bottom: 10px; color: #ff8a3d; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
+.jar-test-field { display: flex; align-items: center; gap: 10px; margin-top: 12px; color: #aeb6c7; font-size: 12px; }
+.jar-test-field input { width: 120px; }
+@media (max-width: 980px) { .jar-workspace { grid-template-columns: 1fr; } .jar-live-preview { max-width: 380px; margin: 0 auto; width: 100%; } }
+@media (max-width: 600px) { .jar-config-grid { grid-template-columns: 1fr; } .jar-obs-link { grid-template-columns: 1fr; } .jar-obs-feedback { grid-column: auto; } }
 .gameplay-section-title {
   margin: 16px 0 8px;
   color: #ff8a3d;

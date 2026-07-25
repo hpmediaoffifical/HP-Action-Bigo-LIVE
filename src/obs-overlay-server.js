@@ -9,10 +9,13 @@ const MIME = {
 };
 
 class ObsOverlayServer {
-  constructor({ root, port = 18181, token, onEffectEnded, onQueueEmpty, onLog }) {
+  constructor({ root, assetsRoot, port = 18181, token, onEffectEnded, onQueueEmpty, onLog }) {
     this.root = root;
+    this.assetsRoot = assetsRoot || path.join(root, 'assets');
     this.port = port;
     this.token = token || crypto.randomBytes(18).toString('hex');
+    // Đổi mỗi lần mở app → overlay OBS phát hiện instance mới thì tự reload (khỏi bấm Reset OBS).
+    this.instanceId = crypto.randomBytes(6).toString('hex');
     this.onEffectEnded = onEffectEnded || (() => {});
     this.onQueueEmpty = onQueueEmpty || (() => {});
     this.onLog = onLog || (() => {});
@@ -20,12 +23,15 @@ class ObsOverlayServer {
     this.clients = new Map(); // overlayId -> Set(res)
     this.clientLastSeen = new Map(); // overlayId -> timestamp from Browser Source heartbeat
     this.gameplayClients = new Set();
+    this.jarClients = new Set();
     this.rankingClients = new Set();
     this.scoreClients = new Set();
     this.pkDuoClients = new Set();
     this.heartClients = new Set();
     this.gameplayConfig = { items: [], orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', uppercase: false, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, slots: [] };
     this.gameplayCounts = {};
+    this.jarConfig = { enabled: true, visible: true, xPercent: 81, yPercent: 83, height: 500, dropHeight: 80, minIcon: 66, maxIcon: 124, gravity: 4, bounce: 0.55, friction: 0.11, showAvatar: true, showCount: true, theme: 'yellow' };
+    this.jarInfo = []; // danh sách quà kích hoạt hiệu ứng để show overlay thông tin
     this.rankingState = {};
     this.scoreState = {};
     this.pkDuoState = {};
@@ -52,6 +58,8 @@ class ObsOverlayServer {
     this.clientLastSeen.clear();
     for (const res of this.gameplayClients) { try { res.end(); } catch {} }
     this.gameplayClients.clear();
+    for (const res of this.jarClients) { try { res.end(); } catch {} }
+    this.jarClients.clear();
     for (const res of this.rankingClients) { try { res.end(); } catch {} }
     this.rankingClients.clear();
     for (const res of this.scoreClients) { try { res.end(); } catch {} }
@@ -70,6 +78,14 @@ class ObsOverlayServer {
 
   getGameplayUrl() {
     return `http://127.0.0.1:${this.port}/gameplay?token=${encodeURIComponent(this.token)}`;
+  }
+
+  getJarUrl() {
+    return `http://127.0.0.1:${this.port}/jar?token=${encodeURIComponent(this.token)}`;
+  }
+
+  getJarInfoUrl() {
+    return `http://127.0.0.1:${this.port}/jar-info?token=${encodeURIComponent(this.token)}`;
   }
 
   getScoreUrl() {
@@ -154,6 +170,32 @@ class ObsOverlayServer {
     for (const overlayId of this.clients.keys()) this._send(overlayId, 'set-speed', this.speed);
   }
 
+  setJarConfig(cfg) {
+    this.jarConfig = { ...this.jarConfig, ...(cfg || {}) };
+    this._sendJar('config', this.jarConfig);
+  }
+
+  sendJarGift(ev) {
+    this._sendJar('gift', ev || {});
+  }
+
+  clearJar() {
+    this._sendJar('clear', {});
+  }
+
+  sendJarAction(type, count) {
+    this._sendJar('action', { type, count: Math.max(1, parseInt(count, 10) || 1) });
+  }
+
+  reloadJar() {
+    this._sendJar('reload', {});
+  }
+
+  setJarInfo(list) {
+    this.jarInfo = Array.isArray(list) ? list : [];
+    this._sendJar('info', this.jarInfo);
+  }
+
   _send(overlayId, event, data) {
     const set = this.clients.get(overlayId);
     if (!set || set.size === 0) return;
@@ -164,6 +206,11 @@ class ObsOverlayServer {
   _sendGameplay(event, data) {
     const body = `event: ${event}\ndata: ${JSON.stringify(data || {})}\n\n`;
     for (const res of this.gameplayClients) { try { res.write(body); } catch {} }
+  }
+
+  _sendJar(event, data) {
+    const body = `event: ${event}\ndata: ${JSON.stringify(data || {})}\n\n`;
+    for (const res of this.jarClients) { try { res.write(body); } catch {} }
   }
 
   _sendScore(event, data) {
@@ -201,6 +248,9 @@ class ObsOverlayServer {
     if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remote)) return this._reject(res, 403, 'localhost only');
     if (req.method === 'GET' && reqUrl.pathname === '/obs-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'obs-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/gameplay-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'gameplay-overlay.js'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/jar-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'jar-overlay.js'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/matter.min.js') return this._serveFile(path.join(this.root, 'renderer', 'matter.min.js'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/jar-info.js') return this._serveFile(path.join(this.root, 'renderer', 'jar-info-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'ranking-overlay.js'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-overlay.css') return this._serveFile(path.join(this.root, 'renderer', 'ranking-overlay.css'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-grid-overlay.js') return this._serveFile(path.join(this.root, 'renderer', 'ranking-grid-overlay.js'), res);
@@ -220,6 +270,10 @@ class ObsOverlayServer {
     if (req.method === 'GET' && reqUrl.pathname.startsWith('/overlay/')) return this._serveOverlay(reqUrl, res);
     if (req.method === 'GET' && reqUrl.pathname === '/gameplay') return this._serveFile(path.join(this.root, 'renderer', 'gameplay-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/gameplay-events') return this._serveGameplayEvents(req, res);
+    if (req.method === 'GET' && reqUrl.pathname === '/jar') return this._serveFile(path.join(this.root, 'renderer', 'jar-overlay.html'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/jar-info') return this._serveFile(path.join(this.root, 'renderer', 'jar-info-overlay.html'), res);
+    if (req.method === 'GET' && reqUrl.pathname === '/jar-events') return this._serveJarEvents(req, res);
+    if (req.method === 'GET' && reqUrl.pathname.startsWith('/jar-assets/')) return this._serveJarAsset(reqUrl, res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking') return this._serveFile(path.join(this.root, 'renderer', 'ranking-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-grid') return this._serveFile(path.join(this.root, 'renderer', 'ranking-grid-overlay.html'), res);
     if (req.method === 'GET' && reqUrl.pathname === '/ranking-events') return this._serveRankingEvents(req, res);
@@ -265,6 +319,20 @@ class ObsOverlayServer {
     res.write(`event: counts\ndata: ${JSON.stringify(this.gameplayCounts || {})}\n\n`);
     this.gameplayClients.add(res);
     req.on('close', () => this.gameplayClients.delete(res));
+  }
+
+  _serveJarEvents(req, res) {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    // hello mang instanceId của phiên app hiện tại → overlay tự reload khi app khởi động lại
+    // (instanceId đổi) mà không cần vào OBS bấm Reset.
+    res.write(`event: hello\ndata: ${JSON.stringify({ iid: this.instanceId })}\n\n`);
+    res.write(`event: config\ndata: ${JSON.stringify(this.jarConfig)}\n\n`);
+    res.write(`event: info\ndata: ${JSON.stringify(this.jarInfo)}\n\n`);
+    this.jarClients.add(res);
+    req.on('close', () => this.jarClients.delete(res));
   }
 
   _serveScoreEvents(req, res) {
@@ -338,6 +406,13 @@ class ObsOverlayServer {
     if (!fs.existsSync(filePath)) return this._reject(res, 404, 'icon not found');
     res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400, immutable', 'X-Content-Type-Options': 'nosniff' });
     fs.createReadStream(filePath).pipe(res);
+  }
+
+  _serveJarAsset(reqUrl, res) {
+    const name = decodeURIComponent(reqUrl.pathname.split('/')[2] || '');
+    if (!['jar-bottom.png', 'jar-glass.png', 'jar-glass_blue.png', 'jar-glass_cam.png', 'jar-glass_green.png', 'jar-glass_pink.png', 'jar-glass_tim.png', 'jar-glass_yellow.png'].includes(name)) return this._reject(res, 404, 'asset not found');
+    const filePath = path.join(this.assetsRoot, 'jar', name);
+    this._serveFile(filePath, res);
   }
 
   _handleEvent(reqUrl, req, res) {

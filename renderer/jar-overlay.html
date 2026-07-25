@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>HP Action - Hũ Thủy Tinh</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background: transparent;
+      text-rendering: geometricPrecision;
+      -webkit-font-smoothing: antialiased;
+    }
+    #stage { position: fixed; inset: 0; display: grid; place-items: center; background: transparent; }
+    #content {
+      position: relative;
+      width: 1080px; height: 1920px;
+      transform: scale(var(--scale, 1));
+      transform-origin: center;
+      will-change: transform;
+      backface-visibility: hidden;
+    }
+    /* Đáy hũ nằm dưới quà; kính hũ nằm trên quà → quà trông như nằm TRONG hũ.
+       Quà tràn ra ngoài rơi xuống đáy overlay không bị kính che vì kính chỉ phủ vùng hũ. */
+    #content img.jar-layer {
+      position: absolute; pointer-events: none;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: high-quality;
+    }
+    #content img.jar-bottom { z-index: 2; }
+    #content canvas.gift-canvas { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; }
+    #content img.jar-glass { z-index: 4; }
+    #content canvas.fx-canvas { position: absolute; inset: 0; z-index: 5; width: 100%; height: 100%; pointer-events: none; }
+    /* Lớp nhân vật (trộm / osin / đĩa bay) — hoạt cảnh nhiều pha bằng DOM + CSS. */
+    #content #actorLayer { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+    #actorLayer .actor { position: absolute; transform: translate(-50%, -50%); will-change: left, top, transform; }
+    #actorLayer .actor .emoji { font: 118px "Segoe UI Emoji", serif; line-height: 1; filter: drop-shadow(0 6px 10px rgba(0,0,0,.55)); }
+    #actorLayer .actor .label { margin-top: 4px; text-align: center; color: #ffd166; font: 900 26px "Segoe UI", sans-serif; text-shadow: 0 3px 8px rgba(0,0,0,.8); white-space: nowrap; }
+    #actorLayer .actor .cargo { position: absolute; left: 50%; top: 78%; transform: translate(-50%, 0); display: flex; gap: 4px; }
+    #actorLayer .actor .cargo img { width: 46px; height: 46px; border-radius: 50%; }
+    #actorLayer .rope { position: absolute; width: 4px; background: linear-gradient(#e9d7a0, #b99a52); transform: translateX(-50%); transform-origin: top center; box-shadow: 0 0 4px rgba(0,0,0,.5); }
+    #actorLayer .ufo-beam { position: absolute; transform: translateX(-50%); transform-origin: top center; background: linear-gradient(rgba(120,220,255,.55), rgba(120,220,255,0)); clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%); opacity: .85; }
+    #actorLayer .osin-walk .emoji { animation: osinWalk .5s infinite; }
+    @keyframes osinWalk { 0%,100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+    #content.jar-flying img.jar-bottom, #content.jar-flying img.jar-glass { transition: transform .55s cubic-bezier(.3,.7,.4,1), opacity .3s ease; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div id="content">
+      <img class="jar-layer jar-bottom" id="jarBottom" />
+      <canvas class="gift-canvas" id="jarCanvas" width="1080" height="1920"></canvas>
+      <img class="jar-layer jar-glass" id="jarGlass" />
+      <canvas class="fx-canvas" id="fxCanvas" width="1080" height="1920"></canvas>
+      <div id="actorLayer"></div>
+    </div>
+  </div>
+  <script src="/matter.min.js"></script>
+  <script src="/jar-overlay.js"></script>
+</body>
+</html>

@@ -1193,7 +1193,9 @@ function runSpecialFeatureAction(key, ev, cfg, sourceGroup = null) {
 function checkGroupSpecialEffectsTriggers(ev) {
   const all = appSettings?.groupSpecialEffects || {};
   let triggered = false;
-  for (const group of (mapping.groups || []).filter(g => isGroupSpecialRunnable(g))) {
+  // Trigger của nhóm chỉ có hiệu lực khi nhóm đang bật. Nhóm chung luôn active.
+  // Trước đây nhóm đã tắt vẫn có thể chạy special effect, trái với trạng thái UI.
+  for (const group of (mapping.groups || []).filter(g => isGroupSpecialActive(g))) {
     const groupCfg = all[group.id];
     if (!groupCfg) continue;
     const features = groupCfg.features || {};
@@ -1208,7 +1210,6 @@ function checkGroupSpecialEffectsTriggers(ev) {
 }
 
 function checkLegacySpecialEffectsTriggers(ev) {
-  if (hasGroupSpecialEffectsState()) return false;
   const common = getCommonGroup();
   const commonFeatures = getGroupSpecialConfig(common.id, false)?.features || {};
   let triggered = false;
@@ -1592,6 +1593,7 @@ const els = {
   gameplayTextFont: $('gameplayTextFont'), gameplayTextColor: $('gameplayTextColor'), gameplaySlotNumberColor: $('gameplaySlotNumberColor'), gameplayCountColor: $('gameplayCountColor'), gameplayUppercase: $('gameplayUppercase'), gameplayShowName: $('gameplayShowName'), gameplayShowCount: $('gameplayShowCount'),
   gameplayCenterLargest: $('gameplayCenterLargest'), gameplayGrayInactive: $('gameplayGrayInactive'), gameplayKeepScore: $('gameplayKeepScore'),
   gameplayReview: $('gameplayReview'), gameplayGridEditor: $('gameplayGridEditor'), gameplayItems: $('gameplayItems'), btnGameplayAddCol: $('btnGameplayAddCol'), btnGameplayAddRow: $('btnGameplayAddRow'), btnGameplayDelCol: $('btnGameplayDelCol'), btnGameplayDelRow: $('btnGameplayDelRow'), btnGameplaySave: $('btnGameplaySave'), btnGameplayCopyUrl: $('btnGameplayCopyUrl'),
+  jarEnabled: $('jarEnabled'), jarVisible: $('jarVisible'), jarShowAvatar: $('jarShowAvatar'), jarShowCount: $('jarShowCount'), jarTheme: $('jarTheme'), jarX: $('jarX'), jarXVal: $('jarXVal'), jarY: $('jarY'), jarYVal: $('jarYVal'), jarHeight: $('jarHeight'), jarHeightVal: $('jarHeightVal'), jarDropHeight: $('jarDropHeight'), jarDropHeightVal: $('jarDropHeightVal'), jarMinIcon: $('jarMinIcon'), jarMinIconVal: $('jarMinIconVal'), jarMaxIcon: $('jarMaxIcon'), jarMaxIconVal: $('jarMaxIconVal'), jarGravity: $('jarGravity'), jarGravityVal: $('jarGravityVal'), jarBounce: $('jarBounce'), jarBounceVal: $('jarBounceVal'), jarFriction: $('jarFriction'), jarFrictionVal: $('jarFrictionVal'), jarPreview: $('jarPreview'), jarPreviewJar: $('jarPreviewJar'), jarPreviewGlass: $('jarPreviewGlass'), jarObsUrl: $('jarObsUrl'), jarObsFeedback: $('jarObsFeedback'), btnJarSave: $('btnJarSave'), btnJarCopyUrl: $('btnJarCopyUrl'), btnJarClear: $('btnJarClear'), btnJarTest: $('btnJarTest'),
   scoreHours: $('scoreHours'), scoreMinutes: $('scoreMinutes'), scoreSeconds: $('scoreSeconds'), scoreDelay: $('scoreDelay'), scoreTarget: $('scoreTarget'), scoreMemberGroup: $('scoreMemberGroup'), scoreMember: $('scoreMember'), scoreContent: $('scoreContent'), scoreCreatorName: $('scoreCreatorName'), scoreCreatorAvatar: $('scoreCreatorAvatar'), scoreTimeColor: $('scoreTimeColor'), scoreContentColor: $('scoreContentColor'), scoreOverColor: $('scoreOverColor'), scoreBarColor1: $('scoreBarColor1'), scoreBarColor2: $('scoreBarColor2'), scoreWaveColor: $('scoreWaveColor'), scoreBigGiftThreshold: $('scoreBigGiftThreshold'), scorePrepSeconds: $('scorePrepSeconds'), scoreThemePreset: $('scoreThemePreset'), scoreBarStyle: $('scoreBarStyle'), scoreOverlaySize: $('scoreOverlaySize'), scoreCustomMilestones: $('scoreCustomMilestones'), scoreShowGiftUser: $('scoreShowGiftUser'), scoreShowMissing: $('scoreShowMissing'), scoreShowTopUsers: $('scoreShowTopUsers'), scoreShowSpeed: $('scoreShowSpeed'), scoreCompactMode: $('scoreCompactMode'), scoreHideAvatar: $('scoreHideAvatar'), scoreHideCreator: $('scoreHideCreator'), scoreStartSoundLabel: $('scoreStartSoundLabel'), scoreWarningSoundLabel: $('scoreWarningSoundLabel'), scoreGoalSoundLabel: $('scoreGoalSoundLabel'), scoreSuccessSoundLabel: $('scoreSuccessSoundLabel'), scoreFailSoundLabel: $('scoreFailSoundLabel'), btnScorePickStartSound: $('btnScorePickStartSound'), btnScoreClearStartSound: $('btnScoreClearStartSound'), btnScorePickWarningSound: $('btnScorePickWarningSound'), btnScoreClearWarningSound: $('btnScoreClearWarningSound'), btnScorePickGoalSound: $('btnScorePickGoalSound'), btnScoreClearGoalSound: $('btnScoreClearGoalSound'), btnScorePickSuccessSound: $('btnScorePickSuccessSound'), btnScoreClearSuccessSound: $('btnScoreClearSuccessSound'), btnScorePickFailSound: $('btnScorePickFailSound'), btnScoreClearFailSound: $('btnScoreClearFailSound'), btnScoreStart: $('btnScoreStart'), btnScoreStop: $('btnScoreStop'), btnScoreReset: $('btnScoreReset'), scoreTestPoints: $('scoreTestPoints'), btnScoreTest: $('btnScoreTest'), btnScoreTestBig: $('btnScoreTestBig'), btnScoreTestWarning: $('btnScoreTestWarning'), btnScoreTestSuccess: $('btnScoreTestSuccess'), btnScoreTestFail: $('btnScoreTestFail'), btnScoreCopyUrl: $('btnScoreCopyUrl'), scorePreview: $('scorePreview'), scoreReviewStatus: $('scoreReviewStatus'), scoreReviewStats: $('scoreReviewStats'), scoreGiftLog: $('scoreGiftLog'), scoreUserTotals: $('scoreUserTotals'),
   // Gift dialog extras
   dlgPauseBgm: $('dlgPauseBgm'), dlgPreFx: $('dlgPreFx'), dlgBackground: $('dlgBackground'),
@@ -2922,6 +2924,7 @@ async function init() {
   renderQueueCards();
   renderSettingsGroupsList();
   renderConfigExportGroups();
+  renderJarUi();
   renderGameplayUi();
   renderRankingMemberSelectors();
   renderRankingEditor();
@@ -3436,6 +3439,269 @@ function renderGroupsInto(container, opts) {
     const groupNames = (mapping.groups || []).map(g => g.name).filter(Boolean);
     els.groupList.innerHTML = groupNames.map(g => `<option value="${escapeHtml(g)}"></option>`).join('');
   }
+}
+
+// =================== Hũ Thủy Tinh ===================
+const JAR_THEMES = new Set(['default', 'blue', 'green', 'orange', 'pink', 'purple', 'yellow']);
+const JAR_THEME_FILES = { default: 'jar-glass.png', blue: 'jar-glass_blue.png', green: 'jar-glass_green.png', orange: 'jar-glass_cam.png', pink: 'jar-glass_pink.png', purple: 'jar-glass_tim.png', yellow: 'jar-glass_yellow.png' };
+
+function normalizeJarNumber(value, fallback, min, max) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback;
+}
+
+function normalizeJarSettings() {
+  const jar = appSettings.jar || (appSettings.jar = {});
+  jar.enabled = jar.enabled !== false;
+  jar.visible = jar.visible !== false;
+  jar.xPercent = normalizeJarNumber(jar.xPercent, 81, 10, 90);
+  jar.yPercent = normalizeJarNumber(jar.yPercent, 83, 15, 90);
+  jar.height = normalizeJarNumber(jar.height, 500, 220, 900);
+  jar.dropHeight = normalizeJarNumber(jar.dropHeight, 80, 80, 1200);
+  jar.minIcon = normalizeJarNumber(jar.minIcon, 66, 18, 100);
+  jar.maxIcon = Math.max(jar.minIcon, normalizeJarNumber(jar.maxIcon, 124, 40, 220));
+  jar.gravity = normalizeJarNumber(jar.gravity, 4, 1, 4);
+  jar.bounce = normalizeJarNumber(jar.bounce, 0.55, 0, 0.9);
+  jar.friction = normalizeJarNumber(jar.friction, 0.11, 0, 0.2);
+  jar.showAvatar = jar.showAvatar !== false;
+  jar.showCount = jar.showCount !== false;
+  if (!JAR_THEMES.has(jar.theme)) jar.theme = 'yellow';
+  if (!jar.effectGifts || typeof jar.effectGifts !== 'object') jar.effectGifts = {};
+  if (!jar.effectNames || typeof jar.effectNames !== 'object') jar.effectNames = {};   // tên tự đặt cho mỗi hiệu ứng
+  if (!jar.infoShow || typeof jar.infoShow !== 'object') jar.infoShow = {};
+  jar.infoShow = { custom: jar.infoShow.custom === true, giftName: jar.infoShow.giftName === true, effect: jar.infoShow.effect !== false }; // mặc định chỉ hiện tên hiệu ứng
+  return jar;
+}
+
+// Danh sách hiệu ứng có thể gán quà kích hoạt.
+const JAR_EFFECTS = [
+  { key: 'shake', label: '🫨 Rung hũ' }, { key: 'gravflip', label: '🔃 Đảo trọng lực' },
+  { key: 'magnet', label: '🧲 Nam châm' }, { key: 'pourout', label: '🪣 Dốc ngược' },
+  { key: 'kick', label: '🦶 Đá hũ' },
+  { key: 'thief', label: '🦹 Kẻ trộm' }, { key: 'ufo', label: '🛸 Đĩa bay hút' },
+];
+
+function setJarObsFeedback(text, kind = '') {
+  if (!els.jarObsFeedback) return;
+  els.jarObsFeedback.textContent = text;
+  els.jarObsFeedback.className = `jar-obs-feedback standalone${kind ? ` ${kind}` : ''}`;
+}
+
+function sendJarConfig() {
+  if (window.bigo.jarConfig) window.bigo.jarConfig(normalizeJarSettings()).catch(() => {});
+}
+
+async function loadJarPreview() {
+  if (!window.bigo.jarGetUrl) return;
+  const result = await window.bigo.jarGetUrl().catch(e => ({ ok: false, error: e.message }));
+  if (!result?.ok) {
+    setJarObsFeedback(result?.error || 'Không lấy được URL OBS.', 'error');
+    return;
+  }
+  if (els.jarObsUrl) els.jarObsUrl.value = result.url;
+  setJarObsFeedback('URL sẵn sàng. Dán vào Browser Source trong OBS.', 'ok');
+}
+
+function renderJarPreview(jar) {
+  if (!els.jarPreviewJar) return;
+  const width = jar.height * (1024 / 1536);
+  els.jarPreviewJar.style.left = `${jar.xPercent}%`;
+  els.jarPreviewJar.style.top = `${jar.yPercent}%`;
+  els.jarPreviewJar.style.width = `${width / 1080 * 100}%`;
+  els.jarPreviewJar.style.height = `${jar.height / 1920 * 100}%`;
+  els.jarPreviewJar.classList.toggle('is-hidden', !jar.visible);
+  const source = `../assets/jar/${JAR_THEME_FILES[jar.theme] || JAR_THEME_FILES.default}`;
+  if (els.jarPreviewGlass && els.jarPreviewGlass.getAttribute('src') !== source) els.jarPreviewGlass.setAttribute('src', source);
+}
+
+function renderJarUi() {
+  const jar = normalizeJarSettings();
+  if (els.jarEnabled) els.jarEnabled.checked = jar.enabled;
+  if (els.jarVisible) els.jarVisible.checked = jar.visible;
+  if (els.jarShowAvatar) els.jarShowAvatar.checked = jar.showAvatar;
+  if (els.jarShowCount) els.jarShowCount.checked = jar.showCount;
+  if (els.jarTheme) els.jarTheme.value = jar.theme;
+  const fields = [
+    ['jarX', 'jarXVal', 'xPercent', '%'], ['jarY', 'jarYVal', 'yPercent', '%'],
+    ['jarHeight', 'jarHeightVal', 'height', 'px'], ['jarDropHeight', 'jarDropHeightVal', 'dropHeight', 'px'], ['jarMinIcon', 'jarMinIconVal', 'minIcon', 'px'],
+    ['jarMaxIcon', 'jarMaxIconVal', 'maxIcon', 'px'], ['jarGravity', 'jarGravityVal', 'gravity', '×'],
+    ['jarBounce', 'jarBounceVal', 'bounce', ''], ['jarFriction', 'jarFrictionVal', 'friction', ''],
+  ];
+  for (const [inputName, valueName, key, suffix] of fields) {
+    const input = els[inputName];
+    const value = els[valueName];
+    if (input) input.value = jar[key];
+    if (value) value.textContent = `${jar[key]}${suffix}`;
+  }
+  const infoShow = jar.infoShow || {};
+  const setBox = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
+  setBox('jarInfoCustom', infoShow.custom);
+  setBox('jarInfoGiftName', infoShow.giftName);
+  setBox('jarInfoEffect', infoShow.effect !== false);
+  renderJarPreview(jar);
+  renderJarTriggers();
+  pushJarInfoOverlay();
+  sendJarConfig();
+  loadJarPreview();
+}
+
+function jarGiftById(id) {
+  if (id == null || !masterFullList) return null;
+  return masterFullList.find(x => idsEqual(x.typeid, id)) || null;
+}
+function jarGiftIconById(id) { const m = jarGiftById(id); return m ? (m.localIcon || m.img_url || '') : ''; }
+
+function renderJarTriggers() {
+  const box = document.getElementById('jarTriggerList');
+  if (!box) return;
+  const jar = normalizeJarSettings();
+  const map = jar.effectGifts || {};
+  const names = jar.effectNames || {};
+  box.innerHTML = JAR_EFFECTS.map(fx => {
+    const gid = map[fx.key];
+    const gift = gid != null ? jarGiftById(gid) : null;
+    const icon = gift ? (gift.localIcon || gift.img_url || '') : '';
+    const name = gift ? (gift.name || `#${gid}`) : 'Chọn quà…';
+    const custom = names[fx.key] || '';
+    return `<div class="jar-trigger-row">
+      <div class="jt-top">
+        <span class="jar-trigger-name">${fx.label}</span>
+        <button type="button" class="jar-trigger-pick${gift ? ' has-gift' : ''}" data-effect="${fx.key}" title="Bấm để chọn quà">
+          ${icon ? `<img src="${escapeHtml(icon)}" alt="">` : '<span class="ph">＋</span>'}
+          <span class="pick-name">${escapeHtml(name)}</span>
+          <span class="pick-caret">▾</span>
+        </button>
+        <button type="button" class="jar-trigger-clear" data-effect="${fx.key}" title="Bỏ gán">✕</button>
+      </div>
+      <input type="text" class="jar-trigger-custom" data-effect="${fx.key}" maxlength="40" placeholder="✎ Tên tự đặt (tuỳ chọn) — vd: ${escapeHtml(fx.label.replace(/^\S+\s/, ''))}" value="${escapeHtml(custom)}" />
+    </div>`;
+  }).join('');
+}
+
+async function setJarTrigger(effect, giftId) {
+  const jar = normalizeJarSettings();
+  const map = { ...(jar.effectGifts || {}) };
+  if (giftId == null) delete map[effect]; else map[effect] = giftId;
+  await saveJarSettings({ effectGifts: map });
+  pushJarInfoOverlay();
+}
+
+// ===== Popup chọn quà nhanh (có icon) =====
+let jarPickerEffect = null;
+function renderJarPickerList(filter) {
+  const list = document.getElementById('jarPickerList');
+  if (!list) return;
+  if (!masterFullList) { list.innerHTML = '<div class="jar-picker-empty">Đang tải danh sách quà…</div>'; return; }
+  const f = String(filter || '').trim().toLowerCase();
+  let items = masterFullList.filter(g => Number(g.typeid) > 0);
+  if (f) items = items.filter(g => String(g.name || '').toLowerCase().includes(f) || String(g.typeid).includes(f));
+  const shown = items.slice(0, 150);
+  list.innerHTML = shown.map(g => {
+    const icon = g.localIcon || g.img_url || '';
+    const db = Math.max(1, Math.round(Number(g.diamonds) || 1));
+    return `<button type="button" class="jar-picker-item" data-gid="${g.typeid}">
+      ${icon ? `<img src="${escapeHtml(icon)}" loading="lazy" alt="">` : '<span class="ph"></span>'}
+      <span class="meta"><span class="nm">${escapeHtml(g.name || 'Quà')}</span><span class="sub">#${g.typeid} · ${db.toLocaleString('vi-VN')} Đậu</span></span>
+    </button>`;
+  }).join('') || '<div class="jar-picker-empty">Không tìm thấy quà.</div>';
+}
+async function openJarPicker(effect) {
+  jarPickerEffect = effect;
+  const pop = document.getElementById('jarGiftPicker');
+  const label = document.getElementById('jarPickerEffect');
+  const search = document.getElementById('jarPickerSearch');
+  if (label) label.textContent = JAR_FX_LABELS[effect] || effect;
+  if (search) search.value = '';
+  if (pop) pop.classList.remove('hidden');
+  await ensureMasterLoaded();
+  renderJarPickerList('');
+  if (search) search.focus();
+}
+function closeJarPicker() {
+  const pop = document.getElementById('jarGiftPicker');
+  if (pop) pop.classList.add('hidden');
+  jarPickerEffect = null;
+}
+
+// Danh sách quà kích hoạt → overlay thông tin OBS.
+// Mỗi item có mảng lines (dòng đầu = tiêu đề, các dòng sau = phụ) tuỳ 3 nút tích + tên tự đặt.
+function buildJarInfoList() {
+  const jar = normalizeJarSettings();
+  const map = jar.effectGifts || {};
+  const names = jar.effectNames || {};
+  const show = jar.infoShow || { effect: true };
+  const out = [];
+  for (const fx of JAR_EFFECTS) {
+    const gid = map[fx.key];
+    if (gid == null) continue;
+    const g = jarGiftById(gid);
+    const custom = String(names[fx.key] || '').trim();
+    const lines = [];
+    if (show.custom && custom) lines.push(custom);   // tên tự đặt ưu tiên lên đầu
+    if (show.giftName && g) lines.push(g.name || `#${gid}`);
+    if (show.effect) lines.push(fx.label);
+    if (!lines.length) lines.push(custom || fx.label); // luôn có ít nhất 1 dòng
+    out.push({ id: gid, img: g ? (g.img_url || '') : '', lines });
+  }
+  return out;
+}
+async function setJarEffectName(effect, text) {
+  const jar = normalizeJarSettings();
+  const names = { ...(jar.effectNames || {}) };
+  const t = String(text || '').trim();
+  if (!t) delete names[effect]; else names[effect] = t;
+  await saveJarSettings({ effectNames: names });
+  pushJarInfoOverlay();
+}
+async function setJarInfoShow(patch) {
+  const jar = normalizeJarSettings();
+  await saveJarSettings({ infoShow: { ...(jar.infoShow || {}), ...patch } });
+  pushJarInfoOverlay();
+}
+function pushJarInfoOverlay() {
+  if (window.bigo.jarInfo) window.bigo.jarInfo(buildJarInfoList()).catch(() => {});
+}
+
+// Quà LIVE trùng gán → chạy hiệu ứng (count = số lần tặng/combo). Trả true nếu đã kích hoạt.
+function forwardJarEffectTrigger(ev) {
+  if (!ev || ev.type !== 'gift' || !normalizeJarSettings().enabled || !window.bigo.jarAction) return false;
+  const map = normalizeJarSettings().effectGifts || {};
+  const evId = getEventGiftId(ev);
+  if (evId == null) return false;
+  for (const [effect, gid] of Object.entries(map)) {
+    if (gid != null && idsEqual(gid, evId)) {
+      const count = Math.max(1, giftTotalCountFromEvent(ev) || 1);
+      window.bigo.jarAction(effect, count).catch(() => {});
+      return true;
+    }
+  }
+  return false;
+}
+
+async function saveJarSettings(patch) {
+  appSettings.jar = { ...normalizeJarSettings(), ...patch };
+  normalizeJarSettings();
+  await saveAppSettings({ jar: appSettings.jar });
+  renderJarUi();
+}
+
+function forwardJarGiftEvent(ev) {
+  if (!ev || ev.type !== 'gift' || !normalizeJarSettings().enabled || !window.bigo.jarEvent) return;
+  const count = Math.max(1, giftTotalCountFromEvent(ev) || 1);
+  let diamonds = giftDiamondPointsFromEvent(ev);
+  if (!diamonds) {
+    const mappedGift = findGiftByEvent(ev);
+    diamonds = Math.max(1, (getItemDiamonds(mappedGift) || 1) * count);
+  }
+  window.bigo.jarEvent({
+    gift_id: getEventGiftId(ev),
+    gift_name: ev.gift_name || getEventGiftNames(ev)[0] || 'Quà',
+    gift_icon: getEventGiftIcon(ev),
+    gift_count: count,
+    diamonds,
+    user: ev.user || '',
+    user_avatar_url: resolveAvatarForUser(ev.user, ev.user_avatar_url),
+  }).catch(() => {});
 }
 
 // =================== Gameplay Overlay ===================
@@ -4355,6 +4621,9 @@ async function ensureMasterLoaded() {
   masterFullList = await window.bigo.giftsMasterList();
   // Sau khi master load, re-render gift table để show icons
   renderGiftTable();
+  // Preview quà gán hiệu ứng cần master → render lại khi có dữ liệu.
+  try { renderJarTriggers(); } catch {}
+  try { if (jarPickerEffect) renderJarPickerList(document.getElementById('jarPickerSearch')?.value || ''); } catch {}
 }
 
 function sortMasterArr(arr, key) {
@@ -6107,6 +6376,8 @@ function renderParsed(ev) {
       addReceivedGift(ev);
       // Gameplay overlay chỉ nhận bản sao event, không tác động queue/effect pipeline.
       forwardGameplayGiftEvent(ev);
+      // Quà đã gán hiệu ứng → chạy hiệu ứng (không rơi vào hũ). Ngược lại rơi vào hũ như thường.
+      if (!forwardJarEffectTrigger(ev)) forwardJarGiftEvent(ev);
     }
     if (ev.type === 'gift' && matched && canPlayEffectItem(matched)) {
       // Mỗi quà/combo tương ứng 1 hàng hành động. Ví dụ Bell x10 → 10 hàng.
@@ -6219,6 +6490,7 @@ let appSettings = {
   bgm: { file: null, fileName: '', volume: 80, deviceId: 'default' },
   preFx: { enabled: false, file: null, fileName: '' },  // Âm thanh phát trước hiệu ứng
   gameplay: { groupId: '', useCommonGroup: true, orientation: 'horizontal', labelPosition: 'bottom', nameMode: 'marquee', cardBg: '#8d8d8d', cardOpacity: 86, textFont: 'Segoe UI', textColor: '#ffffff', slotNumberColor: '#ffffff', countColor: '#ffffff', countSize: 12, uppercase: false, showName: true, showCount: true, iconSize: 54, itemGap: 10, enlargeActive: false, activeScale: 140, centerLargest: false, grayInactive: false, keepScore: false, gridCols: 5, gridRows: 1, gridSlots: [], order: [], hiddenIds: [] },
+  jar: { enabled: true, visible: true, xPercent: 72, yPercent: 72, height: 560, dropHeight: 420, minIcon: 34, maxIcon: 118, gravity: 1, bounce: 0.35, friction: 0.04, showAvatar: true, showCount: true, theme: 'default' },
   ranking: { title: 'Ranking list', memberGroupId: '', rows: [], activeId: '', running: false, linkScoreTimer: true, roundSeconds: 60, streakSeconds: 12, streakColor: '#67e8f9', grayLosers: true, showRank: true, showAvatar: true, showGift: true, showRound: true, hideAllScores: false, rankStart: 1, rankEnd: 20, gridRows: 3, gridCols: 3, gridFlow: 'row', nameMode: 'two-line', overlayBgColor: '#2a2d37', overlayBgOpacity: 74, showVerticalPreview: true, showGridPreview: true, compactPreview: true },
   pkDuo: { running: false, status: 'idle', prepSeconds: 10, delaySeconds: 5, durationSeconds: 60, endsAt: 0, teamA: { name: 'ĐỘI A', content: 'HP Media', color: '#d8587c', giftIds: ['', '', ''] }, teamB: { name: 'ĐỘI B', content: 'HP Media', color: '#6380ff', giftIds: ['', '', ''] }, scoreA: 0, scoreB: 0, joinMode: false, userTeams: {}, bgColor: '#000000', bgOpacity: 88, giftSize: 46, content: 'Vui lòng chờ', textSize: 21, startSound: '', startSoundName: '', warningSound: '', warningSoundName: '', teamASound: '', teamASoundName: '', teamBSound: '', teamBSoundName: '', drawSound: '', drawSoundName: '' },
   scoreVote: { hours: 0, minutes: 3, seconds: 0, delaySeconds: 5, target: 30000, memberGroupId: '', memberId: '', content: 'Kêu gọi điểm ĐẬU', creatorName: 'Creator', creatorAvatar: '', timeColor: '#ffffff', contentColor: '#f0eef6', overColor: '#ff0000', barColor1: '#b93678', barColor2: '#ff8ed1', waveColor: '#ffffff', bigGiftThreshold: 500, prepSeconds: 3, themePreset: 'custom', barStyle: 'pill', overlaySize: 'medium', customMilestones: '', showGiftUser: true, showMissing: true, showTopUsers: true, showSpeed: true, compactMode: false, hideAvatar: false, hideCreator: false, startSound: '', startSoundName: '', warningSound: '', warningSoundName: '', goalSound: '', goalSoundName: '', successSound: '', successSoundName: '', failSound: '', failSoundName: '' },
@@ -6249,6 +6521,7 @@ async function saveAppSettings(patch) {
     if (patch.bgm) s.bgm = { ...(s.bgm || {}), ...patch.bgm };
     if (patch.preFx) s.preFx = { ...(s.preFx || {}), ...patch.preFx };
     if (patch.gameplay) s.gameplay = { ...(s.gameplay || {}), ...patch.gameplay };
+    if (patch.jar) s.jar = { ...(s.jar || {}), ...patch.jar };
     if (patch.ranking) s.ranking = { ...(s.ranking || {}), ...patch.ranking };
     if (patch.pkDuo) s.pkDuo = { ...(s.pkDuo || {}), ...patch.pkDuo };
     if (patch.scoreVote) s.scoreVote = { ...(s.scoreVote || {}), ...patch.scoreVote };
@@ -6358,6 +6631,7 @@ async function initAppSettings(s) {
   appSettings.bgm = { ...appSettings.bgm, ...(s.bgm || {}) };
   appSettings.preFx = { ...appSettings.preFx, ...(s.preFx || {}) };
   appSettings.gameplay = { ...appSettings.gameplay, ...(s.gameplay || {}) };
+  appSettings.jar = { ...appSettings.jar, ...(s.jar || {}) };
   appSettings.ranking = { ...appSettings.ranking, ...(s.ranking || {}) };
   appSettings.ranking.rows = Array.isArray(appSettings.ranking.rows) ? appSettings.ranking.rows : [];
   appSettings.pkDuo = { ...appSettings.pkDuo, ...(s.pkDuo || {}) };
@@ -6619,17 +6893,13 @@ function hasMeaningfulLegacySpecialConfig(key, cfg) {
   return false;
 }
 
-function hasGroupSpecialEffectsState() {
-  const groupEffects = appSettings?.groupSpecialEffects;
-  return !!(groupEffects && typeof groupEffects === 'object' && Object.keys(groupEffects).length > 0);
-}
-
 function migrateLegacySpecialEffectsToCommonGroup() {
-  if (hasGroupSpecialEffectsState()) return false;
   const common = getCommonGroup();
   const commonCfg = getGroupSpecialConfig(common.id);
   let changed = false;
   for (const key of SE_GROUP_KEYS) {
+    // Migrate theo từng tính năng, không bỏ qua toàn bộ legacy config chỉ vì
+    // một nhóm khác đã có feature. Đây là trạng thái phổ biến sau khi nâng cấp.
     if (commonCfg.features[key]) continue;
     const legacy = appSettings.specialEffects?.[key];
     if (!hasMeaningfulLegacySpecialConfig(key, legacy)) continue;
@@ -7364,6 +7634,7 @@ function _applyAndScheduleSpeedAxis(axis, key, cfgOverride = null) {
   // Apply theo axis
   if (axis === 'audio') applyAudioSpeed(factor);
   else if (axis === 'all') applyAllMediaSpeed(factor);
+  appendLog(`[se:${key}] ${axis === 'audio' ? 'MP3 effects' : 'MP3/video/BGM'} → ×${factor} trong ${duration}s`);
   const state = _speedAxisState[axis];
   state.endsAt = Date.now() + duration * 1000;
   state.timer = setTimeout(() => {
@@ -8688,6 +8959,184 @@ function openPkDuoGiftPicker(side, idx) {
       document.addEventListener('pointerdown', closePkDuoPickerOnPointer, true);
       document.addEventListener('contextmenu', closePkDuoPickerOnPointer, true);
     }, 0);
+  });
+}
+
+let jarPreviewDrag = null;
+function jarPreviewPoint(event) {
+  const rect = els.jarPreview?.getBoundingClientRect();
+  if (!rect) return null;
+  return {
+    x: (event.clientX - rect.left) / rect.width * 1080,
+    y: (event.clientY - rect.top) / rect.height * 1920,
+  };
+}
+
+function setJarPreviewPosition(xPercent, yPercent, save = false) {
+  const jar = normalizeJarSettings();
+  const width = jar.height * (1024 / 1536);
+  const minX = Math.max(10, width / 2 / 1080 * 100);
+  const maxX = Math.min(90, 100 - minX);
+  const minY = Math.max(15, jar.height / 2 / 1920 * 100);
+  const maxY = Math.min(90, 100 - minY);
+  jar.xPercent = Math.max(minX, Math.min(maxX, xPercent));
+  jar.yPercent = Math.max(minY, Math.min(maxY, yPercent));
+  if (els.jarX) els.jarX.value = jar.xPercent;
+  if (els.jarXVal) els.jarXVal.textContent = `${Math.round(jar.xPercent)}%`;
+  if (els.jarY) els.jarY.value = jar.yPercent;
+  if (els.jarYVal) els.jarYVal.textContent = `${Math.round(jar.yPercent)}%`;
+  renderJarPreview(jar);
+  sendJarConfig();
+  if (save) saveJarSettings({ xPercent: jar.xPercent, yPercent: jar.yPercent }).catch(e => alert('Lỗi lưu vị trí Hũ Thủy Tinh: ' + e.message));
+}
+
+function initJarPreviewDrag() {
+  const stage = els.jarPreview;
+  if (!stage) return;
+  stage.addEventListener('pointerdown', event => {
+    const point = jarPreviewPoint(event);
+    const jar = normalizeJarSettings();
+    if (!point) return;
+    const width = jar.height * (1024 / 1536);
+    const left = 1080 * jar.xPercent / 100 - width / 2;
+    const top = 1920 * jar.yPercent / 100 - jar.height / 2;
+    if (point.x < left || point.x > left + width || point.y < top || point.y > top + jar.height) return;
+    jarPreviewDrag = { pointerId: event.pointerId, offsetX: point.x - 1080 * jar.xPercent / 100, offsetY: point.y - 1920 * jar.yPercent / 100 };
+    stage.setPointerCapture(event.pointerId);
+    stage.style.cursor = 'grabbing';
+    els.jarPreviewJar?.classList.add('dragging');
+    event.preventDefault();
+  });
+  stage.addEventListener('pointermove', event => {
+    const point = jarPreviewPoint(event);
+    const jar = normalizeJarSettings();
+    if (!point) return;
+    if (!jarPreviewDrag) {
+      const width = jar.height * (1024 / 1536);
+      const left = 1080 * jar.xPercent / 100 - width / 2;
+      const top = 1920 * jar.yPercent / 100 - jar.height / 2;
+      stage.style.cursor = point.x >= left && point.x <= left + width && point.y >= top && point.y <= top + jar.height ? 'grab' : 'default';
+      return;
+    }
+    setJarPreviewPosition((point.x - jarPreviewDrag.offsetX) / 1080 * 100, (point.y - jarPreviewDrag.offsetY) / 1920 * 100);
+    event.preventDefault();
+  });
+  const finish = event => {
+    if (!jarPreviewDrag || event.pointerId !== jarPreviewDrag.pointerId) return;
+    try { stage.releasePointerCapture(event.pointerId); } catch {}
+    jarPreviewDrag = null;
+    stage.style.cursor = 'grab';
+    els.jarPreviewJar?.classList.remove('dragging');
+    const jar = normalizeJarSettings();
+    setJarPreviewPosition(jar.xPercent, jar.yPercent, true);
+  };
+  stage.addEventListener('pointerup', finish);
+  stage.addEventListener('pointercancel', finish);
+}
+initJarPreviewDrag();
+
+function wireJarRange(input, key, valueEl, suffix) {
+  if (!input) return;
+  input.addEventListener('input', () => {
+    appSettings.jar[key] = Number(input.value);
+    normalizeJarSettings();
+    if (valueEl) valueEl.textContent = `${appSettings.jar[key]}${suffix}`;
+    sendJarConfig();
+  });
+  input.addEventListener('change', () => saveJarSettings({ [key]: Number(input.value) }).catch(e => alert('Lỗi lưu Hũ Thủy Tinh: ' + e.message)));
+}
+if (els.jarEnabled) els.jarEnabled.addEventListener('change', () => saveJarSettings({ enabled: els.jarEnabled.checked }).catch(e => alert('Lỗi lưu Hũ Thủy Tinh: ' + e.message)));
+if (els.jarVisible) els.jarVisible.addEventListener('change', () => saveJarSettings({ visible: els.jarVisible.checked }).catch(e => alert('Lỗi lưu Hũ Thủy Tinh: ' + e.message)));
+if (els.jarShowAvatar) els.jarShowAvatar.addEventListener('change', () => saveJarSettings({ showAvatar: els.jarShowAvatar.checked }).catch(e => alert('Lỗi lưu Hũ Thủy Tinh: ' + e.message)));
+if (els.jarShowCount) els.jarShowCount.addEventListener('change', () => saveJarSettings({ showCount: els.jarShowCount.checked }).catch(e => alert('Lỗi lưu Hũ Thủy Tinh: ' + e.message)));
+if (els.jarTheme) els.jarTheme.addEventListener('change', () => saveJarSettings({ theme: els.jarTheme.value }).catch(e => alert('Lỗi lưu Hũ Thủy Tinh: ' + e.message)));
+wireJarRange(els.jarX, 'xPercent', els.jarXVal, '%');
+wireJarRange(els.jarY, 'yPercent', els.jarYVal, '%');
+wireJarRange(els.jarHeight, 'height', els.jarHeightVal, 'px');
+wireJarRange(els.jarDropHeight, 'dropHeight', els.jarDropHeightVal, 'px');
+wireJarRange(els.jarMinIcon, 'minIcon', els.jarMinIconVal, 'px');
+wireJarRange(els.jarMaxIcon, 'maxIcon', els.jarMaxIconVal, 'px');
+wireJarRange(els.jarGravity, 'gravity', els.jarGravityVal, '×');
+wireJarRange(els.jarBounce, 'bounce', els.jarBounceVal, '');
+wireJarRange(els.jarFriction, 'friction', els.jarFrictionVal, '');
+if (els.btnJarSave) els.btnJarSave.onclick = () => saveJarSettings({}).then(() => appendLog('[hũ] đã lưu và cập nhật OBS overlay')).catch(e => alert('Lỗi lưu Hũ Thủy Tinh: ' + e.message));
+if (els.btnJarCopyUrl) els.btnJarCopyUrl.onclick = async () => {
+  sendJarConfig();
+  const r = await window.bigo.jarCopyUrl().catch(e => ({ ok: false, error: e.message }));
+  if (r?.ok) {
+    if (els.jarObsUrl) els.jarObsUrl.value = r.url;
+    setJarObsFeedback('Đã copy URL. Trong OBS: Add Browser Source rồi dán URL này.', 'ok');
+    appendLog('[hũ] đã copy link OBS: ' + r.url);
+    showToast({ key: 'jar-obs-url', title: 'Đã copy link OBS', body: 'Thêm Browser Source trong OBS và dán link vừa copy.', type: 'info', ttl: 7000, throttle: 0 });
+  } else {
+    setJarObsFeedback(r?.error || 'Không copy được link Hũ Thủy Tinh.', 'error');
+    alert(r?.error || 'Không copy được link Hũ Thủy Tinh');
+  }
+};
+if (els.btnJarClear) els.btnJarClear.onclick = () => window.bigo.jarClear().then(() => setJarObsFeedback('Đã xóa toàn bộ quà và thống kê trong hũ.', 'ok')).catch(() => setJarObsFeedback('Không xóa được hũ.', 'error'));
+if (els.btnJarTest) els.btnJarTest.onclick = () => {
+  // Quà ngẫu nhiên từ danh mục, dùng ĐÚNG số Đậu thật của quà → cỡ icon tự scale (1 Đậu nhỏ, quà lớn to).
+  const pool = (masterFullList || []).filter(item => Number(item.typeid) > 0);
+  const gift = pool.length ? pool[Math.floor(Math.random() * pool.length)] : { typeid: 1, name: 'Flower', diamonds: 1 };
+  const diamonds = Math.max(1, Math.round(Number(gift.diamonds) || 1));
+  window.bigo.jarEvent({ gift_id: gift.typeid, gift_name: gift.name || 'Quà thử', gift_count: 1, diamonds, user: 'HP Test' })
+    .then(() => setJarObsFeedback(`Đã thả quà thử: ${gift.name || 'Quà'} (${diamonds.toLocaleString('vi-VN')} Đậu).`, 'ok'))
+    .catch(() => setJarObsFeedback('Không gửi được quà thử.', 'error'));
+};
+
+// Hiệu ứng tác động hũ — gửi lệnh xuống overlay OBS.
+const JAR_FX_LABELS = { shake: 'Rung hũ', gravflip: 'Đảo trọng lực', magnet: 'Nam châm', pourout: 'Dốc ngược', kick: 'Đá hũ', thief: 'Kẻ trộm', ufo: 'Đĩa bay hút' };
+document.querySelectorAll('.jar-fx-btn[data-jar-action]').forEach(btn => {
+  btn.onclick = () => {
+    if (!window.bigo.jarAction) return;
+    const type = btn.dataset.jarAction;
+    window.bigo.jarAction(type)
+      .then(() => setJarObsFeedback(`Đã kích hoạt: ${JAR_FX_LABELS[type] || type}.`, 'ok'))
+      .catch(() => setJarObsFeedback('Không gửi được hiệu ứng.', 'error'));
+  };
+});
+
+// Gán / bỏ gán icon quà kích hoạt hiệu ứng — bấm ô quà mở popup chọn nhanh có icon.
+const jarTriggerList = document.getElementById('jarTriggerList');
+if (jarTriggerList) {
+  jarTriggerList.addEventListener('click', (e) => {
+    const pick = e.target.closest('.jar-trigger-pick');
+    if (pick) { openJarPicker(pick.dataset.effect); return; }
+    const clear = e.target.closest('.jar-trigger-clear');
+    if (clear) setJarTrigger(clear.dataset.effect, null).then(() => setJarObsFeedback(`Đã bỏ gán ${JAR_FX_LABELS[clear.dataset.effect] || clear.dataset.effect}.`, 'ok'));
+  });
+  jarTriggerList.addEventListener('change', (e) => {
+    const input = e.target.closest('.jar-trigger-custom');
+    if (input) setJarEffectName(input.dataset.effect, input.value);
+  });
+}
+// 3 nút tích: overlay DANH SÁCH hiện tên tự đặt / tên quà / tên hiệu ứng.
+for (const [id, key] of [['jarInfoCustom', 'custom'], ['jarInfoGiftName', 'giftName'], ['jarInfoEffect', 'effect']]) {
+  const box = document.getElementById(id);
+  if (box) box.addEventListener('change', () => setJarInfoShow({ [key]: box.checked }));
+}
+document.getElementById('btnJarInfoCopyUrl')?.addEventListener('click', () => {
+  if (!window.bigo.jarInfoCopyUrl) return;
+  window.bigo.jarInfoCopyUrl()
+    .then(r => setJarObsFeedback(r?.ok ? 'Đã copy link overlay DANH SÁCH. Dán vào Browser Source mới trong OBS.' : 'Không lấy được link.', r?.ok ? 'ok' : 'error'))
+    .catch(() => setJarObsFeedback('Không lấy được link.', 'error'));
+});
+const jarGiftPicker = document.getElementById('jarGiftPicker');
+if (jarGiftPicker) {
+  const search = document.getElementById('jarPickerSearch');
+  if (search) search.addEventListener('input', () => renderJarPickerList(search.value));
+  document.getElementById('jarPickerClose')?.addEventListener('click', closeJarPicker);
+  jarGiftPicker.addEventListener('click', (e) => { if (e.target === jarGiftPicker) closeJarPicker(); }); // bấm nền ngoài → đóng
+  document.getElementById('jarPickerList')?.addEventListener('click', (e) => {
+    const item = e.target.closest('.jar-picker-item');
+    if (!item || !jarPickerEffect) return;
+    const gid = Number(item.dataset.gid);
+    const effect = jarPickerEffect;
+    setJarTrigger(effect, gid).then(() => {
+      const g = jarGiftById(gid);
+      setJarObsFeedback(`Đã gán "${g?.name || gid}" → ${JAR_FX_LABELS[effect] || effect}.`, 'ok');
+    });
+    closeJarPicker();
   });
 }
 

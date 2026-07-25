@@ -28,6 +28,7 @@
     <aside class="sidebar">
       <button class="tab sidebar-tab active" data-tab="embed" title="TƯƠNG TÁC" aria-label="TƯƠNG TÁC">💬</button>
       <button class="tab sidebar-tab" data-tab="gifts" title="BẢNG QUÀ" aria-label="BẢNG QUÀ">🎁</button>
+      <button class="tab sidebar-tab" data-tab="jar" title="HŨ THỦY TINH" aria-label="HŨ THỦY TINH">🫙</button>
       <button class="tab sidebar-tab" data-tab="gameplay" title="GROUP DANCE" aria-label="GROUP DANCE">👯</button>
       <button class="tab sidebar-tab" data-tab="ranking" title="BẢNG XẾP HẠNG" aria-label="BẢNG XẾP HẠNG">👑</button>
       <button class="tab sidebar-tab" data-tab="pkduo" title="PK ĐÔI" aria-label="PK ĐÔI">⚔️</button>
@@ -250,6 +251,96 @@
             </thead>
             <tbody id="scanNewTableBody"></tbody>
           </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================== TAB: HŨ THỦY TINH =================== -->
+    <section class="tab-panel" data-tab="jar">
+      <div class="panel jar-panel">
+        <div class="panel-head">
+          <h2>🫙 HŨ THỦY TINH</h2>
+          <div style="display:flex;gap:8px">
+            <button id="btnJarClear" class="danger">🗑 Xóa hũ</button>
+            <button id="btnJarTest" type="button">🎁 Test quà</button>
+            <button id="btnJarSave" class="primary">💾 LƯU</button>
+            <button id="btnJarCopyUrl" class="primary">🔗 Copy link OBS</button>
+          </div>
+        </div>
+        <div class="hint small panel-hint">Mọi quà BIGO đã nhận đều rơi vào hũ. Icon tăng cỡ theo số Đậu, va chạm trong thân hũ; hũ đầy thì quà tràn ra ngoài, nằm ở đáy overlay.</div>
+        <div class="jar-fx-bar" role="group" aria-label="Hiệu ứng tác động hũ">
+          <span class="jar-fx-label">✨ Hiệu ứng:</span>
+          <button type="button" class="jar-fx-btn" data-jar-action="shake">🫨 Rung hũ</button>
+          <button type="button" class="jar-fx-btn" data-jar-action="gravflip">🔃 Đảo trọng lực</button>
+          <button type="button" class="jar-fx-btn" data-jar-action="magnet">🧲 Nam châm</button>
+          <button type="button" class="jar-fx-btn" data-jar-action="pourout">🪣 Dốc ngược</button>
+          <button type="button" class="jar-fx-btn" data-jar-action="kick">🦶 Đá hũ</button>
+          <button type="button" class="jar-fx-btn" data-jar-action="thief">🦹 Kẻ trộm</button>
+          <button type="button" class="jar-fx-btn" data-jar-action="ufo">🛸 Đĩa bay hút</button>
+        </div>
+        <div class="jar-trigger-box">
+          <div class="jar-trigger-head">🎯 Gán icon quà kích hoạt hiệu ứng
+            <span class="hint small">Bấm ô quà để chọn nhanh (có icon + số Đậu). Tặng quà đã gán → hiệu ứng tự chạy. Tặng 10 / combo 10 → 10 lượt lần lượt. Các hiệu ứng khác nhau chạy đồng thời.</span>
+            <div class="jar-info-opts">
+              <span>Overlay DANH SÁCH hiện:</span>
+              <label><input type="checkbox" id="jarInfoCustom" /> Tên tự đặt</label>
+              <label><input type="checkbox" id="jarInfoGiftName" /> Tên quà</label>
+              <label><input type="checkbox" id="jarInfoEffect" checked /> Tên hiệu ứng</label>
+              <button id="btnJarInfoCopyUrl" type="button" class="primary">🔗 DANH SÁCH (OBS)</button>
+            </div>
+          </div>
+          <div id="jarTriggerList" class="jar-trigger-list"></div>
+        </div>
+        <div id="jarGiftPicker" class="jar-picker hidden">
+          <div class="jar-picker-panel">
+            <div class="jar-picker-head"><b>Chọn quà cho <span id="jarPickerEffect"></span></b><button id="jarPickerClose" type="button">✕</button></div>
+            <input id="jarPickerSearch" type="text" placeholder="🔍 Tìm theo tên hoặc ID quà…" />
+            <div id="jarPickerList" class="jar-picker-list"></div>
+          </div>
+        </div>
+        <div id="jarObsFeedback" class="jar-obs-feedback standalone">Bấm 🔗 Copy link OBS để chép URL Hũ.</div>
+        <div class="jar-workspace">
+          <div class="jar-live-preview">
+            <div class="jar-live-preview-head"><b>Preview kéo thả</b><span>1080 × 1920</span></div>
+            <div id="jarPreview" class="jar-preview-frame" title="Kéo hũ đến vị trí mong muốn">
+              <div id="jarPreviewJar" class="jar-preview-jar">
+                <img class="jar-preview-bottom" src="../assets/jar/jar-bottom.png" alt="" />
+                <img id="jarPreviewGlass" class="jar-preview-glass" src="../assets/jar/jar-glass.png" alt="Hũ Thủy Tinh" />
+                <span class="jar-preview-drag-icon">✥</span>
+              </div>
+              <div class="jar-preview-hint">Kéo trực tiếp hũ để đổi vị trí OBS</div>
+            </div>
+          </div>
+          <div class="jar-controls">
+            <div class="jar-controls-title">Cài đặt hũ</div>
+            <div class="jar-config-grid">
+              <label class="jar-switch"><span>Bật Hũ Thủy Tinh</span><input id="jarEnabled" type="checkbox" checked /></label>
+              <label class="jar-switch"><span>Hiện khung hũ</span><input id="jarVisible" type="checkbox" checked /></label>
+              <label class="jar-switch"><span>Treo avatar người tặng</span><input id="jarShowAvatar" type="checkbox" checked /></label>
+              <label class="jar-switch"><span>Hiện số Đậu</span><input id="jarShowCount" type="checkbox" checked /></label>
+              <label>Theme hũ
+                <select id="jarTheme">
+                  <option value="default">Mặc định</option>
+                  <option value="blue">Xanh dương</option>
+                  <option value="green">Xanh lá</option>
+                  <option value="orange">Cam</option>
+                  <option value="pink">Hồng</option>
+                  <option value="purple">Tím</option>
+                  <option value="yellow">Vàng</option>
+                </select>
+              </label>
+              <label>Vị trí ngang <span id="jarXVal">81%</span><input id="jarX" type="range" min="10" max="90" value="81" /></label>
+              <label>Vị trí dọc <span id="jarYVal">83%</span><input id="jarY" type="range" min="15" max="90" value="83" /></label>
+              <label>Chiều cao hũ <span id="jarHeightVal">500px</span><input id="jarHeight" type="range" min="220" max="900" step="10" value="500" /></label>
+              <label>Độ cao rơi <span id="jarDropHeightVal">80px</span><input id="jarDropHeight" type="range" min="80" max="1200" step="20" value="80" /></label>
+              <label>Quà nhỏ <span id="jarMinIconVal">66px</span><input id="jarMinIcon" type="range" min="18" max="100" value="66" /></label>
+              <label>Quà lớn <span id="jarMaxIconVal">124px</span><input id="jarMaxIcon" type="range" min="40" max="220" value="124" /></label>
+              <label>Tốc độ rơi <span id="jarGravityVal">4×</span><input id="jarGravity" type="range" min="1" max="4" step="0.1" value="4" /></label>
+              <label>Độ nảy <span id="jarBounceVal">0.55</span><input id="jarBounce" type="range" min="0" max="0.9" step="0.05" value="0.55" /></label>
+              <label>Ma sát <span id="jarFrictionVal">0.11</span><input id="jarFriction" type="range" min="0" max="0.2" step="0.01" value="0.11" /></label>
+            </div>
+            <div class="hint small">Bấm 🎁 Test quà để thả một quà ngẫu nhiên — cỡ icon theo đúng số Đậu thật của quà đó.</div>
+          </div>
         </div>
       </div>
     </section>

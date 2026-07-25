@@ -835,6 +835,7 @@ app.whenReady().then(async () => {
   const obsCfg = ensureObsOverlaySettings();
   obsOverlayServer = new ObsOverlayServer({
     root: ROOT,
+    assetsRoot: SHIPPED_ASSETS_DIR,
     port: obsCfg.port || 18181,
     token: obsCfg.token,
     onEffectEnded: ({ overlayId }) => {
@@ -1272,7 +1273,12 @@ ipcMain.handle('bigo:start', async (_e, opts) => {
     },
     onLog: (msg) => { if (win && !win.isDestroyed()) win.webContents.send('bigo:log', msg); },
   });
-  try { await client.start(); return { ok: true, gameSess: client.gameSess }; }
+  try {
+    await client.start();
+    // Kết nối LIVE thành công → tự reset Hũ (xoá quà/thống kê phiên cũ) cho phiên mới, khỏi vào OBS bấm Reset.
+    if (obsOverlayServer) { try { obsOverlayServer.clearJar(); } catch {} }
+    return { ok: true, gameSess: client.gameSess };
+  }
   catch (e) { return { ok: false, error: e.message }; }
 });
 ipcMain.handle('bigo:stop', async () => {
@@ -2188,6 +2194,42 @@ ipcMain.handle('gameplay:counts', (_e, counts) => {
 ipcMain.handle('gameplay:event', (_e, ev) => {
   if (obsOverlayServer) obsOverlayServer.sendGameplayEvent(ev);
   return { ok: true };
+});
+ipcMain.handle('jar:get-url', () => {
+  if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
+  return { ok: true, url: obsOverlayServer.getJarUrl() };
+});
+ipcMain.handle('jar:copy-url', () => {
+  if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
+  const url = obsOverlayServer.getJarUrl();
+  clipboard.writeText(url);
+  return { ok: true, url };
+});
+ipcMain.handle('jar:config', (_e, cfg) => {
+  if (obsOverlayServer) obsOverlayServer.setJarConfig(cfg);
+  return { ok: true };
+});
+ipcMain.handle('jar:event', (_e, ev) => {
+  if (obsOverlayServer) obsOverlayServer.sendJarGift(ev);
+  return { ok: true };
+});
+ipcMain.handle('jar:clear', () => {
+  if (obsOverlayServer) obsOverlayServer.clearJar();
+  return { ok: true };
+});
+ipcMain.handle('jar:action', (_e, type, count) => {
+  if (obsOverlayServer) obsOverlayServer.sendJarAction(type, count);
+  return { ok: true };
+});
+ipcMain.handle('jar:info', (_e, list) => {
+  if (obsOverlayServer) obsOverlayServer.setJarInfo(list);
+  return { ok: true };
+});
+ipcMain.handle('jar:info-copy-url', () => {
+  if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
+  const url = obsOverlayServer.getJarInfoUrl();
+  clipboard.writeText(url);
+  return { ok: true, url };
 });
 ipcMain.handle('ranking:copy-url', () => {
   if (!obsOverlayServer) return { ok: false, error: 'OBS overlay server chưa sẵn sàng' };
