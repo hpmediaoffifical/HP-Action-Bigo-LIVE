@@ -3700,6 +3700,7 @@ function forwardJarGiftEvent(ev) {
     gift_count: count,
     diamonds,
     user: ev.user || '',
+    user_openid: ev.user_openid || '',
     user_avatar_url: resolveAvatarForUser(ev.user, ev.user_avatar_url),
   }).catch(() => {});
 }

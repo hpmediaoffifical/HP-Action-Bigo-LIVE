@@ -36,7 +36,11 @@ const spawnQueue = [];
 let config = defaultConfig();
 let jarWalls = [];
 let worldWalls = [];
-let lastGifter = null;
+// Gom Đậu tích luỹ mỗi người tặng trong phiên. Key = openid (nếu có) hoặc tên.
+// Hũ treo avatar TOP 5 theo tổng Đậu. Giữ avatar tốt nhất đã thấy (event sau
+// thiếu avatar vẫn dùng lại avatar cũ → tránh fallback tròn cam).
+const gifters = new Map();
+let topGifters = [];
 let stats = { gifts: 0, diamonds: 0 };
 let lastSpawn = 0;
 // Trạng thái hiệu ứng tác động hũ (mốc thời gian kết thúc, ms theo performance.now()).
@@ -174,11 +178,33 @@ function enqueueGift(gift) {
   for (let i = 0; i < count; i++) spawnQueue.push({ icon, size: iconSize(unitDiamonds), name: gift.gift_name || 'Quà' });
   stats.gifts += count;
   stats.diamonds += totalDiamonds;
-  if (gift.user_avatar_url || gift.user) {
-    const name = String(gift.user || 'Khách');
-    lastGifter = { name, avatar: gift.user_avatar_url || '', hanger: hangerFor(name) };
-    if (lastGifter.avatar) imageFor(lastGifter.avatar);
+  accumulateGifter(gift, totalDiamonds);
+}
+
+// Cộng dồn Đậu cho người tặng và cập nhật danh sách TOP 5.
+function accumulateGifter(gift, diamonds) {
+  if (!gift.user && !gift.user_openid) return;
+  const key = String(gift.user_openid || gift.user || '').trim();
+  if (!key) return;
+  let g = gifters.get(key);
+  if (!g) {
+    g = { key, name: String(gift.user || 'Khách'), avatar: '', diamonds: 0, hanger: hangerFor(key) };
+    gifters.set(key, g);
   }
+  if (gift.user) g.name = String(gift.user);
+  // Giữ avatar tốt nhất: chỉ ghi đè khi event có avatar (event thiếu không xoá cái cũ).
+  const av = gift.user_avatar_url || '';
+  if (av && av !== g.avatar) { g.avatar = av; imageFor(av); }
+  g.diamonds += Math.max(0, Number(diamonds) || 0);
+  g.lastTs = performance.now();
+  recomputeTopGifters();
+}
+
+// TOP 5 theo tổng Đậu (đồng hạng → người tặng gần nhất trước).
+function recomputeTopGifters() {
+  topGifters = [...gifters.values()]
+    .sort((a, b) => (b.diamonds - a.diamonds) || ((b.lastTs || 0) - (a.lastTs || 0)))
+    .slice(0, 5);
 }
 
 function makeGiftBody(g, x, y) {
@@ -592,16 +618,68 @@ function drawStats(rect) {
   drawPill(clamp(rect.cx - width / 2, 12, W - width - 12), clamp(rect.y + rect.h * .9, 12, H - 52), width, 44, text);
 }
 
-function drawAvatar(rect) {
-  if (!config.showAvatar || !lastGifter) return;
-  const hanger = lastGifter.hanger || hangerFor(lastGifter.name);
-  const size = clamp(rect.w * 0.21, 50, 82);
-  const anchorX = rect.x + rect.w * hanger.x;
-  const anchorY = rect.y + rect.h * hanger.y;
-  const ropeLength = clamp(rect.h * 0.18, 58, 118);
-  const sway = Math.sin(performance.now() / 430 + hanger.phase) * clamp(rect.w * 0.055, 8, 18);
+// Vị trí neo cố định cho TOP 5 quanh miệng hũ (fraction theo jar rect) + tỉ lệ
+// kích thước theo hạng. #1 to nhất, ở giữa trên cao; các hạng sau nhỏ dần, xen kẽ.
+const AVATAR_SLOTS = [
+  { x: 0.50, y: 0.04, scale: 1.00 },
+  { x: 0.15, y: 0.17, scale: 0.78 },
+  { x: 0.85, y: 0.17, scale: 0.78 },
+  { x: 0.30, y: 0.40, scale: 0.64 },
+  { x: 0.70, y: 0.40, scale: 0.64 },
+];
+// Viền theo hạng: vàng / bạc / đồng, còn lại trắng.
+const RANK_RING = ['#ffd54a', '#d7dde6', '#e08a4b', 'rgba(255,255,255,.9)', 'rgba(255,255,255,.9)'];
+
+// Vương miện vàng 3 chóp cho TOP 1, ngồi trên đỉnh avatar.
+function drawCrown(cx, bottomY, w) {
+  const h = w * 0.62;
+  const L = cx - w / 2, R = cx + w / 2, B = bottomY;
+  fxCtx.save();
+  fxCtx.shadowColor = 'rgba(0,0,0,.55)'; fxCtx.shadowBlur = 4;
+  fxCtx.beginPath();
+  fxCtx.moveTo(L, B);
+  fxCtx.lineTo(L, B - h * 0.62);
+  fxCtx.lineTo(cx - w * 0.18, B - h * 0.28);
+  fxCtx.lineTo(cx, B - h * 1.02);
+  fxCtx.lineTo(cx + w * 0.18, B - h * 0.28);
+  fxCtx.lineTo(R, B - h * 0.62);
+  fxCtx.lineTo(R, B);
+  fxCtx.closePath();
+  const grad = fxCtx.createLinearGradient(0, B - h, 0, B);
+  grad.addColorStop(0, '#ffe98a'); grad.addColorStop(1, '#f5a623');
+  fxCtx.fillStyle = grad; fxCtx.fill();
+  fxCtx.lineWidth = Math.max(1.5, w * 0.03); fxCtx.strokeStyle = '#b8791b'; fxCtx.stroke();
+  // Đế vương miện.
+  fxCtx.shadowBlur = 0;
+  fxCtx.fillStyle = '#f5a623';
+  fxCtx.beginPath(); fxCtx.roundRect(L, B - h * 0.02, w, h * 0.26, h * 0.08); fxCtx.fill(); fxCtx.stroke();
+  // Ngọc đỏ ở 3 chóp.
+  const gemR = Math.max(2, w * 0.07);
+  fxCtx.fillStyle = '#ff5a5a';
+  for (const [gx, gy] of [[L, B - h * 0.62], [cx, B - h * 1.02], [R, B - h * 0.62]]) {
+    fxCtx.beginPath(); fxCtx.arc(gx, gy, gemR, 0, Math.PI * 2); fxCtx.fill();
+  }
+  fxCtx.restore();
+}
+
+function drawAvatars(rect) {
+  if (!config.showAvatar || !topGifters.length) return;
+  // Vẽ hạng thấp trước để #1 nằm trên cùng nếu có chồng lấn.
+  for (let rank = topGifters.length - 1; rank >= 0; rank--) {
+    drawOneAvatar(rect, topGifters[rank], rank);
+  }
+}
+
+function drawOneAvatar(rect, g, rank) {
+  const slot = AVATAR_SLOTS[rank] || AVATAR_SLOTS[AVATAR_SLOTS.length - 1];
+  const size = clamp(rect.w * 0.20, 46, 80) * slot.scale;
+  const anchorX = rect.x + rect.w * slot.x;
+  const anchorY = rect.y + rect.h * slot.y;
+  const ropeLength = clamp(rect.h * 0.16, 50, 110) * slot.scale;
+  const sway = Math.sin(performance.now() / 430 + (g.hanger?.phase || 0)) * clamp(rect.w * 0.05, 7, 16) * slot.scale;
   const x = clamp(anchorX + sway, size / 2 + 3, W - size / 2 - 3);
   const y = clamp(anchorY + ropeLength, size / 2 + 3, H - size / 2 - 30);
+  // Dây treo + điểm neo.
   fxCtx.save();
   fxCtx.strokeStyle = 'rgba(255, 221, 132, .96)';
   fxCtx.lineWidth = 3;
@@ -613,18 +691,36 @@ function drawAvatar(rect) {
   fxCtx.fillStyle = '#ffd166';
   fxCtx.beginPath(); fxCtx.arc(anchorX, anchorY, 5, 0, Math.PI * 2); fxCtx.fill();
   fxCtx.shadowBlur = 0;
+  // Avatar (bo tròn). Thiếu ảnh → logo HP thay vì tròn cam trơn.
   fxCtx.beginPath(); fxCtx.arc(x, y, size / 2, 0, Math.PI * 2); fxCtx.clip();
-  const image = imageFor(lastGifter.avatar);
+  const image = g.avatar ? imageFor(g.avatar) : null;
   if (image?.complete && image.naturalWidth) fxCtx.drawImage(image, x - size / 2, y - size / 2, size, size);
-  else { fxCtx.fillStyle = '#ff8a3d'; fxCtx.fillRect(x - size / 2, y - size / 2, size, size); }
+  else {
+    const logo = fallbackLogo();
+    if (logo?.complete && logo.naturalWidth) fxCtx.drawImage(logo, x - size / 2, y - size / 2, size, size);
+    else { fxCtx.fillStyle = '#ff8a3d'; fxCtx.fillRect(x - size / 2, y - size / 2, size, size); }
+  }
   fxCtx.restore();
+  // Viền theo hạng.
   fxCtx.save();
-  fxCtx.strokeStyle = 'rgba(255,255,255,.9)'; fxCtx.lineWidth = 3;
+  fxCtx.strokeStyle = RANK_RING[rank] || 'rgba(255,255,255,.9)';
+  fxCtx.lineWidth = rank === 0 ? 5 : 3;
+  fxCtx.shadowColor = 'rgba(0,0,0,.6)'; fxCtx.shadowBlur = 4;
   fxCtx.beginPath(); fxCtx.arc(x, y, size / 2, 0, Math.PI * 2); fxCtx.stroke();
-  if (lastGifter.name) {
-    fxCtx.fillStyle = '#fff'; fxCtx.font = '700 22px Segoe UI, sans-serif'; fxCtx.textAlign = 'center';
-    fxCtx.shadowColor = 'rgba(0,0,0,.85)'; fxCtx.shadowBlur = 6;
-    fxCtx.fillText(lastGifter.name.slice(0, 18), x, y + size / 2 + 27);
+  fxCtx.shadowBlur = 0;
+  if (rank === 0) {
+    // TOP 1 → vương miện trên đỉnh avatar.
+    drawCrown(x, y - size / 2 + size * 0.12, size * 0.78);
+  } else {
+    // Hạng 2..5 → huy hiệu số ở góc trên-trái.
+    const badgeR = clamp(size * 0.22, 12, 20);
+    const bx = x - size / 2 + badgeR * 0.6, by = y - size / 2 + badgeR * 0.6;
+    fxCtx.fillStyle = RANK_RING[rank] || '#fff';
+    fxCtx.beginPath(); fxCtx.arc(bx, by, badgeR, 0, Math.PI * 2); fxCtx.fill();
+    fxCtx.fillStyle = '#20140a'; fxCtx.font = `800 ${Math.round(badgeR * 1.15)}px Segoe UI, sans-serif`;
+    fxCtx.textAlign = 'center'; fxCtx.textBaseline = 'middle';
+    fxCtx.fillText(String(rank + 1), bx, by + 1);
+    fxCtx.textBaseline = 'alphabetic';
   }
   fxCtx.restore();
 }
@@ -664,7 +760,7 @@ function render() {
     ctx.restore();
   }
   const rect = jarRect();
-  drawAvatar(rect);
+  drawAvatars(rect);
   drawStats(rect);
   requestAnimationFrame(render);
 }
@@ -730,6 +826,7 @@ es.addEventListener('clear', () => {
   for (const b of bodies) Composite.remove(engine.world, b);
   bodies.length = 0;
   spawnQueue.length = 0;
-  lastGifter = null;
+  gifters.clear();
+  topGifters = [];
   stats = { gifts: 0, diamonds: 0 };
 });
