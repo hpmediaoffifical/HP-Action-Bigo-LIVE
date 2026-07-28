@@ -2264,10 +2264,63 @@ if (els.btnResetStats) {
 
 // Phiên bản hiện tại + license key (tab ℹ️) — wire với Google Apps Script.
 let _machineId = null;
+let _licenseCache = null;
+let _licenseCacheLoaded = false;
+let _licenseCachePromise = null;
 async function ensureMachineId() {
   if (_machineId) return _machineId;
   try { _machineId = await window.bigo.licenseMachineId(); } catch { _machineId = ''; }
   return _machineId || '';
+}
+
+// localStorage was the original cache. Keep it only as a migration/fallback;
+// the authoritative copy lives in main-process userData and survives upgrades.
+async function loadPersistentLicenseCache() {
+  if (_licenseCacheLoaded) return _licenseCache || { key: '', info: null, machineId: '', verifiedAt: 0 };
+  if (_licenseCachePromise) return _licenseCachePromise;
+  _licenseCachePromise = (async () => {
+    let cache = { key: '', info: null, machineId: '', verifiedAt: 0 };
+    try { cache = await window.bigo.licenseLoadCache(); } catch {}
+    if (!cache || typeof cache !== 'object') cache = { key: '', info: null, machineId: '', verifiedAt: 0 };
+    try {
+      if (!cache.key) cache.key = localStorage.getItem('hp_license_key') || '';
+      if (!cache.info) {
+        const rawInfo = localStorage.getItem('hp_license_info');
+        cache.info = rawInfo ? JSON.parse(rawInfo) : null;
+      }
+      if (!cache.machineId) cache.machineId = localStorage.getItem('hp_license_machine_id') || '';
+      if (!cache.verifiedAt) cache.verifiedAt = Number(localStorage.getItem('hp_license_verified_at') || 0);
+    } catch {}
+    _licenseCache = cache;
+    _licenseCacheLoaded = true;
+    // One-time migration for installations upgraded from localStorage-only builds.
+    if (cache.key && window.bigo.licenseSaveCache) {
+      window.bigo.licenseSaveCache(cache).catch(() => {});
+    }
+    return cache;
+  })();
+  try { return await _licenseCachePromise; }
+  finally { _licenseCachePromise = null; }
+}
+
+async function rememberPersistentLicenseKey(key) {
+  const normalized = String(key || '').trim();
+  if (!normalized) return;
+  const cache = await loadPersistentLicenseCache();
+  cache.key = normalized;
+  _licenseCache = cache;
+  try { localStorage.setItem('hp_license_key', normalized); } catch {}
+  if (window.bigo.licenseRememberKey) await window.bigo.licenseRememberKey(normalized).catch(() => {});
+}
+
+async function savePersistentLicenseCache(info, key, machineId) {
+  const cache = await loadPersistentLicenseCache();
+  cache.key = String(key || cache.key || '').trim();
+  cache.info = info || null;
+  cache.machineId = machineId || cache.machineId || '';
+  cache.verifiedAt = Date.now();
+  _licenseCache = cache;
+  if (window.bigo.licenseSaveCache) await window.bigo.licenseSaveCache(cache).catch(() => {});
 }
 
 function renderLicenseStatus(data) {
@@ -2474,6 +2527,7 @@ async function verifyLicense(key, action = 'verify') {
     localStorage.setItem('hp_license_info', JSON.stringify(info));
     localStorage.setItem('hp_license_verified_at', String(Date.now()));
   } catch {}
+  savePersistentLicenseCache(info, key, machineId).catch(() => {});
   return info;
 }
 
@@ -2554,9 +2608,8 @@ function waitForLicenseGateUnlock() {
 // oan user hợp lệ khi rớt mạng. Server từ chối rõ ràng (khóa/thu hồi/hết hạn) vẫn chặn.
 function openWithCachedLicense() {
   try {
-    const cached = localStorage.getItem('hp_license_info');
-    if (!cached) return false;
-    const info = JSON.parse(cached);
+    const info = _licenseCache?.info || JSON.parse(localStorage.getItem('hp_license_info') || 'null');
+    if (!info) return false;
     if (!isLicenseUsable(info).ok) return false; // cache đã hết hạn/không khả dụng → chặn
     renderLicenseStatus(info);
     updateHeaderLicense(info);
@@ -2576,6 +2629,7 @@ async function unlockLicenseGate(info, key, machineId) {
     localStorage.removeItem('hp_license_fail_count');
     localStorage.removeItem('hp_license_lock_until');
   } catch {}
+  await savePersistentLicenseCache(info, key, machineId);
   renderLicenseStatus(info);
   updateHeaderLicense(info);
   checkLicenseReminder(info);
@@ -2593,6 +2647,9 @@ function removeLicenseKey() {
     localStorage.removeItem('hp_license_fail_count');
     localStorage.removeItem('hp_license_lock_until');
   } catch {}
+  _licenseCache = { key: '', info: null, machineId: '', verifiedAt: 0 };
+  _licenseCacheLoaded = true;
+  if (window.bigo.licenseClearCache) window.bigo.licenseClearCache().catch(() => {});
   const infoInput = document.getElementById('licenseKey');
   if (infoInput) infoInput.value = '';
   const gateInput = document.getElementById('licenseGateKey');
@@ -2615,7 +2672,7 @@ async function submitLicenseGateKey(key, action = 'activate') {
   // Ghi nhớ KEY ngay khi user submit — dù verify fail (hết hạn/bị khóa) vẫn giữ
   // để user gia hạn xong KHÔNG phải nhập lại. unlockLicenseGate cũng setItem
   // (idempotent) khi success.
-  try { localStorage.setItem('hp_license_key', key); } catch {}
+  await rememberPersistentLicenseKey(key);
   if (btn) btn.disabled = true;
   if (input) input.disabled = true;
   setLicenseGateMessage('Đang kiểm tra KEY và thiết bị...', '');
@@ -2646,15 +2703,14 @@ async function ensureLicenseGate() {
   document.body.classList.remove('license-ok');
   const form = document.getElementById('licenseGateForm');
   const input = document.getElementById('licenseGateKey');
-  if (input) {
-    try { input.value = localStorage.getItem('hp_license_key') || ''; } catch {}
-  }
+  const cache = await loadPersistentLicenseCache();
+  if (input) input.value = cache.key || '';
   if (form && !form.dataset.wired) {
     form.dataset.wired = '1';
     // Ghi nhớ KEY khi user gõ — đề phòng user nhập rồi tắt app trước khi submit
     if (input) {
       input.addEventListener('input', () => {
-        try { localStorage.setItem('hp_license_key', input.value.trim()); } catch {}
+        rememberPersistentLicenseKey(input.value).catch(() => {});
       });
     }
     form.addEventListener('submit', (e) => {
@@ -2780,9 +2836,10 @@ async function ensureLicenseGate() {
   const activateBtn = document.getElementById('btnActivateLicense');
 
   if (keyInput) {
-    try { keyInput.value = localStorage.getItem('hp_license_key') || ''; } catch {}
+    const cache = await loadPersistentLicenseCache();
+    keyInput.value = cache.key || '';
     keyInput.addEventListener('change', () => {
-      try { localStorage.setItem('hp_license_key', keyInput.value.trim()); } catch {}
+      rememberPersistentLicenseKey(keyInput.value).catch(() => {});
     });
   }
   if (verifyBtn) {
@@ -2816,15 +2873,15 @@ async function ensureLicenseGate() {
 
   // Auto-load cached info on app start
   try {
-    const cached = localStorage.getItem('hp_license_info');
-    if (cached) {
-      const info = JSON.parse(cached);
+    const cache = await loadPersistentLicenseCache();
+    const info = cache.info;
+    if (info) {
       renderLicenseStatus(info);
       updateHeaderLicense(info);
       // Check reminder ngay tu cache (offline-friendly)
       checkLicenseReminder(info);
     }
-    const cachedKey = localStorage.getItem('hp_license_key');
+    const cachedKey = cache.key;
     if (cachedKey) {
       // Background re-verify (silent) — sau 2s để không block UI startup.
       setTimeout(() => verifyLicense(cachedKey, 'verify').catch(() => {}), 2000);
@@ -3662,20 +3719,36 @@ function pushJarInfoOverlay() {
   if (window.bigo.jarInfo) window.bigo.jarInfo(buildJarInfoList()).catch(() => {});
 }
 
-// Quà LIVE trùng gán → chạy hiệu ứng (count = số lần tặng/combo). Trả true nếu đã kích hoạt.
+// Quà LIVE trùng gán → chạy mọi hiệu ứng đã gán (count = số lần tặng/combo).
+// BIGO Web có thể chỉ gửi tên hoặc icon, không có typeid; so khớp cả ba dữ liệu
+// để quà đã chọn trong hũ luôn nhận được tín hiệu.
+function jarTriggerMatchesGift(ev, giftId) {
+  if (giftId == null) return false;
+  if (idsEqual(giftId, getEventGiftId(ev))) return true;
+  const configuredGift = jarGiftById(giftId);
+  if (!configuredGift) return false;
+
+  const configuredName = normalizeGameplayGiftKey(configuredGift.name);
+  const eventNames = getEventGiftNames(ev).map(normalizeGameplayGiftKey).filter(Boolean);
+  if (configuredName && eventNames.includes(configuredName)) return true;
+
+  const configuredIcon = normalizeGameplayIconUrl(configuredGift.img_url || configuredGift.localIcon);
+  const eventIcon = normalizeGameplayIconUrl(getEventGiftIcon(ev));
+  return !!configuredIcon && !!eventIcon && configuredIcon === eventIcon;
+}
+
 function forwardJarEffectTrigger(ev) {
   if (!ev || ev.type !== 'gift' || !normalizeJarSettings().enabled || !window.bigo.jarAction) return false;
   const map = normalizeJarSettings().effectGifts || {};
-  const evId = getEventGiftId(ev);
-  if (evId == null) return false;
+  let triggered = false;
+  const count = Math.max(1, giftTotalCountFromEvent(ev) || 1);
   for (const [effect, gid] of Object.entries(map)) {
-    if (gid != null && idsEqual(gid, evId)) {
-      const count = Math.max(1, giftTotalCountFromEvent(ev) || 1);
+    if (jarTriggerMatchesGift(ev, gid)) {
       window.bigo.jarAction(effect, count).catch(() => {});
-      return true;
+      triggered = true;
     }
   }
-  return false;
+  return triggered;
 }
 
 async function saveJarSettings(patch) {
@@ -6377,8 +6450,10 @@ function renderParsed(ev) {
       addReceivedGift(ev);
       // Gameplay overlay chỉ nhận bản sao event, không tác động queue/effect pipeline.
       forwardGameplayGiftEvent(ev);
-      // Quà đã gán hiệu ứng → chạy hiệu ứng (không rơi vào hũ). Ngược lại rơi vào hũ như thường.
-      if (!forwardJarEffectTrigger(ev)) forwardJarGiftEvent(ev);
+      // Mọi quà đều vào hũ để cộng TOP người tặng. Quà được gán còn kích hoạt
+      // hiệu ứng riêng, không được chặn khỏi luồng cập nhật avatar/thống kê của hũ.
+      forwardJarGiftEvent(ev);
+      forwardJarEffectTrigger(ev);
     }
     if (ev.type === 'gift' && matched && canPlayEffectItem(matched)) {
       // Mỗi quà/combo tương ứng 1 hàng hành động. Ví dụ Bell x10 → 10 hàng.

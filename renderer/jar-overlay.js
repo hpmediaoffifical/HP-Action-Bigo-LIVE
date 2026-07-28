@@ -274,6 +274,20 @@ function hangerFor(name) {
 // ===== Hiệu ứng tác động hũ (Phase 1) =====
 // Rung hũ: hất tung toàn bộ quà lên + sang ngang một nhịp.
 function fxShake() {
+  // SSE quà và action tới liền nhau. Tạo ít nhất quà đầu tiên trước khi hất,
+  // nếu không shake chạy trên hũ trống và người xem không thấy gì.
+  if (!bodies.length && spawnQueue.length) spawnOne();
+  for (const el of [jarBottomEl, jarGlassEl]) {
+    if (typeof el.animate === 'function') {
+      el.animate([
+        { transform: 'translateX(0) rotate(0deg)' },
+        { transform: 'translateX(-14px) rotate(-2.2deg)' },
+        { transform: 'translateX(13px) rotate(2deg)' },
+        { transform: 'translateX(-9px) rotate(-1.3deg)' },
+        { transform: 'translateX(0) rotate(0deg)' },
+      ], { duration: 460, easing: 'ease-in-out' });
+    }
+  }
   for (const b of bodies) {
     Body.setVelocity(b, { x: (Math.random() - 0.5) * 26, y: -(6 + Math.random() * 16) });
     Body.setAngularVelocity(b, (Math.random() - 0.5) * 0.6);

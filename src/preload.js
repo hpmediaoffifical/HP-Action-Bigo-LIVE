@@ -81,6 +81,10 @@ contextBridge.exposeInMainWorld('bigo', {
 
   // License (Google Apps Script)
   licenseMachineId: () => ipcRenderer.invoke('license:machine-id'),
+  licenseLoadCache: () => ipcRenderer.invoke('license:load-cache'),
+  licenseRememberKey: (key) => ipcRenderer.invoke('license:remember-key', key),
+  licenseSaveCache: (data) => ipcRenderer.invoke('license:save-cache', data),
+  licenseClearCache: () => ipcRenderer.invoke('license:clear-cache'),
   licenseVerify: (opts) => ipcRenderer.invoke('license:verify', opts),
 
   // Open API mode

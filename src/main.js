@@ -560,6 +560,34 @@ function enrichGiftEvent(ev) {
 // =================== App ===================
 function loadSettings() { return loadJson(CONFIG_PATH, { env: 'prod', accessToken: '', gameId: '', openid: '', bigoId: '', windowBounds: {} }); }
 function saveSettings(s) { saveJson(CONFIG_PATH, s); }
+function loadLicenseCache() {
+  const cache = loadSettings().licenseCache;
+  if (!cache || typeof cache !== 'object') return { key: '', info: null, machineId: '', verifiedAt: 0 };
+  return {
+    key: typeof cache.key === 'string' ? cache.key : '',
+    info: cache.info && typeof cache.info === 'object' ? cache.info : null,
+    machineId: typeof cache.machineId === 'string' ? cache.machineId : '',
+    verifiedAt: Number(cache.verifiedAt) || 0,
+  };
+}
+function saveLicenseCache(patch) {
+  const settings = loadSettings();
+  const current = loadLicenseCache();
+  const next = { ...current, ...(patch || {}) };
+  settings.licenseCache = {
+    key: typeof next.key === 'string' ? next.key : '',
+    info: next.info && typeof next.info === 'object' ? next.info : null,
+    machineId: typeof next.machineId === 'string' ? next.machineId : '',
+    verifiedAt: Number(next.verifiedAt) || 0,
+  };
+  saveSettings(settings);
+  return settings.licenseCache;
+}
+function clearLicenseCache() {
+  const settings = loadSettings();
+  delete settings.licenseCache;
+  saveSettings(settings);
+}
 function ensureObsOverlaySettings() {
   const s = loadSettings();
   if (!s.obsOverlay) s.obsOverlay = {};
@@ -907,7 +935,15 @@ app.on('will-quit', () => {
 ipcMain.handle('settings:load', () => loadJson(CONFIG_PATH, {
   env: 'prod', accessToken: '', gameId: '', openid: '', bigoId: '',
 }));
-ipcMain.handle('settings:save', (_e, data) => { saveJson(CONFIG_PATH, data); return true; });
+ipcMain.handle('settings:save', (_e, data) => {
+  // Renderer settings saves must never erase the main-process license cache,
+  // including when a delayed UI save still holds an older settings snapshot.
+  const current = loadSettings();
+  const next = data && typeof data === 'object' ? data : {};
+  if (current.licenseCache) next.licenseCache = current.licenseCache;
+  saveJson(CONFIG_PATH, next);
+  return true;
+});
 
 ipcMain.handle('shell:open-external', (_e, url) => shell.openExternal(url));
 
@@ -934,6 +970,24 @@ ipcMain.handle('updater:state', () => autoUpdater.getState());
 ipcMain.handle('license:machine-id', () => {
   return require('../hpkey/hwid').getHWID();
 });
+// KEY must outlive the renderer's localStorage. Packaged builds write this cache
+// under userData/config, which NSIS upgrades preserve (deleteAppDataOnUninstall=false).
+ipcMain.handle('license:load-cache', () => loadLicenseCache());
+ipcMain.handle('license:remember-key', (_e, key) => {
+  const normalizedKey = require('../hpkey/core').normalizeKey(key);
+  if (normalizedKey) saveLicenseCache({ key: normalizedKey });
+  return normalizedKey;
+});
+ipcMain.handle('license:save-cache', (_e, data = {}) => {
+  const key = require('../hpkey/core').normalizeKey(data.key || loadLicenseCache().key);
+  return saveLicenseCache({
+    key,
+    info: data.info && typeof data.info === 'object' ? data.info : null,
+    machineId: typeof data.machineId === 'string' ? data.machineId : '',
+    verifiedAt: Number(data.verifiedAt) || Date.now(),
+  });
+});
+ipcMain.handle('license:clear-cache', () => { clearLicenseCache(); return true; });
 
 // Xac thuc qua HP KEY (hpvn.media). Tra ve { ok:true, data:{TRANG_THAI,...} }
 // hoac { ok:false, error } - dung shape renderer dang doc.
@@ -944,6 +998,9 @@ ipcMain.handle('license:verify', async (_e, { key, action }) => {
   const res = await require('../hpkey/validate').licenseVerify(normalizedKey, action);
   if (res && res.ok) {
     _hpkeyCurrentKey = normalizedKey;
+    // Persist in main before replying to the renderer. An immediate update/restart
+    // can no longer lose a valid key between verification and localStorage writes.
+    saveLicenseCache({ key: normalizedKey, info: res.data || null, verifiedAt: Date.now() });
     if (!_hpkeyWatching) {
       _hpkeyWatching = true;
       // Check key real-time: cam key tren admin -> dong app trong <= RECHECK_SECONDS
