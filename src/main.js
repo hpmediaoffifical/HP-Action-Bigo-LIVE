@@ -604,7 +604,7 @@ function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function refreshObsBrowserSources(reason, { cooldownMs = 10000 } = {}) {
+async function refreshObsBrowserSources(reason, { cooldownMs = 10000, quiet = false } = {}) {
   const obsCfg = ensureObsOverlaySettings();
   if (!obsCfg.autoRefreshBrowserSources) return { ok: false, skipped: 'disabled' };
   if (obsBrowserRefreshPromise) return obsBrowserRefreshPromise;
@@ -621,20 +621,58 @@ async function refreshObsBrowserSources(reason, { cooldownMs = 10000 } = {}) {
       const detail = result.matched
         ? `đã làm mới ${result.refreshed}/${result.matched} Browser Source HP Action`
         : 'không tìm thấy Browser Source HP Action nào';
-      if (win && !win.isDestroyed()) {
+      if (!quiet && win && !win.isDestroyed()) {
         try { win.webContents.send('bigo:log', `[obs-websocket] ${reason}: ${detail}`); } catch {}
       }
-      return result;
+      return { ok: true, ...result };
     })
     .catch((e) => {
       const error = e?.message || String(e);
-      if (win && !win.isDestroyed()) {
+      if (!quiet && win && !win.isDestroyed()) {
         try { win.webContents.send('bigo:log', `[obs-websocket] ${reason}: không kết nối được OBS tại 127.0.0.1:${obsCfg.webSocketPort} (${error})`); } catch {}
       }
       return { ok: false, error };
     })
     .finally(() => { obsBrowserRefreshPromise = null; });
   return obsBrowserRefreshPromise;
+}
+
+// Bật OBS TRƯỚC app: Browser Source đã nạp link overlay lúc server chưa chạy → CEF của OBS
+// cache trang lỗi (ERR_CONNECTION_REFUSED) và KHÔNG tự nạp lại. Một lần refresh lúc khởi động
+// là chưa đủ vì OBS có thể còn đang mở dở (obs-websocket chưa sẵn sàng).
+// Hàm này lặp lại refresh tới khi có Browser Source SSE kết nối thật (hoặc hết giờ) →
+// bật OBS trước hay sau app đều chạy được, không cần bấm tay.
+async function ensureObsOverlayConnectedOnStartup() {
+  const obsCfg = ensureObsOverlaySettings();
+  if (!obsCfg.autoRefreshBrowserSources) return;
+
+  const obsTargets = () => (mapping?.overlays || []).filter(o => o.target === 'obs' || o.target === 'both');
+  const anyConnected = () => obsTargets().some(o => obsOverlayServer?.hasClients(o.id));
+  if (obsTargets().length === 0) return; // không overlay nào bắn sang OBS → khỏi cần
+
+  const log = (msg) => { if (win && !win.isDestroyed()) { try { win.webContents.send('bigo:log', msg); } catch {} } };
+  let warnedNoWebSocket = false;
+  let warnedNoSource = false;
+  const deadline = Date.now() + 48000;
+  let attempt = 0;
+  while (Date.now() < deadline) {
+    if (anyConnected()) return; // đã có Browser Source kết nối → xong
+    attempt++;
+    // cooldownMs:0 để bỏ qua throttle 10s trong lúc đang cố phục hồi lần đầu.
+    const res = await refreshObsBrowserSources(`khởi động (lần ${attempt})`, { cooldownMs: 0, quiet: true }).catch(() => ({ ok: false }));
+    if (res && res.ok && res.matched === 0 && !warnedNoSource) {
+      warnedNoSource = true;
+      log('[obs-websocket] Đã kết nối OBS nhưng chưa thấy Browser Source nào trỏ tới link overlay HP Action. Hãy tạo Browser Source và dán link 🔗 OBS của overlay (target = OBS).');
+    } else if (res && res.ok === false && res.error && !warnedNoWebSocket) {
+      warnedNoWebSocket = true;
+      log('[obs-websocket] Chưa kết nối được OBS WebSocket Server → app không thể tự làm mới Browser Source khi bật OBS trước. Trong OBS: Tools → WebSocket Server Settings → tích "Enable WebSocket server" (để trống mật khẩu), rồi mở lại app. Khi đó bật OBS trước hay sau đều chạy hiệu ứng.');
+    }
+    // OBS/CEF cần vài giây để nạp lại trang & mở SSE sau khi bấm refresh.
+    await wait(res && res.ok && res.matched > 0 ? 2500 : 4000);
+  }
+  if (!anyConnected()) {
+    log('[obs-overlay] Sau khởi động vẫn chưa thấy Browser Source OBS kết nối. Kiểm tra: (1) link 🔗 OBS đã dán đúng vào Browser Source, (2) đã bật OBS WebSocket Server để app tự làm mới.');
+  }
 }
 
 async function waitForObsOverlayClient(overlayId, timeoutMs = 1200) {
@@ -897,9 +935,10 @@ app.whenReady().then(async () => {
     }
     focusMainWindow();
   }, 1200);
-  // OBS Browser Source can retain a dead SSE connection after OBS or this app restarts.
-  // Refresh only HP Action sources after the local overlay server is ready.
-  setTimeout(() => { refreshObsBrowserSources('khởi động ứng dụng').catch(() => {}); }, 1800);
+  // OBS Browser Source can retain a dead SSE connection after OBS or this app restarts,
+  // hoặc đã nạp trang lỗi khi bật OBS trước app. Lặp lại refresh tới khi có client kết nối
+  // để bật OBS trước hay sau app đều chạy hiệu ứng (xem ensureObsOverlayConnectedOnStartup).
+  setTimeout(() => { ensureObsOverlayConnectedOnStartup().catch(() => {}); }, 1500);
   // Background: load master → auto-download icons nếu thiếu
   (async () => {
     const r = await ensureGiftMaster().catch(e => ({ ok: false, error: e.message }));
