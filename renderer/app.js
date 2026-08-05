@@ -3503,19 +3503,25 @@ function renderGroupsInto(container, opts) {
 const JAR_THEMES = new Set(['default', 'blue', 'green', 'orange', 'pink', 'purple', 'yellow']);
 const JAR_THEME_FILES = { default: 'jar-glass.png', blue: 'jar-glass_blue.png', green: 'jar-glass_green.png', orange: 'jar-glass_cam.png', pink: 'jar-glass_pink.png', purple: 'jar-glass_tim.png', yellow: 'jar-glass_yellow.png' };
 
-// Base cho ảnh hũ trong preview. Khi đóng gói, thư mục `assets` nằm NGOÀI app.asar (chỉ ship qua
-// extraResources) nên đường dẫn tương đối `../assets/...` từ renderer trong asar sẽ 404 → mất hình hũ.
-// Lúc init hỏi main process đường dẫn tuyệt đối (file://) rồi áp lại.
-let JAR_ASSETS_BASE = '../assets';
-async function resolveAssetsBase() {
+// Ảnh hũ trong preview. Khi đóng gói, `assets` nằm NGOÀI app.asar (chỉ ship qua extraResources)
+// nên đường dẫn tương đối `../assets/...` từ renderer trong asar sẽ 404 → mất hình hũ. Dùng URL
+// http của server overlay (serve từ assetsRoot, đúng cả dev lẫn packaged) — hỏi main lúc init.
+let JAR_ASSETS_HTTP = null; // { base, token } từ server; null → fallback ../assets (chỉ đúng dev)
+function jarAssetUrl(file) {
+  if (JAR_ASSETS_HTTP) return `${JAR_ASSETS_HTTP.base}/${file}?token=${encodeURIComponent(JAR_ASSETS_HTTP.token)}`;
+  return `../assets/jar/${file}`;
+}
+async function resolveAssetsBase(attempt = 0) {
   try {
-    const base = window.bigo.assetsBase ? await window.bigo.assetsBase() : '';
-    if (base) { JAR_ASSETS_BASE = base.replace(/\/+$/, ''); applyJarPreviewAssetBase(); }
+    const info = window.bigo.assetsBase ? await window.bigo.assetsBase() : null;
+    if (info && info.base) { JAR_ASSETS_HTTP = info; applyJarPreviewAssetBase(); return; }
   } catch {}
+  // Server overlay có thể chưa lên lúc init → retry vài lần.
+  if (attempt < 10) setTimeout(() => resolveAssetsBase(attempt + 1), 800);
 }
 function applyJarPreviewAssetBase() {
   const bottom = document.querySelector('.jar-preview-bottom');
-  if (bottom) bottom.setAttribute('src', `${JAR_ASSETS_BASE}/jar/jar-bottom.png`);
+  if (bottom) bottom.setAttribute('src', jarAssetUrl('jar-bottom.png'));
   renderJarPreview(normalizeJarSettings());
 }
 
@@ -3584,7 +3590,7 @@ function renderJarPreview(jar) {
   els.jarPreviewJar.style.width = `${width / 1080 * 100}%`;
   els.jarPreviewJar.style.height = `${jar.height / 1920 * 100}%`;
   els.jarPreviewJar.classList.toggle('is-hidden', !jar.visible);
-  const source = `${JAR_ASSETS_BASE}/jar/${JAR_THEME_FILES[jar.theme] || JAR_THEME_FILES.default}`;
+  const source = jarAssetUrl(JAR_THEME_FILES[jar.theme] || JAR_THEME_FILES.default);
   if (els.jarPreviewGlass && els.jarPreviewGlass.getAttribute('src') !== source) els.jarPreviewGlass.setAttribute('src', source);
 }
 

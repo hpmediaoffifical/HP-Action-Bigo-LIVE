@@ -995,9 +995,14 @@ ipcMain.handle('app:get-version', () => {
   try { return require(path.join(ROOT, 'package.json')).version || '0.0.0'; } catch { return '0.0.0'; }
 });
 
-// Base file:// URL của thư mục assets ship kèm (resourcesPath/assets khi đóng gói) — dùng cho
-// preview trong app. KHÔNG dùng đường dẫn tương đối `../assets` vì assets nằm NGOÀI app.asar.
-ipcMain.handle('app:assets-base', () => fileUrl(SHIPPED_ASSETS_DIR));
+// URL http của server overlay để preview ảnh hũ trong app. Dùng http (KHÔNG file:// / KHÔNG
+// đường dẫn tương đối `../assets`) để chạy đúng cả bản đóng gói — assets nằm NGOÀI app.asar,
+// server serve từ assetsRoot đúng ở cả dev lẫn packaged (chính route OBS jar đang dùng).
+// Trả null nếu server chưa sẵn sàng → renderer tự retry.
+ipcMain.handle('app:assets-base', () => {
+  if (!obsOverlayServer) return null;
+  return { base: `http://127.0.0.1:${obsOverlayServer.port}/jar-assets`, token: obsOverlayServer.token };
+});
 
 // =================== Auto-updater IPC ===================
 ipcMain.handle('updater:check', async () => {
