@@ -2981,6 +2981,7 @@ async function init() {
   renderQueueCards();
   renderSettingsGroupsList();
   renderConfigExportGroups();
+  resolveAssetsBase();
   renderJarUi();
   renderGameplayUi();
   renderRankingMemberSelectors();
@@ -3502,6 +3503,22 @@ function renderGroupsInto(container, opts) {
 const JAR_THEMES = new Set(['default', 'blue', 'green', 'orange', 'pink', 'purple', 'yellow']);
 const JAR_THEME_FILES = { default: 'jar-glass.png', blue: 'jar-glass_blue.png', green: 'jar-glass_green.png', orange: 'jar-glass_cam.png', pink: 'jar-glass_pink.png', purple: 'jar-glass_tim.png', yellow: 'jar-glass_yellow.png' };
 
+// Base cho ảnh hũ trong preview. Khi đóng gói, thư mục `assets` nằm NGOÀI app.asar (chỉ ship qua
+// extraResources) nên đường dẫn tương đối `../assets/...` từ renderer trong asar sẽ 404 → mất hình hũ.
+// Lúc init hỏi main process đường dẫn tuyệt đối (file://) rồi áp lại.
+let JAR_ASSETS_BASE = '../assets';
+async function resolveAssetsBase() {
+  try {
+    const base = window.bigo.assetsBase ? await window.bigo.assetsBase() : '';
+    if (base) { JAR_ASSETS_BASE = base.replace(/\/+$/, ''); applyJarPreviewAssetBase(); }
+  } catch {}
+}
+function applyJarPreviewAssetBase() {
+  const bottom = document.querySelector('.jar-preview-bottom');
+  if (bottom) bottom.setAttribute('src', `${JAR_ASSETS_BASE}/jar/jar-bottom.png`);
+  renderJarPreview(normalizeJarSettings());
+}
+
 function normalizeJarNumber(value, fallback, min, max) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback;
@@ -3567,7 +3584,7 @@ function renderJarPreview(jar) {
   els.jarPreviewJar.style.width = `${width / 1080 * 100}%`;
   els.jarPreviewJar.style.height = `${jar.height / 1920 * 100}%`;
   els.jarPreviewJar.classList.toggle('is-hidden', !jar.visible);
-  const source = `../assets/jar/${JAR_THEME_FILES[jar.theme] || JAR_THEME_FILES.default}`;
+  const source = `${JAR_ASSETS_BASE}/jar/${JAR_THEME_FILES[jar.theme] || JAR_THEME_FILES.default}`;
   if (els.jarPreviewGlass && els.jarPreviewGlass.getAttribute('src') !== source) els.jarPreviewGlass.setAttribute('src', source);
 }
 

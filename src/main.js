@@ -539,7 +539,10 @@ function enrichGiftEvent(ev) {
   if (meta) {
     ev.gift_id = meta.typeid;
     ev.gift_value = rateToDiamonds(meta.vm_exchange_rate); // ĐÚNG: chia 100
-    if (!ev.gift_icon) ev.gift_icon = localIconUrl(meta.typeid) || meta.img_url;
+    // Ưu tiên URL CDN (http) — overlay hũ chạy trong OBS Browser Source (origin http) KHÔNG load
+    // được file:// (bị chặn). Khi thiếu img_url mới rơi về file local. Icon local vẫn phục vụ
+    // được qua route /gift-icon/{gift_id} (server đọc userData + shipped) khi gift_icon rỗng.
+    if (!ev.gift_icon) ev.gift_icon = meta.img_url || localIconUrl(meta.typeid);
   }
   // VN override: nếu typeid có trong vietnam-gifts.json → ưu tiên giá KC khu vực VN.
   // Giữ vm_exchange_rate global trong meta, chỉ override gift_value xuống dòng dưới.
@@ -902,6 +905,7 @@ app.whenReady().then(async () => {
   obsOverlayServer = new ObsOverlayServer({
     root: ROOT,
     assetsRoot: SHIPPED_ASSETS_DIR,
+    userAssetsRoot: USER_ASSETS_DIR,
     port: obsCfg.port || 18181,
     token: obsCfg.token,
     onEffectEnded: ({ overlayId }) => {
@@ -990,6 +994,10 @@ ipcMain.handle('shell:open-external', (_e, url) => shell.openExternal(url));
 ipcMain.handle('app:get-version', () => {
   try { return require(path.join(ROOT, 'package.json')).version || '0.0.0'; } catch { return '0.0.0'; }
 });
+
+// Base file:// URL của thư mục assets ship kèm (resourcesPath/assets khi đóng gói) — dùng cho
+// preview trong app. KHÔNG dùng đường dẫn tương đối `../assets` vì assets nằm NGOÀI app.asar.
+ipcMain.handle('app:assets-base', () => fileUrl(SHIPPED_ASSETS_DIR));
 
 // =================== Auto-updater IPC ===================
 ipcMain.handle('updater:check', async () => {

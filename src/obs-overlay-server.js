@@ -9,9 +9,12 @@ const MIME = {
 };
 
 class ObsOverlayServer {
-  constructor({ root, assetsRoot, port = 18181, token, onEffectEnded, onQueueEmpty, onLog }) {
+  constructor({ root, assetsRoot, userAssetsRoot, port = 18181, token, onEffectEnded, onQueueEmpty, onLog }) {
     this.root = root;
     this.assetsRoot = assetsRoot || path.join(root, 'assets');
+    // Thư mục assets ghi được (userData) — nơi chứa icon quà user tự tải về. Ưu tiên đọc ở đây
+    // trước khi rơi về bộ icon ship kèm app, để icon mới tải hiện realtime.
+    this.userAssetsRoot = userAssetsRoot || null;
     this.port = port;
     this.token = token || crypto.randomBytes(18).toString('hex');
     // Đổi mỗi lần mở app → overlay OBS phát hiện instance mới thì tự reload (khỏi bấm Reset OBS).
@@ -402,8 +405,13 @@ class ObsOverlayServer {
   _serveGiftIcon(reqUrl, res) {
     const typeid = decodeURIComponent(reqUrl.pathname.split('/')[2] || '');
     if (!/^\d+$/.test(typeid)) return this._reject(res, 404, 'icon not found');
-    const filePath = path.join(this.root, 'assets', 'gift-icons', `${typeid}.png`);
-    if (!fs.existsSync(filePath)) return this._reject(res, 404, 'icon not found');
+    // Khi đóng gói, `assets` KHÔNG nằm trong app.asar (chỉ ship qua extraResources → assetsRoot).
+    // Đọc từ assetsRoot (bộ icon ship kèm) + userAssetsRoot (icon user tải về), user dir trước.
+    const candidates = [];
+    if (this.userAssetsRoot) candidates.push(path.join(this.userAssetsRoot, 'gift-icons', `${typeid}.png`));
+    candidates.push(path.join(this.assetsRoot, 'gift-icons', `${typeid}.png`));
+    const filePath = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+    if (!filePath) return this._reject(res, 404, 'icon not found');
     res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400, immutable', 'X-Content-Type-Options': 'nosniff' });
     fs.createReadStream(filePath).pipe(res);
   }

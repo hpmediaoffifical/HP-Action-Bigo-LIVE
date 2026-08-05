@@ -62,6 +62,7 @@ contextBridge.exposeInMainWorld('bigo', {
 
   // App info
   appGetVersion: () => ipcRenderer.invoke('app:get-version'),
+  assetsBase: () => ipcRenderer.invoke('app:assets-base'),
   windowSizeLock: (locked) => ipcRenderer.invoke('app:window-size-lock', locked),
   windowSetPreset: (preset) => ipcRenderer.invoke('app:window-set-preset', preset),
 
