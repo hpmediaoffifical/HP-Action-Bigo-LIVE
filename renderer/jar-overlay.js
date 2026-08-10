@@ -91,10 +91,30 @@ function scaleToViewport() {
 
 function imageFor(src) {
   if (!src) return null;
-  if (images.has(src)) return images.get(src);
+  const now = performance.now();
+  const cached = images.get(src);
+  if (cached) {
+    if (cached.state === 'error') {
+      if (now < cached.retryAt) return cached.image;
+      images.delete(src);
+    } else {
+      return cached.image;
+    }
+  }
+
   const image = new Image();
+  const record = { image, state: 'loading', retryAt: 0 };
+  image.onload = () => {
+    record.state = 'ready';
+  };
+  image.onerror = () => {
+    if (record.state === 'error') return;
+    record.state = 'error';
+    // Nếu icon/file chưa kịp tồn tại lúc render đầu, thử lại sau một nhịp.
+    record.retryAt = performance.now() + 5000;
+  };
   image.src = src;
-  images.set(src, image);
+  images.set(src, record);
   return image;
 }
 
@@ -215,7 +235,7 @@ function makeGiftBody(g, x, y) {
     frictionStatic: 0.6,
     density: 0.0016,
   });
-  body.gm = { sz, img: imageFor(g.icon), name: g.name };
+  body.gm = { sz, src: g.icon, name: g.name };
   Body.setVelocity(body, { x: (Math.random() - 0.5) * 2, y: Math.random() * 2 + 1 });
   Composite.add(engine.world, body);
   bodies.push(body);
@@ -373,7 +393,7 @@ function removeBody(b) {
 
 function spawnBodyAt(icon, sz, x, y, vx, vy) {
   const body = Bodies.circle(x, y, sz / 2, { restitution: config.bounce, friction: clamp(0.15 + config.friction, 0, 0.9), frictionStatic: 0.6, density: 0.0016 });
-  body.gm = { sz, img: imageFor(icon), name: 'Quà' };
+  body.gm = { sz, src: icon, name: 'Quà' };
   Body.setVelocity(body, { x: vx || 0, y: vy || 0 });
   Composite.add(engine.world, body);
   bodies.push(body);
@@ -381,7 +401,7 @@ function spawnBodyAt(icon, sz, x, y, vx, vy) {
 }
 
 const waitMs = (ms) => new Promise(res => setTimeout(res, ms));
-function bodyIcon(b) { return b.gm?.img?.src || '/logo-hp.png'; }
+function bodyIcon(b) { return b.gm?.src || '/logo-hp.png'; }
 function insideJar(b, r) { const p = b.position; return p.x > r.x + r.w * SHAPE.bodyLeftX && p.x < r.x + r.w * SHAPE.bodyRightX && p.y > r.y + r.h * SHAPE.neckTopY && p.y < r.y + r.h * SHAPE.bodyBottomY; }
 function sample(arr, k) {
   const c = arr.slice();
@@ -757,7 +777,7 @@ function render() {
     ctx.save();
     ctx.translate(b.position.x, b.position.y);
     ctx.rotate(b.angle);
-    const img = m.img;
+    const img = imageFor(m.src);
     if (img?.complete && img.naturalWidth) ctx.drawImage(img, -m.sz / 2, -m.sz / 2, m.sz, m.sz);
     else {
       // Quà thiếu icon → hiện logo HP (bo tròn) thay vòng tròn 'G'.
